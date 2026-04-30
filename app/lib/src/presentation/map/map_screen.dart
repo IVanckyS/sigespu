@@ -23,6 +23,24 @@ final dangerFilterProvider = StateProvider<String>((ref) => 'all');
 final heatmapOnProvider = StateProvider<bool>((ref) => false);
 final dateRangeProvider = StateProvider<String>((ref) => '30');
 
+// Elementos creados por el usuario en esta sesión (en memoria)
+final userElementsProvider = StateProvider<List<ElementoMapa>>((ref) => []);
+
+// Todos los elementos: seed + usuario
+final allElementsProvider = Provider<List<ElementoMapa>>((ref) {
+  return [...kElementosSeed, ...ref.watch(userElementsProvider)];
+});
+
+// Polígonos dibujados por el usuario con su zona asociada
+final userPolygonsProvider =
+    StateProvider<List<({List<LatLng> points, ElementoMapa zona})>>((ref) => []);
+
+// Observaciones de funcionarios por sector del Plan Regulador
+final planReguladorObsProvider = StateProvider<Map<String, String>>((ref) => {});
+
+// Atribución de observaciones del Plan Regulador
+final planReguladorAttrProvider = StateProvider<Map<String, String>>((ref) => {});
+
 // ── MapScreen ─────────────────────────────────────────────────────────────────
 
 class MapScreen extends ConsumerWidget {
@@ -40,7 +58,7 @@ class MapScreen extends ConsumerWidget {
 
     // Filtrar elementos por fecha y capa
     final dateLimit = _dateLimit(dateRange);
-    final elementos = kElementosSeed.where((e) {
+    final elementos = ref.watch(allElementsProvider).where((e) {
       if (!activeLayers.contains(e.layerKey)) return false;
       if (dateLimit != null) {
         final d = DateTime.tryParse(e.fecha);

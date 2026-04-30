@@ -83,6 +83,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> register(String nombre, String email, String password) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'nombre': nombre, 'email': email, 'password': password}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        await _storage.write(key: 'access_token', value: data['access_token']);
+        await _storage.write(key: 'refresh_token', value: data['refresh_token']);
+        await _storage.write(key: 'user_info', value: jsonEncode(data['user']));
+        state = state.copyWith(isAuthenticated: true, isLoading: false, user: data['user']);
+        return true;
+      } else {
+        final data = jsonDecode(response.body);
+        state = state.copyWith(isLoading: false, error: data['error'] ?? 'Error al registrarse');
+        return false;
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Error de conexión con el servidor');
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
     await _storage.delete(key: 'access_token');

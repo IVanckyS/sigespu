@@ -12,6 +12,7 @@ import 'layers/custom_markers.dart';
 import 'widgets/add_element_modal.dart';
 import 'widgets/element_detail_sheet.dart';
 import 'widgets/zona_form_sheet.dart';
+import 'widgets/plan_regulador_sheet.dart';
 
 // ── Providers de estado del mapa ──────────────────────────────────────────────
 
@@ -162,8 +163,19 @@ class MapScreen extends ConsumerWidget {
                         },
                       ),
                     ),
-                  if (activeLayers.contains('plan_regulador'))
+                  if (activeLayers.contains('plan_regulador')) ...[
                     PolygonLayer(polygons: PlanReguladorLayer.buildPolygons()),
+                    MarkerLayer(
+                      markers: PlanReguladorLayer.buildCentroidMarkers(
+                        (sector) => showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => PlanReguladorSheet(sector: sector),
+                        ),
+                      ),
+                    ),
+                  ],
                   if (isDrawing && drawingPoints.length >= 3)
                     PolygonLayer(polygons: [
                       Polygon(

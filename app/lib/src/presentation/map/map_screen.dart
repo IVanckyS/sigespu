@@ -10,6 +10,7 @@ import '../../data/providers.dart';
 import 'layers/plan_regulador_layer.dart';
 import 'layers/custom_markers.dart';
 import 'widgets/element_detail_sheet.dart';
+import 'widgets/zona_form_sheet.dart';
 
 // ── Providers de estado del mapa ──────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ class MapScreen extends ConsumerWidget {
       return true;
     }).toList();
 
+    final userPolygons = ref.watch(userPolygonsProvider);
     final userElements = ref.watch(userElementsProvider);
     final List<Marker> markers = elementos.map((e) {
       final isPending = userElements.any((u) => u.id == e.id);
@@ -170,6 +172,15 @@ class MapScreen extends ConsumerWidget {
                         borderStrokeWidth: 2,
                       ),
                     ]),
+                  if (userPolygons.isNotEmpty)
+                    PolygonLayer(
+                      polygons: userPolygons.map((p) => Polygon(
+                        points: p.points,
+                        color: AppTheme.redDanger.withValues(alpha: 0.2),
+                        borderColor: AppTheme.redDanger,
+                        borderStrokeWidth: 2,
+                      )).toList(),
+                    ),
                   MarkerLayer(markers: markers),
                 ],
               ),
@@ -252,16 +263,17 @@ class MapScreen extends ConsumerWidget {
     return _ListHeatMapDataSource(dataList);
   }
 
-  void _showGuardarZona(BuildContext context, WidgetRef ref, List<LatLng> points) {
-    ref.read(isDrawingModeProvider.notifier).state = false;
-    ref.read(drawingPointsProvider.notifier).state = [];
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Zona guardada con ${points.length} puntos'),
-        backgroundColor: AppTheme.greenSuccess,
-      ),
-    );
-  }
+}
+
+void _showGuardarZona(BuildContext context, WidgetRef ref, List<LatLng> points) {
+  ref.read(isDrawingModeProvider.notifier).state = false;
+  ref.read(drawingPointsProvider.notifier).state = [];
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => ZonaFormSheet(points: points),
+  );
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -698,13 +710,7 @@ class _FabGroup extends StatelessWidget {
           backgroundColor: canFinish ? AppTheme.redDanger : AppTheme.stone400,
           foregroundColor: Colors.white,
           onPressed: canFinish
-              ? () {
-                  ref.read(isDrawingModeProvider.notifier).state = false;
-                  ref.read(drawingPointsProvider.notifier).state = [];
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Zona guardada con ${drawingPoints.length} puntos'), backgroundColor: AppTheme.greenSuccess),
-                  );
-                }
+              ? () => _showGuardarZona(context, ref, drawingPoints)
               : null,
           icon: const Icon(Icons.check, size: 18),
           label: const Text('Guardar Zona'),

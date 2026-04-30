@@ -9,6 +9,7 @@ import '../../data/seed_data.dart';
 import '../../data/providers.dart';
 import 'layers/plan_regulador_layer.dart';
 import 'layers/custom_markers.dart';
+import 'widgets/add_element_modal.dart';
 import 'widgets/element_detail_sheet.dart';
 import 'widgets/zona_form_sheet.dart';
 
@@ -754,31 +755,8 @@ class _FabGroup extends StatelessWidget {
     showModalBottomSheet(
       context: ctx,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, left: 24, right: 24, top: 24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Agregar elemento', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.stone900)),
-          const SizedBox(height: 8),
-          const Text('Selecciona el tipo de elemento a registrar en el mapa.', style: TextStyle(fontSize: 13, color: AppTheme.stone600)),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8, runSpacing: 8,
-            children: ['Reporte de robo', 'Vandalismo', 'Accidente', 'Centro de acopio', 'Zona de peligro', 'Incidente urbano'].map((t) =>
-              ActionChip(
-                label: Text(t, style: const TextStyle(fontSize: 12)),
-                backgroundColor: AppTheme.stone100,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Tipo seleccionado: $t'), backgroundColor: AppTheme.orange600));
-                },
-              ),
-            ).toList(),
-          ),
-          const SizedBox(height: 24),
-        ]),
-      ),
+      backgroundColor: Colors.transparent,
+      builder: (_) => const AddElementModal(),
     );
   }
 }

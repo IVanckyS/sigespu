@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Paleta oficial SIGESPU Lota (definida en CLAUDE.md)
+  // Paleta oficial SIGESPU Lota (definida en CLAUDE.md y Design System)
   static const orange600 = Color(0xFFEA580C);
   static const orange700 = Color(0xFFC2410C);
+  static const orange500 = Color(0xFFF97316);
   static const orange100 = Color(0xFFFFEDD5);
   static const orange50  = Color(0xFFFFF7ED);
 
@@ -23,7 +24,20 @@ class AppTheme {
 
   static const greenSuccess = Color(0xFF15803D);
   static const redDanger    = Color(0xFFB91C1C);
-  static const amberWarning = Color(0xFFCA8A04);
+  static const amberWarning = Color(0xFFD97706);
+  static const infoBlue     = Color(0xFF1D4ED8);
+
+  // Colores específicos de tipos (Design System)
+  static const tSede        = Color(0xFF16A34A);
+  static const tRobo        = Color(0xFFDC2626);
+  static const tVandalismo  = Color(0xFF7C3AED);
+  static const tLuminaria   = Color(0xFFCA8A04);
+  static const tCamara      = Color(0xFF6D28D9);
+  static const tArbol       = Color(0xFF65A30D);
+  static const tSinLuz      = Color(0xFF374151);
+  static const tSocavon     = Color(0xFF92400E);
+  static const tAgua        = Color(0xFF0284C7);
+  static const tBasural     = Color(0xFF78350F);
 
   static ThemeData get lightTheme {
     return ThemeData(

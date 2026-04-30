@@ -95,24 +95,28 @@ class CustomMarkers {
   }
 
   static Color getColorForTipo(String tipo) {
-    if (tipo.startsWith('reporte_')) return AppTheme.redDanger;
     switch (tipo) {
       case 'centro_acopio': return AppTheme.orange600;
-      case 'sede_comunitaria': return AppTheme.greenSuccess;
+      case 'sede_comunitaria': return AppTheme.tSede;
       case 'infraestructura': return AppTheme.blue800;
       case 'zona_peligro': return AppTheme.redDanger;
       case 'patente': return AppTheme.amberWarning;
-      case 'luminaria': return Colors.yellow.shade700;
-      case 'camara_cctv': return Colors.purple.shade600;
-      case 'arbol_caido': return Colors.green.shade800;
-      case 'poste_caido': return AppTheme.orange600;
-      case 'sector_sin_luz': return AppTheme.stone800;
-      case 'cable_colgando': return AppTheme.orange700;
-      case 'semaforo_dañado': return AppTheme.redDanger;
-      case 'socavon': return Colors.brown.shade700;
-      case 'fuga_agua': return Colors.blue.shade600;
-      case 'microbasural': return Colors.brown.shade800;
-      default: return AppTheme.stone600;
+      case 'reporte_robo': return AppTheme.tRobo;
+      case 'reporte_vandalismo': return AppTheme.tVandalismo;
+      case 'reporte_accidente': return AppTheme.orange500;
+      case 'luminaria': return AppTheme.tLuminaria;
+      case 'camara_cctv': return AppTheme.tCamara;
+      case 'arbol_caido': return AppTheme.tArbol;
+      case 'poste_caido': return AppTheme.orange700;
+      case 'sector_sin_luz': return AppTheme.tSinLuz;
+      case 'cable_colgando': return AppTheme.orange600;
+      case 'semaforo_dañado': return AppTheme.tRobo;
+      case 'socavon': return AppTheme.tSocavon;
+      case 'fuga_agua': return AppTheme.tAgua;
+      case 'microbasural': return AppTheme.tBasural;
+      default:
+        if (tipo.startsWith('reporte_')) return AppTheme.redDanger;
+        return AppTheme.stone600;
     }
   }
 }

@@ -11,3 +11,17 @@ INSERT INTO usuarios (
   true,
   NOW()
 ) ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO usuarios (
+  id, email, nombre, password_hash, nivel_acceso,
+  solicitud_operativo, activo, created_at
+) VALUES (
+  uuid_generate_v4(),
+  'admin@lota.cl',
+  'Administrador del Sistema',
+  '$2a$12$Vz7RTvLmIubAynwgWt8gjezaNiui8j21dLkxxt6BMXZjuZQY17QES',
+  'director',
+  NULL,
+  true,
+  NOW()
+) ON CONFLICT (email) DO NOTHING;

@@ -1,0 +1,21 @@
+name: scraper
+description: SIGESPU Lota Scraper Worker
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  http: ^1.2.0
+  html: ^0.15.4
+  postgres: ^3.1.1
+  redis: ^3.0.0
+  cron: ^0.6.0
+  logger: ^2.0.2
+  uuid: ^4.2.1
+  shared:
+    path: ../shared
+
+dev_dependencies:
+  lints: ^3.0.0

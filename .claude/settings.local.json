@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:8080/api/health)",
+      "Bash(curl -s -X POST http://localhost:8080/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"director@lota.cl\",\"password\":\"Admin2026!\"}')",
+      "Bash(curl -s -X OPTIONS http://localhost:8080/auth/login -H \"Origin: http://localhost:4500\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: Content-Type\" -v)",
+      "Bash(docker exec *)",
+      "Bash(node -e \"const bcrypt = require\\('bcrypt'\\); bcrypt.hash\\('Admin2026!', 12\\).then\\(h => console.log\\(h\\)\\);\")",
+      "Bash(python3 -c \"import bcrypt; print\\(bcrypt.hashpw\\(b'Admin2026!', bcrypt.gensalt\\(12\\)\\).decode\\(\\)\\)\")",
+      "PowerShell(docker exec sigespu-backend-1 sh -c 'find /usr -name dart -type f 2>/dev/null | head -3')",
+      "PowerShell(docker exec sigespu-backend-1 ls /app/bin/)",
+      "Bash(dart --version)",
+      "Bash(where dart *)",
+      "Bash(dart pub *)",
+      "Bash(dart run -e ' *)",
+      "Bash(dart run *)",
+      "PowerShell(docker exec sigespu-postgres-1 psql -U sigespu_user -d sigespu -c \"UPDATE usuarios SET password_hash = '`$2a`$12`$Vz7RTvLmIubAynwgWt8gjezaNiui8j21dLkxxt6BMXZjuZQY17QES' WHERE email = 'director@lota.cl' RETURNING email, nivel_acceso;\")",
+      "Bash(curl -s -X OPTIONS http://localhost:8080/auth/login -H \"Origin: http://localhost:4500\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: Content-Type\" -D -)",
+      "Bash(curl -s -X POST http://localhost:8080/auth/login -H \"Content-Type: application/json\" -H \"Origin: http://localhost:4500\" -d '{\"email\":\"director@lota.cl\",\"password\":\"Admin2026!\"}' -D -)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

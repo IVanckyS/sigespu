@@ -1,0 +1,9 @@
+.dart_tool/
+.packages
+build/
+.env
+*.iml
+.idea/
+.vscode/
+node_modules/
+*.sqlite

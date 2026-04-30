@@ -1,0 +1,2859 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>SIGESPU Lota · Sistema de Información Geoespacial de Seguridad Pública</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --orange-50:#FFF7ED; --orange-100:#FFEDD5; --orange-200:#FED7AA;
+  --orange-500:#F97316; --orange-600:#EA580C; --orange-700:#C2410C; --orange-900:#7C2D12;
+  --blue-800:#1E3A8A; --blue-900:#1E293B;
+  --stone-50:#FAFAF9; --stone-100:#F5F5F4; --stone-200:#E7E5E4; --stone-300:#D6D3D1;
+  --stone-400:#A8A29E; --stone-500:#78716C; --stone-600:#57534E; --stone-700:#44403C;
+  --stone-800:#292524; --stone-900:#1C1917;
+  --green-100:#DCFCE7; --green-600:#16A34A; --green-700:#15803D;
+  --red-100:#FEE2E2; --red-500:#EF4444; --red-600:#DC2626; --red-700:#B91C1C;
+  --amber-100:#FEF3C7; --amber-500:#F59E0B; --amber-600:#D97706;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--stone-50);
+  color: var(--stone-900);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+.hidden { display: none !important; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, select, textarea { font-family: inherit; font-size: 14px; }
+
+/* ================ LOGIN ================ */
+#login {
+  position: fixed; inset: 0;
+  background: linear-gradient(135deg, #FFF7ED 0%, #FFFFFF 60%, #F5F5F4 100%);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 1rem;
+}
+.login-card {
+  width: 100%; max-width: 420px;
+  background: white;
+  border: 1px solid var(--stone-200);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  box-shadow: var(--shadow-lg);
+}
+.login-header { text-align: center; margin-bottom: 2rem; }
+.brand-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 1.25rem; }
+.logo-muni, .logo-sigespu { width: 48px; height: 48px; }
+.brand-divider { width: 1px; height: 36px; background: var(--stone-200); }
+.login-title {
+  font-size: 22px; font-weight: 700; color: var(--stone-900); margin-bottom: 4px;
+  letter-spacing: -0.02em;
+}
+.login-subtitle { font-size: 13px; color: var(--stone-500); }
+.login-muni { font-size: 11px; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 6px; }
+.login-form { display: flex; flex-direction: column; gap: 1rem; }
+.input-group { display: flex; flex-direction: column; gap: 6px; }
+.input-group label { font-size: 12px; font-weight: 500; color: var(--stone-700); }
+.input-group input {
+  padding: 10px 12px; border: 1px solid var(--stone-200); border-radius: 8px;
+  background: var(--stone-50); transition: all 0.15s;
+}
+.input-group input:focus {
+  outline: none; border-color: var(--orange-500);
+  background: white; box-shadow: 0 0 0 3px var(--orange-100);
+}
+.btn-login {
+  background: var(--orange-600); color: white;
+  padding: 12px; border-radius: 8px; font-weight: 600; font-size: 14px;
+  transition: all 0.15s; margin-top: 4px;
+}
+.btn-login:hover { background: var(--orange-700); }
+.demo-accounts {
+  margin-top: 1.25rem; padding-top: 1.25rem;
+  border-top: 1px dashed var(--stone-200);
+  font-size: 12px; color: var(--stone-500);
+}
+.demo-accounts strong { color: var(--stone-700); font-weight: 600; display: block; margin-bottom: 6px; }
+.demo-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 10px; border-radius: 6px; margin-top: 4px;
+  background: var(--stone-50); color: var(--stone-700);
+  transition: all 0.15s; font-size: 12px; text-align: left;
+}
+.demo-btn:hover { background: var(--orange-50); color: var(--orange-700); }
+.demo-btn .role { margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--stone-200); text-transform: uppercase; letter-spacing: 0.05em; }
+.demo-btn.director .role { background: var(--blue-800); color: white; }
+.demo-btn.funcionario .role { background: var(--orange-600); color: white; }
+
+/* ================ APP SHELL ================ */
+#app { display: none; flex-direction: column; height: 100vh; }
+#app.active { display: flex; }
+
+.header {
+  background: white;
+  border-bottom: 1px solid var(--stone-200);
+  padding: 10px 16px;
+  display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+  height: 60px;
+}
+.header-brand { display: flex; align-items: center; gap: 10px; }
+.header-brand .logo-muni, .header-brand .logo-sigespu { width: 36px; height: 36px; }
+.header-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+.header-brand-text .primary {
+  font-weight: 700; font-size: 15px; color: var(--stone-900); letter-spacing: -0.01em;
+}
+.header-brand-text .secondary {
+  font-size: 10px; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.08em;
+}
+
+.mode-switcher {
+  display: flex; background: var(--stone-100); border-radius: 10px; padding: 3px;
+  margin-left: 1.5rem;
+}
+.mode-btn {
+  padding: 7px 14px; border-radius: 7px; font-size: 13px; font-weight: 500;
+  color: var(--stone-600); transition: all 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.mode-btn:hover { color: var(--stone-900); }
+.mode-btn.active { background: white; color: var(--orange-700); box-shadow: var(--shadow-sm); }
+.mode-btn svg { width: 15px; height: 15px; }
+
+.header-actions {
+  margin-left: auto; display: flex; align-items: center; gap: 10px;
+}
+.conn-status {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 16px;
+  font-size: 11px; font-weight: 600;
+  transition: all 0.2s;
+}
+.conn-status.online { background: var(--green-100); color: var(--green-700); }
+.conn-status.offline { background: var(--amber-100); color: var(--amber-600); }
+.conn-status.syncing { background: var(--orange-100); color: var(--orange-700); }
+.conn-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.conn-status.online .conn-dot { animation: pulse 2s infinite; }
+.conn-status.syncing .conn-dot { animation: spin 1s linear infinite; border-radius: 2px; transform-origin: center; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.btn-export {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 8px; font-size: 12px; font-weight: 500;
+  background: var(--stone-100); color: var(--stone-700);
+  transition: all 0.15s;
+}
+.btn-export:hover { background: var(--orange-100); color: var(--orange-700); }
+.btn-export svg { width: 14px; height: 14px; }
+
+.btn-toggle-conn {
+  padding: 6px 10px; border-radius: 6px; font-size: 11px;
+  background: transparent; color: var(--stone-500); border: 1px dashed var(--stone-300);
+  transition: all 0.15s;
+}
+.btn-toggle-conn:hover { color: var(--stone-700); border-color: var(--stone-400); }
+
+.user-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px 5px 5px; border-radius: 20px;
+  background: var(--stone-100);
+}
+.user-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--blue-800); color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+}
+.user-chip.funcionario .user-avatar { background: var(--orange-600); }
+.user-info { line-height: 1.15; display: flex; flex-direction: column; }
+.user-info .name { font-size: 12px; font-weight: 600; color: var(--stone-900); }
+.user-info .role { font-size: 10px; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.btn-logout {
+  padding: 6px; border-radius: 6px; color: var(--stone-500); transition: all 0.15s;
+}
+.btn-logout:hover { color: var(--red-600); background: var(--red-100); }
+
+/* ================ OFFLINE BANNER ================ */
+.offline-banner {
+  background: var(--amber-100); color: var(--amber-600);
+  padding: 8px 16px; font-size: 12px; font-weight: 500;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid rgba(217,119,6,0.2);
+}
+.offline-banner.hidden { display: none !important; }
+.offline-banner svg { width: 14px; height: 14px; flex-shrink: 0; }
+.offline-banner .pending-count { margin-left: auto; font-weight: 700; }
+
+/* ================ MAIN LAYOUT ================ */
+.main { flex: 1; display: flex; overflow: hidden; position: relative; }
+
+/* ============ VIEW: MAP ============ */
+.view-map { display: flex; flex: 1; overflow: hidden; }
+.view-map.hidden { display: none; }
+
+.sidebar-layers {
+  width: 280px; background: white;
+  border-right: 1px solid var(--stone-200);
+  overflow-y: auto; flex-shrink: 0;
+  display: flex; flex-direction: column;
+}
+.sidebar-section { padding: 14px 16px; border-bottom: 1px solid var(--stone-100); }
+.sidebar-section h3 {
+  font-size: 10px; font-weight: 700; color: var(--stone-500);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sidebar-section h3 .count {
+  font-size: 10px; font-weight: 600; color: var(--stone-400); letter-spacing: 0;
+}
+
+.layer-toggle {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px; border-radius: 6px;
+  margin-bottom: 2px; transition: all 0.1s;
+  cursor: pointer; user-select: none;
+}
+.layer-toggle:hover { background: var(--stone-50); }
+.layer-toggle.active { background: var(--orange-50); }
+.layer-icon {
+  width: 28px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.layer-icon svg { width: 15px; height: 15px; }
+.layer-name { font-size: 12.5px; font-weight: 500; color: var(--stone-800); flex: 1; }
+.layer-count { font-size: 10.5px; color: var(--stone-500); background: var(--stone-100); padding: 1px 7px; border-radius: 10px; font-weight: 600; }
+.layer-toggle.active .layer-count { background: var(--orange-200); color: var(--orange-700); }
+
+.switch {
+  position: relative; width: 28px; height: 16px;
+  background: var(--stone-300); border-radius: 10px;
+  transition: all 0.2s; flex-shrink: 0;
+}
+.switch::after {
+  content: ''; position: absolute;
+  top: 2px; left: 2px; width: 12px; height: 12px;
+  background: white; border-radius: 50%;
+  transition: all 0.2s;
+}
+.layer-toggle.active .switch { background: var(--orange-600); }
+.layer-toggle.active .switch::after { left: 14px; }
+
+.filter-chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.filter-chip {
+  padding: 4px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 500;
+  background: var(--stone-100); color: var(--stone-600);
+  transition: all 0.15s; border: 1px solid transparent;
+}
+.filter-chip:hover { background: var(--stone-200); }
+.filter-chip.active {
+  background: var(--orange-600); color: white;
+}
+
+.heatmap-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; background: var(--stone-50);
+  border-radius: 8px; margin-top: 6px;
+  border: 1px solid var(--stone-200);
+}
+.heatmap-toggle .label { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; color: var(--stone-800); }
+.heatmap-toggle .label svg { width: 16px; height: 16px; color: var(--orange-600); }
+
+.date-filter { display: flex; gap: 6px; align-items: center; font-size: 11.5px; color: var(--stone-600); }
+.date-filter select {
+  flex: 1; padding: 5px 8px; border: 1px solid var(--stone-200);
+  border-radius: 6px; background: white; font-size: 11.5px;
+}
+
+/* ============ MAP ============ */
+.map-container { flex: 1; position: relative; }
+#map { width: 100%; height: 100%; background: var(--stone-100); }
+
+.map-fab-group {
+  position: absolute; right: 16px; bottom: 24px;
+  display: flex; flex-direction: column; gap: 10px; z-index: 500;
+}
+.fab {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: white; border: 1px solid var(--stone-200);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--stone-700); box-shadow: var(--shadow);
+  transition: all 0.15s;
+}
+.fab:hover { background: var(--stone-50); color: var(--orange-600); }
+.fab.primary {
+  width: 56px; height: 56px; background: var(--orange-600); color: white;
+  border-color: var(--orange-600);
+}
+.fab.primary:hover { background: var(--orange-700); transform: scale(1.05); }
+.fab svg { width: 20px; height: 20px; }
+.fab.primary svg { width: 24px; height: 24px; }
+
+.map-info-panel {
+  position: absolute; top: 16px; left: 16px; z-index: 500;
+  background: white; border-radius: 10px; padding: 10px 14px;
+  border: 1px solid var(--stone-200); box-shadow: var(--shadow-sm);
+  font-size: 12px; color: var(--stone-600);
+  display: flex; align-items: center; gap: 10px;
+}
+.map-info-panel .coord { font-family: 'Inter', monospace; color: var(--stone-900); font-weight: 600; }
+.map-info-panel .count-badge {
+  background: var(--orange-100); color: var(--orange-700);
+  padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 11px;
+}
+
+.legend-panel {
+  position: absolute; bottom: 24px; left: 16px; z-index: 500;
+  background: white; border-radius: 10px; padding: 10px 14px;
+  border: 1px solid var(--stone-200); box-shadow: var(--shadow-sm);
+  min-width: 180px;
+}
+.legend-panel .title { font-size: 10px; font-weight: 700; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+.legend-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--stone-700); margin-bottom: 4px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ============ VIEW: RESUMEN ============ */
+.view-resumen {
+  flex: 1; overflow-y: auto; padding: 1.5rem;
+  background: var(--stone-50);
+}
+.view-resumen.hidden { display: none; }
+.resumen-title {
+  font-size: 20px; font-weight: 700; color: var(--stone-900);
+  margin-bottom: 4px; letter-spacing: -0.02em;
+}
+.resumen-subtitle { font-size: 13px; color: var(--stone-500); margin-bottom: 1.5rem; }
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px; margin-bottom: 1.5rem;
+}
+.kpi-card {
+  background: white; border: 1px solid var(--stone-200);
+  border-radius: 12px; padding: 1.25rem;
+  display: flex; flex-direction: column; gap: 4px;
+  position: relative; overflow: hidden;
+}
+.kpi-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 3px; background: var(--orange-500);
+}
+.kpi-card.blue::before { background: var(--blue-800); }
+.kpi-card.red::before { background: var(--red-500); }
+.kpi-card.amber::before { background: var(--amber-500); }
+.kpi-card.green::before { background: var(--green-600); }
+
+.kpi-label { font-size: 11px; font-weight: 600; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.06em; }
+.kpi-value {
+  font-size: 32px; font-weight: 700; color: var(--stone-900);
+  letter-spacing: -0.03em; line-height: 1.1;
+}
+.kpi-trend { font-size: 11.5px; color: var(--green-700); font-weight: 500; display: flex; align-items: center; gap: 4px; }
+.kpi-trend.negative { color: var(--red-600); }
+.kpi-trend svg { width: 12px; height: 12px; }
+.kpi-icon {
+  position: absolute; top: 16px; right: 16px;
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--orange-50); color: var(--orange-600);
+  display: flex; align-items: center; justify-content: center;
+}
+.kpi-icon svg { width: 16px; height: 16px; }
+.kpi-card.blue .kpi-icon { background: #DBEAFE; color: var(--blue-800); }
+.kpi-card.red .kpi-icon { background: var(--red-100); color: var(--red-600); }
+.kpi-card.amber .kpi-icon { background: var(--amber-100); color: var(--amber-600); }
+.kpi-card.green .kpi-icon { background: var(--green-100); color: var(--green-700); }
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px; margin-bottom: 12px;
+}
+.dashboard-card {
+  background: white; border: 1px solid var(--stone-200);
+  border-radius: 12px; padding: 1.25rem;
+}
+.dashboard-card h3 {
+  font-size: 14px; font-weight: 700; color: var(--stone-900);
+  margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;
+}
+.dashboard-card h3 .subtitle { font-size: 11px; color: var(--stone-500); font-weight: 500; }
+
+.chart-canvas { height: 220px; width: 100%; position: relative; }
+
+.sector-list { display: flex; flex-direction: column; gap: 8px; }
+.sector-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px; border-radius: 8px; background: var(--stone-50);
+}
+.sector-code {
+  font-weight: 700; color: white; padding: 4px 8px;
+  border-radius: 6px; font-size: 11px; min-width: 36px; text-align: center;
+}
+.sector-info { flex: 1; line-height: 1.2; }
+.sector-info .name { font-size: 12px; font-weight: 600; color: var(--stone-800); }
+.sector-info .stats { font-size: 10.5px; color: var(--stone-500); }
+.sector-bar {
+  width: 60px; height: 6px; background: var(--stone-200); border-radius: 3px; overflow: hidden;
+}
+.sector-bar-fill { height: 100%; background: var(--orange-600); border-radius: 3px; }
+
+.recent-list { display: flex; flex-direction: column; gap: 8px; }
+.recent-item {
+  display: flex; gap: 10px; padding: 10px;
+  border: 1px solid var(--stone-100); border-radius: 8px;
+  transition: all 0.15s; cursor: pointer;
+}
+.recent-item:hover { background: var(--stone-50); border-color: var(--stone-200); }
+.recent-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.recent-icon svg { width: 16px; height: 16px; }
+.recent-body { flex: 1; line-height: 1.25; min-width: 0; }
+.recent-body .title { font-size: 12.5px; font-weight: 600; color: var(--stone-900); margin-bottom: 2px; }
+.recent-body .meta { font-size: 10.5px; color: var(--stone-500); display: flex; gap: 8px; }
+.recent-tag {
+  font-size: 9.5px; padding: 1px 6px; border-radius: 8px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+/* ============ VIEW: TABLA ============ */
+.view-tabla {
+  flex: 1; overflow: hidden; display: flex; flex-direction: column;
+  background: var(--stone-50); padding: 1.25rem;
+}
+.view-tabla.hidden { display: none; }
+
+.tabla-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 1rem; flex-wrap: wrap; gap: 12px;
+}
+.tabla-header h2 {
+  font-size: 20px; font-weight: 700; color: var(--stone-900);
+  letter-spacing: -0.02em;
+}
+
+.tabla-filters {
+  background: white; border: 1px solid var(--stone-200);
+  border-radius: 10px; padding: 12px; margin-bottom: 12px;
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+}
+.tabla-filters .group { display: flex; align-items: center; gap: 6px; }
+.tabla-filters label { font-size: 11px; font-weight: 600; color: var(--stone-600); text-transform: uppercase; letter-spacing: 0.05em; }
+.tabla-filters select, .tabla-filters input {
+  padding: 6px 10px; border: 1px solid var(--stone-200);
+  border-radius: 6px; background: var(--stone-50); font-size: 12.5px;
+}
+.search-box {
+  position: relative; flex: 1; min-width: 200px;
+}
+.search-box input { padding-left: 30px; width: 100%; }
+.search-box svg { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--stone-400); }
+
+.results-count {
+  font-size: 11.5px; color: var(--stone-600); margin-left: auto;
+}
+.results-count strong { color: var(--orange-700); font-weight: 700; }
+
+.tabla-wrapper {
+  flex: 1; overflow: auto;
+  background: white; border: 1px solid var(--stone-200); border-radius: 10px;
+}
+table.data-table {
+  width: 100%; border-collapse: collapse; font-size: 12.5px;
+}
+table.data-table thead {
+  background: var(--stone-50); position: sticky; top: 0; z-index: 10;
+}
+table.data-table th {
+  text-align: left; padding: 11px 12px; font-weight: 600;
+  color: var(--stone-600); border-bottom: 1px solid var(--stone-200);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  white-space: nowrap; cursor: pointer; user-select: none;
+}
+table.data-table th:hover { color: var(--stone-900); background: var(--stone-100); }
+table.data-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--stone-100); color: var(--stone-800);
+  vertical-align: middle;
+}
+table.data-table tr:hover td { background: var(--orange-50); }
+.badge-inline {
+  display: inline-block; font-size: 10.5px; font-weight: 600;
+  padding: 2px 8px; border-radius: 10px; letter-spacing: 0.02em;
+}
+
+/* ============ ADD MODAL ============ */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(28,25,23,0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2000; padding: 1rem;
+}
+.modal-backdrop.hidden { display: none; }
+.modal {
+  background: white; border-radius: 14px;
+  width: 100%; max-width: 600px; max-height: 88vh;
+  overflow: hidden; display: flex; flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+.modal-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--stone-200);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-header h3 { font-size: 16px; font-weight: 700; color: var(--stone-900); letter-spacing: -0.01em; }
+.modal-header .close { padding: 4px; border-radius: 6px; color: var(--stone-500); }
+.modal-header .close:hover { color: var(--stone-900); background: var(--stone-100); }
+.modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+.modal-footer {
+  padding: 14px 20px; border-top: 1px solid var(--stone-200);
+  display: flex; justify-content: flex-end; gap: 8px;
+  background: var(--stone-50);
+}
+.btn-primary {
+  background: var(--orange-600); color: white;
+  padding: 9px 18px; border-radius: 8px; font-weight: 600; font-size: 13px;
+  transition: all 0.15s;
+}
+.btn-primary:hover { background: var(--orange-700); }
+.btn-secondary {
+  background: white; border: 1px solid var(--stone-200); color: var(--stone-700);
+  padding: 9px 18px; border-radius: 8px; font-weight: 500; font-size: 13px;
+  transition: all 0.15s;
+}
+.btn-secondary:hover { background: var(--stone-100); }
+
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.type-card {
+  padding: 14px 10px; border: 1px solid var(--stone-200);
+  border-radius: 10px; background: white;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: all 0.15s; cursor: pointer;
+  text-align: center;
+}
+.type-card:hover { border-color: var(--orange-500); background: var(--orange-50); }
+.type-card.selected { border-color: var(--orange-600); background: var(--orange-50); border-width: 2px; }
+.type-card-icon {
+  width: 36px; height: 36px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.type-card-icon svg { width: 18px; height: 18px; }
+.type-card-name { font-size: 11px; font-weight: 600; color: var(--stone-800); line-height: 1.25; }
+
+.form-section { margin-bottom: 14px; }
+.form-section label {
+  display: block; font-size: 11px; font-weight: 600;
+  color: var(--stone-600); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.form-section input, .form-section textarea, .form-section select {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--stone-200);
+  border-radius: 7px; background: var(--stone-50); transition: all 0.15s;
+}
+.form-section input:focus, .form-section textarea:focus, .form-section select:focus {
+  outline: none; border-color: var(--orange-500); background: white;
+  box-shadow: 0 0 0 3px var(--orange-100);
+}
+.form-section textarea { resize: vertical; min-height: 72px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.gps-capture {
+  background: var(--stone-50); border: 1px dashed var(--stone-300);
+  border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px;
+}
+.gps-capture svg { width: 18px; height: 18px; color: var(--orange-600); }
+.gps-capture .text { flex: 1; }
+.gps-capture .label { font-size: 11px; color: var(--stone-500); text-transform: uppercase; letter-spacing: 0.04em; }
+.gps-capture .coords { font-size: 13px; font-weight: 600; color: var(--stone-900); font-family: 'Inter', monospace; }
+
+.risk-scale { display: flex; gap: 4px; }
+.risk-level {
+  flex: 1; padding: 8px 4px; border: 1px solid var(--stone-200);
+  border-radius: 6px; font-size: 11px; font-weight: 600; text-align: center;
+  cursor: pointer; transition: all 0.1s; background: white; color: var(--stone-500);
+}
+.risk-level:hover { border-color: var(--stone-400); }
+.risk-level.selected { color: white; }
+.risk-level.selected[data-level="1"] { background: #86EFAC; border-color: #22C55E; color: #14532D; }
+.risk-level.selected[data-level="2"] { background: #FDE68A; border-color: #EAB308; color: #713F12; }
+.risk-level.selected[data-level="3"] { background: #FDBA74; border-color: #F97316; color: #7C2D12; }
+.risk-level.selected[data-level="4"] { background: #FCA5A5; border-color: #EF4444; color: #7F1D1D; }
+.risk-level.selected[data-level="5"] { background: #B91C1C; border-color: #7F1D1D; color: white; }
+
+.suggestion-card {
+  background: linear-gradient(135deg, var(--orange-50) 0%, #FFFBEB 100%);
+  border: 1px solid var(--orange-200); border-radius: 10px; padding: 12px;
+  margin-bottom: 14px;
+}
+.suggestion-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  font-size: 11px; font-weight: 700; color: var(--orange-700);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.suggestion-header svg { width: 14px; height: 14px; }
+.suggestion-data { font-size: 12.5px; color: var(--stone-800); margin-bottom: 8px; }
+.suggestion-data strong { font-weight: 600; color: var(--stone-900); }
+.suggestion-data .meta { font-size: 11px; color: var(--stone-600); margin-top: 2px; }
+.suggestion-actions { display: flex; gap: 6px; }
+.btn-mini {
+  padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  transition: all 0.15s;
+}
+.btn-mini.primary { background: var(--orange-600); color: white; }
+.btn-mini.primary:hover { background: var(--orange-700); }
+.btn-mini.secondary { background: white; border: 1px solid var(--stone-200); color: var(--stone-700); }
+.btn-mini.secondary:hover { background: var(--stone-100); }
+
+/* ============ EXPORT PDF PREVIEW ============ */
+.pdf-preview {
+  width: 100%; max-width: 760px; margin: 0 auto;
+  background: white; padding: 2rem;
+  font-family: 'Inter', sans-serif; color: var(--stone-900);
+  font-size: 11px;
+}
+.pdf-preview .pdf-header {
+  display: flex; align-items: center; gap: 12px;
+  padding-bottom: 12px; border-bottom: 2px solid var(--orange-600);
+  margin-bottom: 16px;
+}
+.pdf-preview .pdf-header .logo { width: 42px; height: 42px; }
+.pdf-preview .pdf-header h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.pdf-preview .pdf-header .sub { font-size: 9px; color: var(--stone-600); text-transform: uppercase; letter-spacing: 0.05em; }
+.pdf-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 10px; margin-bottom: 16px; padding: 8px 12px; background: var(--stone-50); border-radius: 6px; }
+.pdf-meta strong { display: block; color: var(--stone-500); font-size: 8px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+.pdf-preview h2 { font-size: 12px; font-weight: 700; margin: 16px 0 8px; color: var(--orange-700); }
+.pdf-preview table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.pdf-preview table th { text-align: left; padding: 6px 8px; background: var(--stone-100); border-bottom: 1px solid var(--stone-300); font-weight: 600; }
+.pdf-preview table td { padding: 5px 8px; border-bottom: 1px solid var(--stone-200); }
+.pdf-preview .pdf-footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid var(--stone-300); font-size: 9px; color: var(--stone-500); display: flex; justify-content: space-between; }
+
+/* ============ LEAFLET CUSTOM ============ */
+.leaflet-popup-content-wrapper { border-radius: 10px; box-shadow: var(--shadow-lg); }
+.leaflet-popup-content { margin: 12px 14px; font-family: 'Inter', sans-serif; font-size: 12.5px; }
+.leaflet-popup-content h4 { font-size: 13px; font-weight: 700; color: var(--stone-900); margin-bottom: 6px; }
+.leaflet-popup-content .popup-type { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--orange-700); margin-bottom: 4px; }
+.leaflet-popup-content .popup-meta { font-size: 11px; color: var(--stone-600); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--stone-100); line-height: 1.4; }
+.custom-marker {
+  width: 32px; height: 32px; border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  position: relative;
+}
+.custom-marker svg { transform: rotate(45deg); width: 14px; height: 14px; color: white; }
+.marker-pending::after {
+  content: '!'; position: absolute; top: -4px; right: -4px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--amber-500); color: white;
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  transform: rotate(45deg); border: 1.5px solid white;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 960px) {
+  .sidebar-layers { width: 240px; }
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .mode-switcher { margin-left: 0.5rem; }
+  .mode-btn { padding: 7px 10px; }
+  .mode-btn span { display: none; }
+}
+@media (max-width: 720px) {
+  .header { padding: 8px 12px; height: auto; flex-wrap: wrap; gap: 8px; }
+  .header-brand-text { display: none; }
+  .sidebar-layers {
+    position: absolute; top: 0; left: 0; bottom: 0; z-index: 400;
+    transform: translateX(-100%); transition: transform 0.25s;
+    box-shadow: var(--shadow-lg);
+  }
+  .sidebar-layers.open { transform: translateX(0); }
+  .fab.menu-toggle { display: flex; }
+  .conn-status .label { display: none; }
+  .user-info { display: none; }
+  .btn-export span { display: none; }
+  .btn-toggle-conn span { display: none; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .tabla-header { flex-direction: column; align-items: flex-start; }
+  .view-resumen, .view-tabla { padding: 1rem; }
+  .map-info-panel { display: none; }
+}
+
+/* ============ SIDEBAR COLAPSABLE ============ */
+.sidebar-toggle-btn {
+  position: absolute; top: 16px; z-index: 600;
+  width: 36px; height: 36px; border-radius: 8px;
+  background: white; border: 1px solid var(--stone-200);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-sm); transition: all 0.2s;
+  color: var(--stone-700);
+}
+.sidebar-toggle-btn:hover { background: var(--orange-50); color: var(--orange-700); }
+.sidebar-toggle-btn svg { width: 18px; height: 18px; }
+.sidebar-toggle-btn.sidebar-open { left: 264px; }
+.sidebar-toggle-btn.sidebar-closed { left: 16px; }
+.sidebar-layers { transition: transform 0.25s ease, width 0.25s ease; }
+.sidebar-layers.collapsed {
+  transform: translateX(-100%);
+  width: 0; border-right: none; overflow: hidden;
+}
+
+/* ============ DRAW POLYGON ============ */
+.draw-hint-panel {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 600;
+  background: var(--orange-600); color: white;
+  padding: 10px 16px; border-radius: 24px;
+  font-size: 12.5px; font-weight: 500;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: var(--shadow-lg);
+  max-width: 90%;
+}
+.draw-hint-panel.hidden { display: none; }
+.draw-hint-panel svg { width: 16px; height: 16px; flex-shrink: 0; }
+.draw-hint-panel .vertex-count {
+  background: rgba(255,255,255,0.25); padding: 2px 8px;
+  border-radius: 10px; font-weight: 700; font-size: 11px;
+}
+.draw-hint-panel button {
+  padding: 4px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+  background: white; color: var(--orange-700);
+  transition: all 0.15s;
+}
+.draw-hint-panel button:hover { background: var(--orange-100); }
+.draw-hint-panel button.btn-cancel { background: transparent; color: white; border: 1px solid rgba(255,255,255,0.4); }
+.draw-hint-panel button.btn-cancel:hover { background: rgba(255,255,255,0.15); }
+
+.map-cursor-drawing { cursor: crosshair !important; }
+.map-cursor-drawing .leaflet-interactive { cursor: crosshair !important; }
+
+/* ============ VIEW SCRAPING ============ */
+.view-scraping {
+  flex: 1; overflow: hidden; display: flex; flex-direction: column;
+  background: var(--stone-50); padding: 1.25rem;
+}
+.view-scraping.hidden { display: none; }
+
+.scraping-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 1rem; flex-wrap: wrap; gap: 12px;
+}
+.scraping-header h2 {
+  font-size: 20px; font-weight: 700; color: var(--stone-900);
+  letter-spacing: -0.02em;
+}
+.scraping-header .subtitle {
+  font-size: 12.5px; color: var(--stone-500); margin-top: 2px;
+}
+.scraping-status {
+  display: flex; align-items: center; gap: 10px;
+  background: white; border: 1px solid var(--stone-200);
+  border-radius: 10px; padding: 8px 14px;
+}
+.scraping-status .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green-600);
+  animation: pulse 2s infinite;
+}
+.scraping-status .label { font-size: 11.5px; color: var(--stone-700); font-weight: 500; }
+.scraping-status .last { font-size: 11px; color: var(--stone-500); }
+
+.scraping-tabs {
+  display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--stone-200);
+}
+.scraping-tab {
+  padding: 9px 16px; font-size: 12.5px; font-weight: 500;
+  color: var(--stone-500); transition: all 0.15s;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  display: flex; align-items: center; gap: 6px;
+}
+.scraping-tab:hover { color: var(--stone-900); }
+.scraping-tab.active { color: var(--orange-700); border-bottom-color: var(--orange-600); font-weight: 600; }
+.scraping-tab .count {
+  font-size: 10px; background: var(--stone-100); color: var(--stone-600);
+  padding: 1px 6px; border-radius: 8px; font-weight: 600;
+}
+.scraping-tab.active .count { background: var(--orange-100); color: var(--orange-700); }
+
+.scraping-meta-bar {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  background: white; border: 1px solid var(--stone-200);
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;
+}
+.scraping-meta-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--stone-600); }
+.scraping-meta-item strong { color: var(--stone-900); font-weight: 700; font-family: 'Inter', monospace; }
+.scraping-meta-item svg { width: 13px; height: 13px; }
+.scraping-meta-item a {
+  font-size: 10.5px; color: var(--blue-800); text-decoration: none;
+  padding: 2px 8px; border-radius: 4px; background: var(--stone-100);
+}
+.scraping-meta-item a:hover { background: #DBEAFE; }
+
+.confidence-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px;
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.confidence-badge.high { background: var(--green-100); color: var(--green-700); }
+.confidence-badge.med { background: var(--amber-100); color: var(--amber-600); }
+.confidence-badge.low { background: var(--red-100); color: var(--red-700); }
+.confidence-badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* ============ MOBILE DRAWER ============ */
+@media (max-width: 720px) {
+  .sidebar-layers {
+    position: absolute; top: 0; left: 0; bottom: 0; z-index: 500;
+    transform: translateX(-100%); box-shadow: var(--shadow-lg);
+    width: 280px;
+  }
+  .sidebar-layers:not(.collapsed) { transform: translateX(0); }
+  .sidebar-layers.collapsed { transform: translateX(-100%); }
+  .sidebar-toggle-btn.sidebar-open { left: 296px; }
+  .sidebar-backdrop {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.3); z-index: 450;
+    display: none;
+  }
+  .sidebar-backdrop.visible { display: block; }
+  .scraping-meta-bar { flex-direction: column; gap: 6px; }
+  .scraping-tabs { overflow-x: auto; }
+}
+
+/* ============ SCROLLBAR ============ */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--stone-300); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--stone-400); }
+
+/* ============ ICON HELPERS ============ */
+.icon { display: inline-flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+
+<!-- ==================== LOGIN ==================== -->
+<div id="login">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="brand-row">
+        <svg class="logo-muni" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="22" fill="#1E3A8A"/>
+          <path d="M12 30 L12 20 Q12 14 18 14 L30 14 Q36 14 36 20 L36 30 Z" fill="#EA580C"/>
+          <path d="M18 30 L18 22 L22 22 L22 30 M26 30 L26 22 L30 22 L30 30" stroke="white" stroke-width="1.5" fill="none"/>
+          <circle cx="24" cy="12" r="2" fill="#FED7AA"/>
+          <path d="M8 36 Q16 32 24 36 T40 36" stroke="white" stroke-width="1.5" fill="none"/>
+        </svg>
+        <div class="brand-divider"></div>
+        <svg class="logo-sigespu" viewBox="0 0 48 48" fill="none">
+          <rect x="4" y="4" width="40" height="40" rx="10" fill="#EA580C"/>
+          <path d="M24 12 C18 12 14 16 14 22 C14 30 24 38 24 38 C24 38 34 30 34 22 C34 16 30 12 24 12 Z" fill="white"/>
+          <circle cx="24" cy="22" r="4" fill="#EA580C"/>
+        </svg>
+      </div>
+      <div class="login-title">SIGESPU Lota</div>
+      <div class="login-subtitle">Sistema de Información Geoespacial<br>de Seguridad Pública</div>
+      <div class="login-muni">Ilustre Municipalidad de Lota</div>
+    </div>
+    <div class="login-form">
+      <div class="input-group">
+        <label for="email">Correo institucional</label>
+        <input id="email" type="email" value="funcionario@munilota.cl" autocomplete="email" />
+      </div>
+      <div class="input-group">
+        <label for="password">Contraseña</label>
+        <input id="password" type="password" value="demo2026" autocomplete="current-password" />
+      </div>
+      <button class="btn-login" onclick="doLogin()">Iniciar sesión</button>
+    </div>
+    <div class="demo-accounts">
+      <strong>Cuentas de demostración</strong>
+      <button class="demo-btn director" onclick="loginAs('director')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L3 7v10a2 2 0 002 2h14a2 2 0 002-2V7l-9-5z"/><circle cx="12" cy="12" r="3"/></svg>
+        director@munilota.cl · demo2026
+        <span class="role">Director</span>
+      </button>
+      <button class="demo-btn funcionario" onclick="loginAs('funcionario')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></svg>
+        funcionario@munilota.cl · demo2026
+        <span class="role">Funcionario</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== APP ==================== -->
+<div id="app">
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-brand">
+      <svg class="logo-muni" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="22" fill="#1E3A8A"/>
+        <path d="M12 30 L12 20 Q12 14 18 14 L30 14 Q36 14 36 20 L36 30 Z" fill="#EA580C"/>
+        <path d="M18 30 L18 22 L22 22 L22 30 M26 30 L26 22 L30 22 L30 30" stroke="white" stroke-width="1.5" fill="none"/>
+        <circle cx="24" cy="12" r="2" fill="#FED7AA"/>
+      </svg>
+      <div class="header-brand-text">
+        <span class="primary">SIGESPU Lota</span>
+        <span class="secondary">I. Municipalidad de Lota</span>
+      </div>
+    </div>
+
+    <nav class="mode-switcher" role="tablist">
+      <button class="mode-btn active" data-view="map" onclick="setView('map')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+        <span>Mapa</span>
+      </button>
+      <button class="mode-btn" data-view="resumen" onclick="setView('resumen')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        <span>Resumen</span>
+      </button>
+      <button class="mode-btn" data-view="tabla" onclick="setView('tabla')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        <span>Tabla</span>
+      </button>
+      <button class="mode-btn" data-view="scraping" onclick="setView('scraping')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        <span>Scraping</span>
+      </button>
+    </nav>
+
+    <div class="header-actions">
+      <button class="btn-toggle-conn" onclick="toggleConnection()" title="Simular conexión">
+        <span id="conn-toggle-label">Simular offline</span>
+      </button>
+      <div id="conn-status" class="conn-status online">
+        <span class="conn-dot"></span>
+        <span class="label">En línea</span>
+      </div>
+      <button class="btn-export" onclick="openExportPreview()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Exportar PDF</span>
+      </button>
+      <div class="user-chip" id="user-chip">
+        <div class="user-avatar" id="user-avatar">FN</div>
+        <div class="user-info">
+          <span class="name" id="user-name">Funcionario</span>
+          <span class="role" id="user-role">Funcionario</span>
+        </div>
+        <button class="btn-logout" onclick="doLogout()" title="Cerrar sesión">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- OFFLINE BANNER -->
+  <div id="offline-banner" class="offline-banner hidden">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M10.71 5.05A16 16 0 0122.58 9"/><path d="M1.42 9a15.91 15.91 0 014.7-2.88"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+    <span>Modo sin conexión activo — Los cambios se guardan localmente y se sincronizarán al recuperar conexión.</span>
+    <span class="pending-count" id="pending-count">0 pendientes</span>
+  </div>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- ========== VIEW MAP ========== -->
+    <div class="view-map" id="view-map">
+      <aside class="sidebar-layers">
+        <div class="sidebar-section">
+          <h3>Capas del sistema <span class="count" id="layer-count">6/6</span></h3>
+          <div id="layers-list"></div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Tipos de peligro</h3>
+          <div class="filter-chip-group" id="danger-filter">
+            <button class="filter-chip active" data-filter="all">Todos</button>
+            <button class="filter-chip" data-filter="drogas">Tráfico drogas</button>
+            <button class="filter-chip" data-filter="robos">Robos</button>
+            <button class="filter-chip" data-filter="vivienda_ilegal">Vivienda ilegal</button>
+            <button class="filter-chip" data-filter="vandalismo">Vandalismo</button>
+            <button class="filter-chip" data-filter="riña">Riñas</button>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Mapa de calor</h3>
+          <div class="heatmap-toggle" id="heatmap-toggle" onclick="toggleHeatmap()">
+            <div class="label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6" opacity="0.6"/><circle cx="12" cy="12" r="9" opacity="0.3"/></svg>
+              Densidad de reportes
+            </div>
+            <div class="switch" id="heatmap-switch"></div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3>Rango de fechas</h3>
+          <div class="date-filter">
+            <select id="date-range">
+              <option value="7">Últimos 7 días</option>
+              <option value="30" selected>Últimos 30 días</option>
+              <option value="90">Últimos 90 días</option>
+              <option value="365">Último año</option>
+              <option value="all">Histórico completo</option>
+            </select>
+          </div>
+        </div>
+      </aside>
+
+      <div class="map-container">
+        <button class="sidebar-toggle-btn sidebar-open" id="sidebar-toggle" onclick="toggleSidebar()" title="Ocultar/Mostrar panel">
+          <svg id="sidebar-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+
+        <div class="draw-hint-panel hidden" id="draw-hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+          <span>Toca el mapa para agregar vértices</span>
+          <span class="vertex-count" id="vertex-count">0 pts</span>
+          <button onclick="finishDrawing()" id="btn-finish-draw" disabled>Cerrar figura</button>
+          <button class="btn-cancel" onclick="cancelDrawing()">Cancelar</button>
+        </div>
+
+        <div class="map-info-panel">
+          <span>Lota, Biobío</span>
+          <span class="coord" id="coord-display">-37.090, -73.158</span>
+          <span class="count-badge" id="visible-count">0 elementos</span>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="legend-panel">
+          <div class="title">Leyenda</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#1E3A8A"></span>Infraestructura</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#16A34A"></span>Sede comunitaria</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#EA580C"></span>Centro acopio</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#B91C1C"></span>Zona peligro</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#D97706"></span>Patente comercial</div>
+        </div>
+
+        <div class="map-fab-group">
+          <button class="fab" onclick="startDrawing()" title="Dibujar zona personalizada">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="12 2 4 8 4 16 12 22 20 16 20 8 12 2"/><circle cx="12" cy="2" r="1.5" fill="currentColor"/><circle cx="4" cy="8" r="1.5" fill="currentColor"/><circle cx="4" cy="16" r="1.5" fill="currentColor"/><circle cx="12" cy="22" r="1.5" fill="currentColor"/><circle cx="20" cy="16" r="1.5" fill="currentColor"/><circle cx="20" cy="8" r="1.5" fill="currentColor"/></svg>
+          </button>
+          <button class="fab" onclick="locateMe()" title="Mi ubicación">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+          </button>
+          <button class="fab primary" onclick="openAddModal()" title="Agregar elemento">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== VIEW RESUMEN ========== -->
+    <div class="view-resumen hidden" id="view-resumen">
+      <h2 class="resumen-title">Resumen operativo</h2>
+      <p class="resumen-subtitle">Dirección de Seguridad Pública · Actualizado: <span id="resumen-date"></span></p>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0112 2a8 8 0 018 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg></div>
+          <span class="kpi-label">Reportes este mes</span>
+          <span class="kpi-value" id="kpi-reportes">—</span>
+          <span class="kpi-trend negative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/></svg>+12% vs mes anterior</span>
+        </div>
+        <div class="kpi-card red">
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+          <span class="kpi-label">Zonas de peligro activas</span>
+          <span class="kpi-value" id="kpi-zonas">—</span>
+          <span class="kpi-trend negative">3 nuevas esta semana</span>
+        </div>
+        <div class="kpi-card amber">
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l7-4z"/></svg></div>
+          <span class="kpi-label">Patentes nuevas (mes)</span>
+          <span class="kpi-value" id="kpi-patentes">—</span>
+          <span class="kpi-trend">scraping · hace 3h</span>
+        </div>
+        <div class="kpi-card blue">
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+          <span class="kpi-label">Centros de acopio</span>
+          <span class="kpi-value" id="kpi-acopios">—</span>
+          <span class="kpi-trend">Listos para emergencias</span>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+          <span class="kpi-label">Sedes comunitarias</span>
+          <span class="kpi-value" id="kpi-sedes">—</span>
+          <span class="kpi-trend">Activas e identificadas</span>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="dashboard-card">
+          <h3>Reportes por tipo <span class="subtitle">últimos 30 días</span></h3>
+          <div class="chart-canvas"><canvas id="chart-tipos"></canvas></div>
+        </div>
+        <div class="dashboard-card">
+          <h3>Zonas por sector <span class="subtitle">Plan Regulador</span></h3>
+          <div class="sector-list" id="sector-list"></div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="dashboard-card">
+          <h3>Tendencia semanal <span class="subtitle">reportes registrados</span></h3>
+          <div class="chart-canvas"><canvas id="chart-trend"></canvas></div>
+        </div>
+        <div class="dashboard-card">
+          <h3>Últimos reportes <span class="subtitle">orden cronológico</span></h3>
+          <div class="recent-list" id="recent-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== VIEW TABLA ========== -->
+    <div class="view-tabla hidden" id="view-tabla">
+      <div class="tabla-header">
+        <h2>Registro de elementos</h2>
+        <div class="results-count">Mostrando <strong id="result-count">0</strong> de <strong id="total-count">0</strong> registros</div>
+      </div>
+
+      <div class="tabla-filters">
+        <div class="group">
+          <label>Tipo</label>
+          <select id="filter-tipo" onchange="renderTabla()">
+            <option value="all">Todos</option>
+            <option value="zona_peligro">Zonas de peligro</option>
+            <option value="reporte">Reportes</option>
+            <option value="patente">Patentes</option>
+            <option value="centro_acopio">Centros de acopio</option>
+            <option value="sede_comunitaria">Sedes comunitarias</option>
+          </select>
+        </div>
+        <div class="group">
+          <label>Sector</label>
+          <select id="filter-sector" onchange="renderTabla()">
+            <option value="all">Todos</option>
+            <option value="S-2">S-2 · Residencial Los Aromos</option>
+            <option value="S-3">S-3 · Mixto Los Aromos</option>
+            <option value="S-4">S-4 · Equipamiento</option>
+            <option value="S-5">S-5 · Vivienda Periférica</option>
+            <option value="Centro">Centro Histórico</option>
+          </select>
+        </div>
+        <div class="group">
+          <label>Estado</label>
+          <select id="filter-estado" onchange="renderTabla()">
+            <option value="all">Todos</option>
+            <option value="activo">Activo</option>
+            <option value="en_revision">En revisión</option>
+            <option value="pendiente_sync">Pendiente sync</option>
+            <option value="cerrado">Cerrado</option>
+          </select>
+        </div>
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-input" placeholder="Buscar por nombre, dirección, RUT..." oninput="renderTabla()" />
+        </div>
+      </div>
+
+      <div class="tabla-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th onclick="sortTabla('tipo')">Tipo</th>
+              <th onclick="sortTabla('nombre')">Nombre / Descripción</th>
+              <th onclick="sortTabla('sector')">Sector</th>
+              <th onclick="sortTabla('direccion')">Dirección</th>
+              <th onclick="sortTabla('fecha')">Fecha</th>
+              <th onclick="sortTabla('estado')">Estado</th>
+              <th>Registrado por</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <!-- ========== VIEW SCRAPING ========== -->
+    <div class="view-scraping hidden" id="view-scraping">
+      <div class="scraping-header">
+        <div>
+          <h2>Datos scrapeados desde Transparencia</h2>
+          <div class="subtitle">Información pública extraída automáticamente desde lotatransparente.cl · Ley 20.285</div>
+        </div>
+        <div class="scraping-status">
+          <span class="dot"></span>
+          <div>
+            <div class="label">Scraper activo</div>
+            <div class="last">Última ejecución: hoy 03:00 AM</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scraping-tabs">
+        <button class="scraping-tab active" data-scrape-tab="patentes" onclick="setScrapingTab('patentes')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l7-4z"/></svg>
+          Patentes comerciales
+          <span class="count" id="count-patentes-scrape">0</span>
+        </button>
+        <button class="scraping-tab" data-scrape-tab="permisos" onclick="setScrapingTab('permisos')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Permisos DOM
+          <span class="count" id="count-permisos-scrape">0</span>
+        </button>
+        <button class="scraping-tab" data-scrape-tab="transito" onclick="setScrapingTab('transito')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Decretos de tránsito
+          <span class="count" id="count-transito-scrape">0</span>
+        </button>
+        <button class="scraping-tab" data-scrape-tab="organizaciones" onclick="setScrapingTab('organizaciones')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          Organizaciones sociales
+          <span class="count" id="count-orgs-scrape">0</span>
+        </button>
+      </div>
+
+      <div class="scraping-meta-bar" id="scraping-meta-bar"></div>
+
+      <div class="tabla-filters">
+        <div class="group">
+          <label>Año</label>
+          <select id="scrape-filter-year" onchange="renderScrapingTable()">
+            <option value="all">Todos</option>
+            <option value="2026" selected>2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+          </select>
+        </div>
+        <div class="group">
+          <label>Mes</label>
+          <select id="scrape-filter-month" onchange="renderScrapingTable()">
+            <option value="all">Todos</option>
+            <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+            <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+            <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+            <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+        </div>
+        <div class="group">
+          <label>Geocoding</label>
+          <select id="scrape-filter-geo" onchange="renderScrapingTable()">
+            <option value="all">Todos</option>
+            <option value="high">Confianza alta</option>
+            <option value="med">Confianza media</option>
+            <option value="low">Confianza baja</option>
+            <option value="failed">Fallo</option>
+          </select>
+        </div>
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="scrape-search" placeholder="Buscar por razón social, RUT, dirección..." oninput="renderScrapingTable()" />
+        </div>
+        <div class="results-count">Mostrando <strong id="scrape-result-count">0</strong> de <strong id="scrape-total-count">0</strong></div>
+      </div>
+
+      <div class="tabla-wrapper">
+        <table class="data-table" id="scraping-table"></table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ==================== ADD MODAL ==================== -->
+<div class="modal-backdrop hidden" id="add-modal" onclick="if(event.target===this) closeAddModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="add-modal-title">Agregar elemento</h3>
+      <button class="close" onclick="closeAddModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="add-modal-body"></div>
+    <div class="modal-footer" id="add-modal-footer">
+      <button class="btn-secondary" onclick="closeAddModal()">Cancelar</button>
+      <button class="btn-primary" id="add-modal-save" onclick="saveElement()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== EXPORT PREVIEW ==================== -->
+<div class="modal-backdrop hidden" id="export-modal" onclick="if(event.target===this) closeExportPreview()">
+  <div class="modal" style="max-width: 820px;">
+    <div class="modal-header">
+      <h3>Vista previa del documento PDF</h3>
+      <button class="close" onclick="closeExportPreview()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="export-body" style="background: var(--stone-100); padding: 2rem 1rem;"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeExportPreview()">Cerrar</button>
+      <button class="btn-primary" onclick="printPreview()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align: middle; margin-right: 6px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Descargar PDF
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// =================================================
+// SIGESPU LOTA · Maqueta interactiva
+// =================================================
+
+// ---------- CONSTANTES GEOGRÁFICAS DE LOTA ----------
+const LOTA_CENTER = [-37.0896, -73.1584];
+const LOTA_ZOOM = 14;
+
+// Polígonos aproximados de sectores del Plan Regulador (MPR-4 Los Aromos)
+const SECTORES = [
+  {
+    code: 'S-2', name: 'Residencial Los Aromos', color: '#86EFAC',
+    coords: [[-37.0850,-73.1690],[-37.0820,-73.1670],[-37.0820,-73.1620],[-37.0850,-73.1610],[-37.0870,-73.1640],[-37.0850,-73.1690]]
+  },
+  {
+    code: 'S-3', name: 'Mixto Los Aromos', color: '#FDE68A',
+    coords: [[-37.0820,-73.1620],[-37.0820,-73.1670],[-37.0790,-73.1660],[-37.0785,-73.1615],[-37.0820,-73.1620]]
+  },
+  {
+    code: 'S-4', name: 'Equipamiento', color: '#BFDBFE',
+    coords: [[-37.0785,-73.1615],[-37.0790,-73.1660],[-37.0760,-73.1655],[-37.0755,-73.1610],[-37.0785,-73.1615]]
+  },
+  {
+    code: 'S-5', name: 'Vivienda Periférica', color: '#C7D2FE',
+    coords: [[-37.0755,-73.1610],[-37.0760,-73.1655],[-37.0720,-73.1640],[-37.0715,-73.1600],[-37.0755,-73.1610]]
+  },
+  {
+    code: 'Centro', name: 'Centro Histórico Lota', color: '#FED7AA',
+    coords: [[-37.1010,-73.1570],[-37.0980,-73.1530],[-37.0950,-73.1560],[-37.0970,-73.1600],[-37.1010,-73.1570]]
+  }
+];
+
+// ---------- TIPOS DE ELEMENTOS ----------
+const TIPOS = {
+  centro_acopio: { nombre: 'Centro de acopio', color: '#EA580C', iconPath: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z|M9 22V12h6v10' },
+  sede_comunitaria: { nombre: 'Sede comunitaria', color: '#16A34A', iconPath: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2|M9 7a4 4 0 100 8 4 4 0 000-8z' },
+  infraestructura: { nombre: 'Infraestructura pública', color: '#1E3A8A', iconPath: 'M12 2L3 7v10a2 2 0 002 2h14a2 2 0 002-2V7l-9-5z' },
+  reporte_robo: { nombre: 'Robo', color: '#B91C1C', iconPath: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z|M12 9v4|M12 17h.01' },
+  reporte_vandalismo: { nombre: 'Vandalismo', color: '#A855F7', iconPath: 'M10 2v7.31|M14 9.3V1.99|M8.5 2h7|M14 9.3a6.5 6.5 0 11-4 0' },
+  reporte_accidente: { nombre: 'Accidente', color: '#F97316', iconPath: 'M14 16H9m10 0h3v-3.15a1 1 0 00-.84-.99L16 11l-2.7-3.6a1 1 0 00-.8-.4H5.24a2 2 0 00-1.8 1.1l-.8 1.63A6 6 0 002 12.42V16h2|M6 20a2 2 0 11-4 0 2 2 0 014 0zm12 0a2 2 0 11-4 0 2 2 0 014 0z' },
+  zona_peligro: { nombre: 'Zona de peligro', color: '#B91C1C', iconPath: 'M12 22s-8-4.5-8-11.8A8 8 0 0112 2a8 8 0 018 8.2c0 7.3-8 11.8-8 11.8z|M12 8v4|M12 16h.01' },
+  patente: { nombre: 'Patente comercial', color: '#D97706', iconPath: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l7-4z' },
+  luminaria: { nombre: 'Luminaria', color: '#EAB308', iconPath: 'M9 18h6|M10 22h4|M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 018.91 14' },
+  camara: { nombre: 'Cámara CCTV', color: '#8B5CF6', iconPath: 'M23 7l-7 5 7 5V7z|M14 5H3a2 2 0 00-2 2v10a2 2 0 002 2h11a2 2 0 002-2V7a2 2 0 00-2-2z' },
+  arbol_caido: { nombre: 'Árbol caído', color: '#65A30D', iconPath: 'M12 22V8|M5 12l-2-2 4-4 2 2M19 12l2-2-4-4-2 2|M12 2L8 6h8z|M4 18l4-2 4 2 4-2 4 2' },
+  poste_caido: { nombre: 'Poste caído', color: '#EA580C', iconPath: 'M4 20l16-8|M12 16l4-2|M8 18l4-2|M20 12v8|M18 10l2 2' },
+  sector_sin_luz: { nombre: 'Sector sin luz', color: '#1E293B', iconPath: 'M1 1l22 22|M9 5.39a6 6 0 016 6c0 1-.23 2.23-1.5 3.5|M10 22h4|M15 18H9' },
+  cable_colgando: { nombre: 'Cable colgando', color: '#F97316', iconPath: 'M4 4l16 0|M4 4c0 8 4 12 8 12s8-4 8-12|M12 16v4|M10 22h4' },
+  semaforo_dañado: { nombre: 'Semáforo dañado', color: '#DC2626', iconPath: 'M8 2h8a2 2 0 012 2v16a2 2 0 01-2 2H8a2 2 0 01-2-2V4a2 2 0 012-2z|M12 7v.01|M12 12v.01|M12 17v.01' },
+  socavon: { nombre: 'Socavón / Hoyo', color: '#78350F', iconPath: 'M2 22h20|M6 18c0-3 3-5 6-5s6 2 6 5|M12 13V6|M10 4h4' },
+  fuga_agua: { nombre: 'Fuga de agua', color: '#0284C7', iconPath: 'M12 2.69l5.66 5.66a8 8 0 11-11.31 0z|M8 14h8' },
+  microbasural: { nombre: 'Microbasural', color: '#92400E', iconPath: 'M3 6h18|M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6|M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2|M10 11v6|M14 11v6' }
+};
+
+const TIPOS_PELIGRO = {
+  drogas: 'Tráfico de drogas',
+  robos: 'Robos recurrentes',
+  vivienda_ilegal: 'Vivienda ilegal / toma',
+  vandalismo: 'Vandalismo frecuente',
+  riña: 'Riñas y violencia',
+  sin_iluminacion: 'Zona sin iluminación',
+  accidentes: 'Accidentes viales',
+  microbasural: 'Microbasural',
+  otro: 'Otro'
+};
+
+// ---------- DATOS SEED ----------
+const DATOS_SEED = [
+  // Centros de acopio
+  { id: 'ca-1', tipo: 'centro_acopio', nombre: 'Gimnasio Municipal Lota', direccion: 'Carlos Cousiño 135, Lota', sector: 'Centro',
+    lat: -37.0999, lng: -73.1559, capacidad: 200, estado: 'activo', fecha: '2024-08-12',
+    by: 'Dirección Seguridad Pública', notas: 'Capacidad 200 personas. Cuenta con baños, duchas y bodega.' },
+  { id: 'ca-2', tipo: 'centro_acopio', nombre: 'Escuela Carlos Cousiño', direccion: 'Pedro A. Cerda 701, Lota', sector: 'Centro',
+    lat: -37.0935, lng: -73.1548, capacidad: 350, estado: 'activo', fecha: '2024-09-20',
+    by: 'Dirección Seguridad Pública', notas: 'Centro educacional habilitado para emergencias. Generador propio.' },
+  { id: 'ca-3', tipo: 'centro_acopio', nombre: 'Liceo Juan Antonio Ríos', direccion: 'Monseñor Fuenzalida 1050', sector: 'S-5',
+    lat: -37.0735, lng: -73.1630, capacidad: 180, estado: 'activo', fecha: '2025-02-10',
+    by: 'Dirección Seguridad Pública', notas: 'Gimnasio techado, cocina industrial.' },
+
+  // Sedes comunitarias
+  { id: 'sc-1', tipo: 'sede_comunitaria', nombre: 'JJ.VV. Los Aromos', direccion: 'Los Aromos 245', sector: 'S-2',
+    lat: -37.0845, lng: -73.1640, estado: 'activo', fecha: '2023-05-15',
+    by: 'DIDECO', notas: 'Presidenta: María Hernández. Reuniones viernes 19:00.' },
+  { id: 'sc-2', tipo: 'sede_comunitaria', nombre: 'Junta Vecinal El Esfuerzo', direccion: 'Pabellón 4, Lota Alto', sector: 'Centro',
+    lat: -37.0910, lng: -73.1515, estado: 'activo', fecha: '2023-11-03',
+    by: 'DIDECO', notas: 'Sede con 45 familias asociadas.' },
+  { id: 'sc-3', tipo: 'sede_comunitaria', nombre: 'Centro de Madres Nueva Vida', direccion: 'Vista Hermosa 890', sector: 'S-3',
+    lat: -37.0805, lng: -73.1635, estado: 'activo', fecha: '2024-01-22',
+    by: 'DIDECO', notas: 'Talleres de costura y repostería.' },
+
+  // Patentes (datos plausibles basados en lotatransparente.cl)
+  { id: 'p-1', tipo: 'patente', nombre: 'COMERCIAL TRINUM SPA', direccion: 'Vista Hermosa 1199, Lota', sector: 'S-3',
+    lat: -37.0810, lng: -73.1622, rut: '77.173.367-0', giro: 'Bodega venta al por menor',
+    estado: 'activo', fecha: '2026-03-30', by: 'Scraping Transparencia',
+    notas: 'Patente otorgada marzo 2026. Vigencia esperada.' },
+  { id: 'p-2', tipo: 'patente', nombre: 'ALMACÉN DOÑA CLARA', direccion: 'P. A. Cerda 808 Local B, Lota', sector: 'Centro',
+    lat: -37.0960, lng: -73.1555, rut: '9.876.543-2', giro: 'Almacén de abarrotes',
+    estado: 'activo', fecha: '2025-11-15', by: 'Scraping Transparencia',
+    notas: 'Funcionamiento de lunes a domingo.' },
+  { id: 'p-3', tipo: 'patente', nombre: 'FERRETERÍA LOS AROMOS', direccion: 'Los Aromos 412', sector: 'S-2',
+    lat: -37.0840, lng: -73.1655, rut: '76.543.210-1', giro: 'Venta ferretería y materiales',
+    estado: 'en_revision', fecha: '2024-06-01', by: 'Scraping Transparencia',
+    notas: 'Patente próxima a vencer. Requiere verificación.' },
+  { id: 'p-4', tipo: 'patente', nombre: 'PANADERÍA EL BUEN PAN', direccion: 'Matta 1205', sector: 'Centro',
+    lat: -37.0965, lng: -73.1578, rut: '8.123.456-7', giro: 'Elaboración y venta de pan',
+    estado: 'activo', fecha: '2026-01-15', by: 'Scraping Transparencia',
+    notas: 'Producción artesanal diaria.' },
+  { id: 'p-5', tipo: 'patente', nombre: 'MINIMARKET LOTA ALTO', direccion: 'Caupolicán 560', sector: 'Centro',
+    lat: -37.0920, lng: -73.1510, rut: '77.889.910-K', giro: 'Minimarket con venta alcoholes',
+    estado: 'activo', fecha: '2025-09-01', by: 'Scraping Transparencia',
+    notas: 'Patente alcohol restringida a viernes y sábados.' },
+
+  // Zonas de peligro
+  { id: 'zp-1', tipo: 'zona_peligro', nombre: 'Esquina Los Aromos con Vista Hermosa', direccion: 'Intersección Los Aromos / Vista Hermosa', sector: 'S-2',
+    lat: -37.0820, lng: -73.1645, tipo_peligro: 'drogas', nivel: 4, estado: 'activo',
+    fecha: '2026-04-15', by: 'R. Sepúlveda · Funcionario',
+    notas: 'Presencia habitual de microtráfico en horario nocturno (22:00-04:00). Reportado por vecinos de la JJ.VV. Los Aromos. Coordinado con Carabineros.',
+    vigencia_hasta: '2026-07-15', horario: 'Nocturno (22:00-04:00)' },
+  { id: 'zp-2', tipo: 'zona_peligro', nombre: 'Pasaje sin nombre sector norte', direccion: 'Pasaje interior S-5', sector: 'S-5',
+    lat: -37.0730, lng: -73.1625, tipo_peligro: 'vivienda_ilegal', nivel: 5, estado: 'activo',
+    fecha: '2026-04-10', by: 'Dir. Seguridad Pública',
+    notas: 'Campamento con 8 viviendas de material ligero sin autorización. Terreno municipal. Requiere coordinación con SERVIU y Bienes Nacionales para regularización o desalojo.',
+    vigencia_hasta: null, horario: '24/7' },
+  { id: 'zp-3', tipo: 'zona_peligro', nombre: 'Plaza Centro - robos a transeúntes', direccion: 'Plaza de Armas Lota', sector: 'Centro',
+    lat: -37.0985, lng: -73.1555, tipo_peligro: 'robos', nivel: 3, estado: 'activo',
+    fecha: '2026-04-05', by: 'C. Muñoz · Funcionario',
+    notas: 'Registro de 7 robos a transeúntes en las últimas 3 semanas, principalmente en horario de 20:00-23:00. Se ha reforzado patrullaje municipal.',
+    vigencia_hasta: '2026-05-30', horario: 'Tarde/Noche' },
+  { id: 'zp-4', tipo: 'zona_peligro', nombre: 'Sector calle peatonal', direccion: 'Calle peatonal Lota Alto', sector: 'Centro',
+    lat: -37.0915, lng: -73.1525, tipo_peligro: 'vandalismo', nivel: 2, estado: 'activo',
+    fecha: '2026-03-28', by: 'P. Castro · Funcionario',
+    notas: 'Rayados frecuentes en fachadas patrimoniales. Se requiere limpieza y refuerzo de CCTV.',
+    vigencia_hasta: null, horario: 'Fines de semana' },
+  { id: 'zp-5', tipo: 'zona_peligro', nombre: 'Salida Liceo JA Ríos', direccion: 'Monseñor Fuenzalida esquina', sector: 'S-5',
+    lat: -37.0738, lng: -73.1625, tipo_peligro: 'riña', nivel: 3, estado: 'activo',
+    fecha: '2026-04-18', by: 'R. Sepúlveda · Funcionario',
+    notas: 'Riñas entre escolares a la salida del liceo (13:00 y 17:00). Coordinado con Encargado de Convivencia.',
+    vigencia_hasta: '2026-06-30', horario: '13:00-17:00 días hábiles' },
+
+  // Reportes
+  { id: 'r-1', tipo: 'reporte_robo', nombre: 'Robo con intimidación', direccion: 'Carlos Cousiño 340', sector: 'Centro',
+    lat: -37.0995, lng: -73.1570, estado: 'activo', fecha: '2026-04-22', by: 'R. Sepúlveda',
+    notas: 'Víctima denunció robo de celular. Derivado a Carabineros 1ª Comisaría Lota.' },
+  { id: 'r-2', tipo: 'reporte_vandalismo', nombre: 'Rayado en fachada municipal', direccion: 'Plaza de Armas Lota', sector: 'Centro',
+    lat: -37.0988, lng: -73.1555, estado: 'cerrado', fecha: '2026-04-19', by: 'P. Castro',
+    notas: 'Limpieza realizada por cuadrilla municipal el 21 de abril.' },
+  { id: 'r-3', tipo: 'reporte_accidente', nombre: 'Colisión vehicular', direccion: 'Av. Pedro Aguirre Cerda 850', sector: 'Centro',
+    lat: -37.0945, lng: -73.1542, estado: 'cerrado', fecha: '2026-04-20', by: 'C. Muñoz',
+    notas: 'Colisión sin lesionados. Vehículos retirados por grúa municipal.' },
+  { id: 'r-4', tipo: 'reporte_robo', nombre: 'Robo en vivienda', direccion: 'Los Aromos 512', sector: 'S-2',
+    lat: -37.0844, lng: -73.1648, estado: 'en_revision', fecha: '2026-04-21', by: 'R. Sepúlveda',
+    notas: 'Presunto ingreso por patio trasero. Denuncia en curso.' },
+  { id: 'r-5', tipo: 'reporte_vandalismo', nombre: 'Daño paradero', direccion: 'Vista Hermosa 1050', sector: 'S-3',
+    lat: -37.0810, lng: -73.1625, estado: 'activo', fecha: '2026-04-23', by: 'P. Castro',
+    notas: 'Paradero con vidrios rotos. Requiere reparación por DOM.' },
+  { id: 'r-6', tipo: 'reporte_robo', nombre: 'Hurto en comercio', direccion: 'Matta 1105', sector: 'Centro',
+    lat: -37.0960, lng: -73.1572, estado: 'activo', fecha: '2026-04-15', by: 'C. Muñoz',
+    notas: 'Comerciante reporta pérdida de mercadería. Revisan cámaras CCTV.' },
+  { id: 'r-7', tipo: 'reporte_accidente', nombre: 'Caída de árbol', direccion: 'Monseñor Fuenzalida 980', sector: 'S-5',
+    lat: -37.0740, lng: -73.1620, estado: 'cerrado', fecha: '2026-04-17', by: 'R. Sepúlveda',
+    notas: 'Árbol caído por viento. Retirado por emergencia municipal.' },
+  { id: 'r-8', tipo: 'reporte_robo', nombre: 'Robo en local comercial', direccion: 'P. A. Cerda 702', sector: 'Centro',
+    lat: -37.0940, lng: -73.1548, estado: 'activo', fecha: '2026-04-11', by: 'P. Castro',
+    notas: 'Forzamiento de cortinas metálicas durante la madrugada.' },
+
+  // Infraestructura
+  { id: 'i-1', tipo: 'infraestructura', nombre: 'I. Municipalidad de Lota', direccion: 'Pedro Aguirre Cerda 302', sector: 'Centro',
+    lat: -37.0961, lng: -73.1562, estado: 'activo', fecha: '1960-01-01', by: 'Registro histórico',
+    notas: 'Edificio principal del municipio.' },
+  { id: 'i-2', tipo: 'infraestructura', nombre: 'Hospital Lota', direccion: 'Anibal Pinto 1170', sector: 'Centro',
+    lat: -37.0929, lng: -73.1570, estado: 'activo', fecha: '1990-01-01', by: 'Registro histórico',
+    notas: 'Hospital de baja complejidad, atención 24h.' },
+  { id: 'i-3', tipo: 'infraestructura', nombre: '1ª Compañía Bomberos Lota', direccion: 'Galvarino 580', sector: 'Centro',
+    lat: -37.0975, lng: -73.1540, estado: 'activo', fecha: '1915-01-01', by: 'Registro histórico',
+    notas: 'Cuartel de Bomberos.' },
+
+  // Luminarias
+  { id: 'l-1', tipo: 'luminaria', nombre: 'Luminaria dañada pasaje', direccion: 'Pasaje Los Lirios', sector: 'S-2',
+    lat: -37.0852, lng: -73.1660, estado: 'en_revision', fecha: '2026-04-18', by: 'Reporte ciudadano',
+    notas: 'Luminaria apagada hace 2 semanas. Derivado a DOM.' },
+
+  // Incidentes urbanos
+  { id: 'arb-1', tipo: 'arbol_caido', nombre: 'Árbol caído sobre calzada', direccion: 'Los Aromos 380', sector: 'S-2',
+    lat: -37.0846, lng: -73.1652, estado: 'activo', fecha: '2026-04-23', by: 'R. Sepúlveda',
+    notas: 'Árbol de eucalipto caído por viento. Bloquea parcialmente el tránsito. Solicitado retiro a DOM.' },
+  { id: 'post-1', tipo: 'poste_caido', nombre: 'Poste eléctrico inclinado', direccion: 'Monseñor Fuenzalida 1020', sector: 'S-5',
+    lat: -37.0738, lng: -73.1628, estado: 'activo', fecha: '2026-04-22', by: 'C. Muñoz',
+    notas: 'Poste con inclinación peligrosa tras temporal. Derivado a CGE. URGENTE.' },
+  { id: 'sl-1', tipo: 'sector_sin_luz', nombre: 'Sector nororiente sin luminarias', direccion: 'Sector completo Vista Hermosa alto', sector: 'S-3',
+    lat: -37.0800, lng: -73.1620, estado: 'activo', fecha: '2026-04-20', by: 'P. Castro',
+    notas: '8 luminarias consecutivas apagadas en 3 cuadras. Sector oscuro en la noche, riesgo de delitos. Solicitado a DOM presupuesto de reposición.' },
+  { id: 'cab-1', tipo: 'cable_colgando', nombre: 'Cable telefónico colgando', direccion: 'Matta esq. Caupolicán', sector: 'Centro',
+    lat: -37.0960, lng: -73.1565, estado: 'activo', fecha: '2026-04-21', by: 'R. Sepúlveda',
+    notas: 'Cable a baja altura, riesgo para vehículos de carga. Reportado a Movistar.' },
+  { id: 'soc-1', tipo: 'socavon', nombre: 'Socavón en calzada', direccion: 'Pedro Aguirre Cerda 450', sector: 'Centro',
+    lat: -37.0955, lng: -73.1553, estado: 'activo', fecha: '2026-04-19', by: 'C. Muñoz',
+    notas: 'Hoyo de aproximadamente 80cm de diámetro. Señalizado con conos. Requiere bacheo urgente.' },
+  { id: 'fa-1', tipo: 'fuga_agua', nombre: 'Filtración desde matriz', direccion: 'Vista Hermosa 1240', sector: 'S-3',
+    lat: -37.0812, lng: -73.1618, estado: 'en_revision', fecha: '2026-04-17', by: 'P. Castro',
+    notas: 'Agua aflorando desde la calzada. Derivado a ESSBIO.' },
+];
+
+// ---------- DATOS SCRAPEADOS (simulados desde lotatransparente.cl) ----------
+const DATOS_SCRAPING = {
+  patentes: [
+    { n_decreto: 1852, fecha_decreto: '2026-03-30', tipo: 'Comercial definitiva', rut: '77.173.367-0', razon_social: 'COMERCIAL Y SERVICIOS TRINUM SPA', giro: 'Bodega venta al por menor no especificada', direccion: 'Vista Hermosa 1199', lat: -37.0810, lng: -73.1622, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=3&a=2026', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1837, fecha_decreto: '2026-03-22', tipo: 'MEF', rut: '19.876.543-2', razon_social: 'MARÍA FERNANDA SOTO ÁLVAREZ', giro: 'Servicios de peluquería', direccion: 'P.A. Cerda 1204', lat: -37.0952, lng: -73.1542, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=3&a=2026', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1819, fecha_decreto: '2026-03-15', tipo: 'Alcoholes', rut: '77.889.910-K', razon_social: 'MINIMARKET LOTA ALTO LIMITADA', giro: 'Minimarket con expendio de alcoholes', direccion: 'Caupolicán 560', lat: -37.0920, lng: -73.1510, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=3&a=2026', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1798, fecha_decreto: '2026-02-28', tipo: 'Profesional', rut: '13.456.789-1', razon_social: 'JUAN PABLO CONTRERAS LÓPEZ', giro: 'Contador auditor', direccion: 'Serrano 485 of. 301', lat: -37.0968, lng: -73.1560, confianza: 'med', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=2&a=2026', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1776, fecha_decreto: '2026-02-18', tipo: 'Comercial definitiva', rut: '9.876.543-2', razon_social: 'SOCIEDAD COMERCIAL DOÑA CLARA LTDA.', giro: 'Almacén de abarrotes y productos varios', direccion: 'P. A. Cerda 808 Local B', lat: -37.0960, lng: -73.1555, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=2&a=2026', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1754, fecha_decreto: '2026-02-10', tipo: 'Comercial definitiva', rut: '76.111.222-3', razon_social: 'DISTRIBUIDORA Y COMERCIAL LOS AROMOS EIRL', giro: 'Venta de frutas y verduras', direccion: 'Los Aromos 290', lat: -37.0842, lng: -73.1650, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=2&a=2026', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1732, fecha_decreto: '2026-01-22', tipo: 'MEF', rut: '20.123.456-7', razon_social: 'RODRIGO IGNACIO PÉREZ SEPÚLVEDA', giro: 'Taller mecánico automotriz', direccion: 'Aníbal Pinto 1020', lat: -37.0930, lng: -73.1568, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=1&a=2026', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1718, fecha_decreto: '2026-01-15', tipo: 'Alcoholes', rut: '8.123.456-7', razon_social: 'PANADERÍA EL BUEN PAN LTDA.', giro: 'Elaboración y venta de pan con cerveza de botellería', direccion: 'Matta 1205', lat: -37.0965, lng: -73.1578, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=1&a=2026', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1701, fecha_decreto: '2026-01-08', tipo: 'Comercial definitiva', rut: '76.543.210-1', razon_social: 'FERRETERÍA LOS AROMOS LTDA.', giro: 'Venta ferretería y materiales de construcción', direccion: 'Los Aromos 412', lat: -37.0840, lng: -73.1655, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=1&a=2026', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1695, fecha_decreto: '2025-12-28', tipo: 'Profesional', rut: '15.678.901-K', razon_social: 'CAROLINA MUÑOZ ESPINOZA', giro: 'Psicóloga clínica', direccion: 'Galvarino 712', lat: -37.0978, lng: -73.1543, confianza: 'med', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=12&a=2025', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1672, fecha_decreto: '2025-12-15', tipo: 'Comercial definitiva', rut: '77.234.567-8', razon_social: 'INVERSIONES CHICO SPA', giro: 'Restaurant con expendio de alcoholes', direccion: 'Aníbal Pinto 580', lat: -37.0933, lng: -73.1565, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=12&a=2025', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1654, fecha_decreto: '2025-11-20', tipo: 'MEF', rut: '18.345.678-9', razon_social: 'ANDREA SOLEDAD CASTRO ROJAS', giro: 'Manicure y servicios de belleza a domicilio', direccion: 'Pabellón 7 S/N Lota Alto', lat: -37.0905, lng: -73.1520, confianza: 'low', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=11&a=2025', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1621, fecha_decreto: '2025-10-30', tipo: 'Comercial definitiva', rut: '76.999.888-2', razon_social: 'SOCIEDAD COMERCIAL EL ESFUERZO LTDA.', giro: 'Botillería', direccion: 'Pabellón 4, Lota Alto', lat: 0, lng: 0, confianza: 'failed', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=10&a=2025', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1599, fecha_decreto: '2025-10-15', tipo: 'Alcoholes', rut: '77.678.901-K', razon_social: 'BAR RESTAURANT EL MINERO LTDA.', giro: 'Restaurant con expendio de alcoholes', direccion: 'Carlos Cousiño 280', lat: -37.0992, lng: -73.1570, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=10&a=2025', scraped_at: '2026-04-24 03:02' },
+    { n_decreto: 1577, fecha_decreto: '2025-09-25', tipo: 'Comercial definitiva', rut: '76.555.444-3', razon_social: 'BAZAR LIBRERÍA LUNA LTDA.', giro: 'Bazar y librería escolar', direccion: 'Matta 980', lat: -37.0962, lng: -73.1572, confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=164&m=9&a=2025', scraped_at: '2026-04-24 03:02' }
+  ],
+  permisos: [
+    { n_permiso: 'PE-2026-042', tipo: 'Edificación nueva', direccion: 'Los Aromos 512', sector: 'S-2', lat: -37.0844, lng: -73.1648, descripcion: 'Ampliación vivienda 45m²', fecha: '2026-04-10', estado: 'activo', confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=172&m=4&a=2026' },
+    { n_permiso: 'PE-2026-041', tipo: 'Demolición', direccion: 'Serrano 345', sector: 'Centro', lat: -37.0970, lng: -73.1562, descripcion: 'Demolición estructura en mal estado', fecha: '2026-04-08', estado: 'activo', confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=172&m=4&a=2026' },
+    { n_permiso: 'PE-2026-038', tipo: 'Cambio de uso', direccion: 'P.A. Cerda 820', sector: 'Centro', lat: -37.0956, lng: -73.1550, descripcion: 'Cambio uso habitacional a comercial', fecha: '2026-04-03', estado: 'activo', confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=172&m=4&a=2026' },
+    { n_permiso: 'PE-2026-035', tipo: 'Edificación nueva', direccion: 'Vista Hermosa 1250', sector: 'S-3', lat: -37.0815, lng: -73.1620, descripcion: 'Construcción vivienda 78m²', fecha: '2026-03-28', estado: 'activo', confianza: 'med', url: 'https://www.lotatransparente.cl/index.php?ig=172&m=3&a=2026' },
+    { n_permiso: 'PE-2026-030', tipo: 'Ampliación', direccion: 'Caupolicán 605', sector: 'Centro', lat: -37.0922, lng: -73.1515, descripcion: 'Ampliación local comercial 25m²', fecha: '2026-03-20', estado: 'vencido', confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=172&m=3&a=2026' },
+    { n_permiso: 'PE-2026-025', tipo: 'Regularización', direccion: 'Monseñor Fuenzalida 1080', sector: 'S-5', lat: -37.0735, lng: -73.1625, descripcion: 'Regularización construcción existente', fecha: '2026-03-10', estado: 'activo', confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=172&m=3&a=2026' },
+    { n_permiso: 'PE-2026-020', tipo: 'Edificación nueva', direccion: 'Los Aromos 245', sector: 'S-2', lat: -37.0845, lng: -73.1640, descripcion: 'Construcción galpón 120m²', fecha: '2026-02-25', estado: 'ejecutado', confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=172&m=2&a=2026' },
+    { n_permiso: 'PE-2026-015', tipo: 'Demolición', direccion: 'Aníbal Pinto 990', sector: 'Centro', lat: -37.0935, lng: -73.1568, descripcion: 'Demolición parcial, conserva fachada patrimonial', fecha: '2026-02-12', estado: 'activo', confianza: 'high', url: 'https://www.lotatransparente.cl/index.php?ig=172&m=2&a=2026' }
+  ],
+  transito: [
+    { n_decreto: 'DT-2026-018', tipo: 'Corte de calle', direccion: 'Carlos Cousiño (entre Galvarino y Matta)', motivo: 'Obras de pavimentación', fecha_inicio: '2026-04-22', fecha_fin: '2026-05-15', estado: 'vigente', url: 'https://www.lotatransparente.cl/index.php?ig=269&m=4&a=2026' },
+    { n_decreto: 'DT-2026-017', tipo: 'Sentido único transitorio', direccion: 'Matta (tramo norte)', motivo: 'Obras de alcantarillado', fecha_inicio: '2026-04-15', fecha_fin: '2026-05-10', estado: 'vigente', url: 'https://www.lotatransparente.cl/index.php?ig=269&m=4&a=2026' },
+    { n_decreto: 'DT-2026-015', tipo: 'Zona de estacionamiento prohibido', direccion: 'Galvarino (frente Bomberos)', motivo: 'Operación cuartel', fecha_inicio: '2026-04-01', fecha_fin: 'indefinido', estado: 'vigente', url: 'https://www.lotatransparente.cl/index.php?ig=269&m=4&a=2026' },
+    { n_decreto: 'DT-2026-010', tipo: 'Corte total fin de semana', direccion: 'Plaza de Armas y calles aledañas', motivo: 'Feria costumbrista', fecha_inicio: '2026-03-21', fecha_fin: '2026-03-22', estado: 'finalizado', url: 'https://www.lotatransparente.cl/index.php?ig=269&m=3&a=2026' },
+    { n_decreto: 'DT-2026-008', tipo: 'Restricción vehículos pesados', direccion: 'Aníbal Pinto (todo su trazado)', motivo: 'Protección pavimento', fecha_inicio: '2026-03-01', fecha_fin: 'indefinido', estado: 'vigente', url: 'https://www.lotatransparente.cl/index.php?ig=269&m=3&a=2026' },
+    { n_decreto: 'DT-2026-003', tipo: 'Paradero transitorio', direccion: 'Los Aromos 380', motivo: 'Obras paradero permanente', fecha_inicio: '2026-02-10', fecha_fin: '2026-03-30', estado: 'finalizado', url: 'https://www.lotatransparente.cl/index.php?ig=269&m=2&a=2026' }
+  ],
+  organizaciones: [
+    { n_personalidad: '3421', tipo: 'Junta de Vecinos', nombre: 'JJ.VV. Los Aromos', direccion: 'Los Aromos 245', representante: 'María Hernández Parra', rut_rep: '12.345.678-9', vigencia: 'Vigente hasta 2027-05-30', sector: 'S-2', url: 'https://www.lotatransparente.cl/index.php?ig=351' },
+    { n_personalidad: '3398', tipo: 'Junta de Vecinos', nombre: 'Junta Vecinal El Esfuerzo', direccion: 'Pabellón 4, Lota Alto', representante: 'Carlos Sanhueza Vera', rut_rep: '10.987.654-3', vigencia: 'Vigente hasta 2026-11-20', sector: 'Centro', url: 'https://www.lotatransparente.cl/index.php?ig=351' },
+    { n_personalidad: '3287', tipo: 'Centro de Madres', nombre: 'Centro de Madres Nueva Vida', direccion: 'Vista Hermosa 890', representante: 'Alejandra Roa Mella', rut_rep: '14.567.890-2', vigencia: 'Vigente hasta 2027-01-15', sector: 'S-3', url: 'https://www.lotatransparente.cl/index.php?ig=351' },
+    { n_personalidad: '3145', tipo: 'Club Deportivo', nombre: 'Club Deportivo Minero', direccion: 'Cancha Los Aromos', representante: 'Pedro Cifuentes Luna', rut_rep: '11.222.333-4', vigencia: 'Vigente hasta 2026-08-30', sector: 'S-2', url: 'https://www.lotatransparente.cl/index.php?ig=351' },
+    { n_personalidad: '3098', tipo: 'Junta de Vecinos', nombre: 'JJ.VV. Vista Hermosa', direccion: 'Vista Hermosa 1150', representante: 'Rosa Mardones Gutierrez', rut_rep: '13.444.555-6', vigencia: 'Vigente hasta 2026-12-10', sector: 'S-3', url: 'https://www.lotatransparente.cl/index.php?ig=351' },
+    { n_personalidad: '2987', tipo: 'Adulto Mayor', nombre: 'Club Adulto Mayor Los Pioneros', direccion: 'Sede Carlos Cousiño 320', representante: 'Juan Espinoza Vega', rut_rep: '6.789.012-3', vigencia: 'Vigente hasta 2027-03-20', sector: 'Centro', url: 'https://www.lotatransparente.cl/index.php?ig=351' },
+    { n_personalidad: '2876', tipo: 'Comité', nombre: 'Comité de Allegados La Esperanza', direccion: 'Sector Lota Alto Norte', representante: 'Patricia Bravo Núñez', rut_rep: '15.678.901-2', vigencia: 'Vigente hasta 2026-07-15', sector: 'S-5', url: 'https://www.lotatransparente.cl/index.php?ig=351' },
+    { n_personalidad: '2754', tipo: 'Junta de Vecinos', nombre: 'JJ.VV. Los Mineros', direccion: 'Pabellón 7, Lota Alto', representante: 'Sergio Aravena Pino', rut_rep: '9.123.456-K', vigencia: 'Vigente hasta 2027-02-28', sector: 'Centro', url: 'https://www.lotatransparente.cl/index.php?ig=351' }
+  ]
+};
+
+// ---------- ESTADO ----------
+let currentUser = null;
+let isOnline = true;
+let heatmapOn = false;
+let currentView = 'map';
+let map, heatLayer;
+let layerGroups = {};
+let activeLayers = {
+  centro_acopio: true,
+  sede_comunitaria: true,
+  zona_peligro: true,
+  patente: true,
+  reporte: true,
+  plan_regulador: true,
+  infraestructura: true
+};
+let activeDangerFilter = 'all';
+let allElements = [...DATOS_SEED];
+let pendingSync = [];
+let sortState = { column: 'fecha', dir: 'desc' };
+let selectedNewType = null;
+let currentGPS = { lat: LOTA_CENTER[0], lng: LOTA_CENTER[1] };
+let charts = {};
+
+// ---------- LOCALSTORAGE ----------
+const STORE_KEY = 'sigespu_lota_data';
+const PENDING_KEY = 'sigespu_lota_pending';
+
+function loadFromStorage() {
+  try {
+    const stored = localStorage.getItem(STORE_KEY);
+    if (stored) {
+      const userData = JSON.parse(stored);
+      allElements = [...DATOS_SEED, ...userData];
+    }
+    const pend = localStorage.getItem(PENDING_KEY);
+    if (pend) pendingSync = JSON.parse(pend);
+  } catch (e) { console.warn('Storage error', e); }
+}
+
+function saveToStorage(element) {
+  try {
+    const userData = allElements.filter(e => !DATOS_SEED.find(s => s.id === e.id));
+    localStorage.setItem(STORE_KEY, JSON.stringify(userData));
+    if (!isOnline) {
+      pendingSync.push(element.id);
+      localStorage.setItem(PENDING_KEY, JSON.stringify(pendingSync));
+      updatePendingCount();
+    }
+  } catch (e) { console.warn('Save error', e); }
+}
+
+function updatePendingCount() {
+  document.getElementById('pending-count').textContent = `${pendingSync.length} pendiente${pendingSync.length === 1 ? '' : 's'}`;
+}
+
+// ---------- LOGIN ----------
+function doLogin() {
+  const email = document.getElementById('email').value;
+  const role = email.includes('director') ? 'director' : 'funcionario';
+  loginAs(role);
+}
+
+function loginAs(role) {
+  const users = {
+    director: { name: 'Jaime Vásquez C.', role: 'Director', email: 'director@munilota.cl', initials: 'JV', roleType: 'director' },
+    funcionario: { name: 'Rodrigo Sepúlveda', role: 'Funcionario', email: 'funcionario@munilota.cl', initials: 'RS', roleType: 'funcionario' }
+  };
+  currentUser = users[role];
+  document.getElementById('user-name').textContent = currentUser.name;
+  document.getElementById('user-role').textContent = currentUser.role;
+  document.getElementById('user-avatar').textContent = currentUser.initials;
+  document.getElementById('user-chip').className = 'user-chip ' + currentUser.roleType;
+
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('app').classList.add('active');
+  initApp();
+}
+
+function doLogout() {
+  document.getElementById('app').classList.remove('active');
+  document.getElementById('login').style.display = 'flex';
+  if (map) { map.remove(); map = null; }
+}
+
+// ---------- INIT APP ----------
+function initApp() {
+  loadFromStorage();
+  loadCustomZones();
+  setTimeout(() => {
+    initMap();
+    renderLayersSidebar();
+    renderCustomZones();
+    renderResumen();
+    renderTabla();
+    updateResumenDate();
+    bindDangerFilters();
+  }, 50);
+}
+
+function updateResumenDate() {
+  const now = new Date();
+  const fmt = now.toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  document.getElementById('resumen-date').textContent = fmt;
+}
+
+// ---------- MAP ----------
+function initMap() {
+  map = L.map('map', { zoomControl: true, attributionControl: true }).setView(LOTA_CENTER, LOTA_ZOOM);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO · SIGESPU Lota · I. Municipalidad de Lota',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  map.on('mousemove', (e) => {
+    document.getElementById('coord-display').textContent = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+  });
+  map.on('click', (e) => { currentGPS = { lat: e.latlng.lat, lng: e.latlng.lng }; });
+
+  // Plan Regulador
+  const planRegGroup = L.layerGroup();
+  SECTORES.forEach(s => {
+    const poly = L.polygon(s.coords, {
+      color: '#CA8A04', weight: 2, opacity: 0.7,
+      fillColor: s.color, fillOpacity: 0.18
+    }).bindPopup(`<div class="popup-type">Plan Regulador</div><h4>Sector ${s.code}</h4><div class="popup-meta">${s.name}</div>`);
+    planRegGroup.addLayer(poly);
+  });
+  layerGroups.plan_regulador = planRegGroup;
+  planRegGroup.addTo(map);
+
+  // Element layers
+  ['centro_acopio','sede_comunitaria','zona_peligro','patente','reporte','infraestructura'].forEach(t => {
+    layerGroups[t] = L.layerGroup().addTo(map);
+  });
+
+  renderMarkers();
+}
+
+function createIcon(tipo, pending = false) {
+  const t = TIPOS[tipo];
+  if (!t) return null;
+  const paths = t.iconPath.split('|').map(p => `<path d="${p}" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`).join('');
+  const html = `<div class="custom-marker ${pending ? 'marker-pending' : ''}" style="background:${t.color}">
+    <svg viewBox="0 0 24 24" fill="none">${paths}</svg>
+  </div>`;
+  return L.divIcon({ html, className: '', iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32] });
+}
+
+function renderMarkers() {
+  Object.keys(layerGroups).forEach(k => {
+    if (k !== 'plan_regulador') layerGroups[k].clearLayers();
+  });
+
+  const dateLimit = getDateLimit();
+  let visibleCount = 0;
+
+  allElements.forEach(el => {
+    const layerKey = getLayerKey(el.tipo);
+    if (!layerKey || !activeLayers[layerKey]) return;
+    if (dateLimit && new Date(el.fecha) < dateLimit) return;
+    if (el.tipo === 'zona_peligro' && activeDangerFilter !== 'all' && el.tipo_peligro !== activeDangerFilter) return;
+
+    const pending = pendingSync.includes(el.id);
+    const icon = createIcon(el.tipo, pending);
+    if (!icon) return;
+
+    const marker = L.marker([el.lat, el.lng], { icon })
+      .bindPopup(buildPopup(el));
+    layerGroups[layerKey].addLayer(marker);
+
+    if (el.tipo === 'zona_peligro' && el.nivel) {
+      const radius = 30 + el.nivel * 15;
+      const zone = L.circle([el.lat, el.lng], {
+        radius, color: '#B91C1C', weight: 1.5, opacity: 0.6,
+        fillColor: '#B91C1C', fillOpacity: 0.08 + (el.nivel * 0.03)
+      });
+      layerGroups[layerKey].addLayer(zone);
+    }
+    visibleCount++;
+  });
+
+  document.getElementById('visible-count').textContent = `${visibleCount} elemento${visibleCount === 1 ? '' : 's'}`;
+  updateLayerCounts();
+  updateHeatmap();
+}
+
+function buildPopup(el) {
+  const t = TIPOS[el.tipo];
+  const pending = pendingSync.includes(el.id);
+  let html = `<div class="popup-type">${t.nombre}${pending ? ' · Pendiente sync' : ''}</div>`;
+  html += `<h4>${el.nombre}</h4>`;
+  html += `<div style="font-size:11.5px;color:var(--stone-600);margin-top:4px">${el.direccion}</div>`;
+
+  if (el.tipo === 'zona_peligro') {
+    const niveles = ['', 'Muy bajo', 'Bajo', 'Medio', 'Alto', 'Crítico'];
+    html += `<div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+      <span class="badge-inline" style="background:#FEE2E2;color:#B91C1C">Nivel ${el.nivel} · ${niveles[el.nivel]}</span>
+      <span class="badge-inline" style="background:#F5F5F4;color:#57534E">${TIPOS_PELIGRO[el.tipo_peligro] || 'Otro'}</span>
+    </div>`;
+    if (el.horario) html += `<div class="popup-meta"><strong>Horario crítico:</strong> ${el.horario}</div>`;
+  }
+
+  if (el.rut) html += `<div class="popup-meta"><strong>RUT:</strong> ${el.rut}<br><strong>Giro:</strong> ${el.giro}</div>`;
+  if (el.capacidad) html += `<div class="popup-meta"><strong>Capacidad:</strong> ${el.capacidad} personas</div>`;
+  if (el.notas) html += `<div class="popup-meta">${el.notas}</div>`;
+  html += `<div class="popup-meta"><strong>Registrado:</strong> ${formatDate(el.fecha)} · ${el.by}</div>`;
+  return html;
+}
+
+function getLayerKey(tipo) {
+  if (tipo.startsWith('reporte_')) return 'reporte';
+  return tipo;
+}
+
+function updateLayerCounts() {
+  const counts = {};
+  allElements.forEach(el => {
+    const k = getLayerKey(el.tipo);
+    counts[k] = (counts[k] || 0) + 1;
+  });
+  document.querySelectorAll('.layer-toggle').forEach(lt => {
+    const k = lt.dataset.layer;
+    const badge = lt.querySelector('.layer-count');
+    if (badge) badge.textContent = counts[k] || 0;
+  });
+  const active = Object.values(activeLayers).filter(Boolean).length;
+  document.getElementById('layer-count').textContent = `${active}/${Object.keys(activeLayers).length}`;
+}
+
+function getDateLimit() {
+  const range = document.getElementById('date-range')?.value || '30';
+  if (range === 'all') return null;
+  const d = new Date();
+  d.setDate(d.getDate() - parseInt(range));
+  return d;
+}
+
+// ---------- SIDEBAR LAYERS ----------
+function renderLayersSidebar() {
+  const layers = [
+    { key: 'centro_acopio', name: 'Centros de acopio', color: '#EA580C', icon: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' },
+    { key: 'sede_comunitaria', name: 'Sedes comunitarias', color: '#16A34A', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2' },
+    { key: 'zona_peligro', name: 'Zonas de peligro', color: '#B91C1C', icon: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z' },
+    { key: 'reporte', name: 'Reportes de seguridad', color: '#EF4444', icon: 'M12 22s-8-4.5-8-11.8A8 8 0 0112 2a8 8 0 018 8.2c0 7.3-8 11.8-8 11.8z' },
+    { key: 'patente', name: 'Patentes comerciales', color: '#D97706', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l7-4z' },
+    { key: 'infraestructura', name: 'Infraestructura pública', color: '#1E3A8A', icon: 'M12 2L3 7v10a2 2 0 002 2h14a2 2 0 002-2V7l-9-5z' },
+    { key: 'plan_regulador', name: 'Plan Regulador', color: '#CA8A04', icon: 'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0116 0z' }
+  ];
+  const list = document.getElementById('layers-list');
+  list.innerHTML = layers.map(l => `
+    <div class="layer-toggle ${activeLayers[l.key] ? 'active' : ''}" data-layer="${l.key}" onclick="toggleLayer('${l.key}')">
+      <div class="layer-icon" style="background:${l.color}22;color:${l.color}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${l.icon}"/></svg>
+      </div>
+      <span class="layer-name">${l.name}</span>
+      <span class="layer-count">0</span>
+      <div class="switch"></div>
+    </div>
+  `).join('');
+  updateLayerCounts();
+}
+
+function toggleLayer(key) {
+  activeLayers[key] = !activeLayers[key];
+  if (key === 'plan_regulador') {
+    if (activeLayers[key]) layerGroups.plan_regulador.addTo(map);
+    else map.removeLayer(layerGroups.plan_regulador);
+  }
+  document.querySelector(`.layer-toggle[data-layer="${key}"]`).classList.toggle('active', activeLayers[key]);
+  renderMarkers();
+}
+
+function bindDangerFilters() {
+  document.querySelectorAll('#danger-filter .filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#danger-filter .filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      activeDangerFilter = chip.dataset.filter;
+      renderMarkers();
+    });
+  });
+  document.getElementById('date-range').addEventListener('change', renderMarkers);
+}
+
+// ---------- HEATMAP ----------
+function toggleHeatmap() {
+  heatmapOn = !heatmapOn;
+  document.getElementById('heatmap-toggle').classList.toggle('active', heatmapOn);
+  updateHeatmap();
+}
+
+function updateHeatmap() {
+  if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+  if (!heatmapOn) return;
+
+  const dateLimit = getDateLimit();
+  const points = allElements
+    .filter(e => {
+      if (!e.tipo.startsWith('reporte_') && e.tipo !== 'zona_peligro') return false;
+      if (dateLimit && new Date(e.fecha) < dateLimit) return false;
+      return true;
+    })
+    .map(e => [e.lat, e.lng, e.tipo === 'zona_peligro' ? (e.nivel || 3) * 0.3 : 0.7]);
+
+  if (points.length > 0) {
+    heatLayer = L.heatLayer(points, {
+      radius: 35, blur: 25, maxZoom: 17,
+      gradient: { 0.2: '#FED7AA', 0.4: '#FB923C', 0.6: '#EA580C', 0.8: '#C2410C', 1.0: '#7C2D12' }
+    }).addTo(map);
+  }
+}
+
+function locateMe() {
+  map.flyTo(LOTA_CENTER, 15, { duration: 1 });
+}
+
+// ---------- VIEW SWITCHER ----------
+function setView(view) {
+  currentView = view;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.getElementById('view-map').classList.toggle('hidden', view !== 'map');
+  document.getElementById('view-resumen').classList.toggle('hidden', view !== 'resumen');
+  document.getElementById('view-tabla').classList.toggle('hidden', view !== 'tabla');
+  document.getElementById('view-scraping').classList.toggle('hidden', view !== 'scraping');
+
+  if (view === 'map' && map) setTimeout(() => map.invalidateSize(), 100);
+  if (view === 'resumen') renderResumen();
+  if (view === 'tabla') renderTabla();
+  if (view === 'scraping') renderScrapingTable();
+}
+
+// ---------- RESUMEN ----------
+function renderResumen() {
+  const reportes = allElements.filter(e => e.tipo.startsWith('reporte_'));
+  const zonas = allElements.filter(e => e.tipo === 'zona_peligro' && e.estado === 'activo');
+  const patentes = allElements.filter(e => e.tipo === 'patente');
+  const acopios = allElements.filter(e => e.tipo === 'centro_acopio');
+  const sedes = allElements.filter(e => e.tipo === 'sede_comunitaria');
+
+  document.getElementById('kpi-reportes').textContent = reportes.length;
+  document.getElementById('kpi-zonas').textContent = zonas.length;
+  document.getElementById('kpi-patentes').textContent = patentes.filter(p => new Date(p.fecha).getFullYear() >= 2026).length;
+  document.getElementById('kpi-acopios').textContent = acopios.length;
+  document.getElementById('kpi-sedes').textContent = sedes.length;
+
+  // Sector list
+  const sectorCounts = {};
+  SECTORES.forEach(s => sectorCounts[s.code] = 0);
+  zonas.forEach(z => { if (sectorCounts[z.sector] !== undefined) sectorCounts[z.sector]++; });
+  const maxSector = Math.max(1, ...Object.values(sectorCounts));
+
+  const sectorColors = { 'S-2': '#22C55E', 'S-3': '#EAB308', 'S-4': '#3B82F6', 'S-5': '#8B5CF6', 'Centro': '#EA580C' };
+  document.getElementById('sector-list').innerHTML = SECTORES.map(s => `
+    <div class="sector-row">
+      <span class="sector-code" style="background:${sectorColors[s.code]}">${s.code}</span>
+      <div class="sector-info">
+        <div class="name">${s.name}</div>
+        <div class="stats">${sectorCounts[s.code]} zona${sectorCounts[s.code] === 1 ? '' : 's'} activa${sectorCounts[s.code] === 1 ? '' : 's'}</div>
+      </div>
+      <div class="sector-bar"><div class="sector-bar-fill" style="width:${(sectorCounts[s.code] / maxSector * 100)}%"></div></div>
+    </div>
+  `).join('');
+
+  // Recent list
+  const recent = [...reportes].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 5);
+  const recentColors = { reporte_robo: '#B91C1C', reporte_vandalismo: '#A855F7', reporte_accidente: '#F97316' };
+  document.getElementById('recent-list').innerHTML = recent.map(r => {
+    const t = TIPOS[r.tipo];
+    return `<div class="recent-item">
+      <div class="recent-icon" style="background:${recentColors[r.tipo]}22;color:${recentColors[r.tipo]}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="${t.iconPath.split('|')[0]}"/></svg>
+      </div>
+      <div class="recent-body">
+        <div class="title">${r.nombre}</div>
+        <div class="meta">
+          <span>${r.direccion}</span>
+          <span class="recent-tag" style="background:${recentColors[r.tipo]}22;color:${recentColors[r.tipo]}">${t.nombre}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  renderCharts(reportes);
+}
+
+function renderCharts(reportes) {
+  // Pie chart: tipos
+  const tipoCtx = document.getElementById('chart-tipos');
+  if (tipoCtx) {
+    const counts = { Robo: 0, Vandalismo: 0, Accidente: 0 };
+    reportes.forEach(r => {
+      if (r.tipo === 'reporte_robo') counts.Robo++;
+      else if (r.tipo === 'reporte_vandalismo') counts.Vandalismo++;
+      else if (r.tipo === 'reporte_accidente') counts.Accidente++;
+    });
+    if (charts.tipos) charts.tipos.destroy();
+    charts.tipos = new Chart(tipoCtx, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(counts),
+        datasets: [{
+          data: Object.values(counts),
+          backgroundColor: ['#B91C1C', '#A855F7', '#F97316'],
+          borderColor: '#FFFFFF', borderWidth: 3
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { font: { family: 'Inter', size: 12 }, padding: 14, usePointStyle: true, pointStyle: 'circle' } }
+        },
+        cutout: '65%'
+      }
+    });
+  }
+
+  // Trend line
+  const trendCtx = document.getElementById('chart-trend');
+  if (trendCtx) {
+    const weeks = ['Semana -4', 'Semana -3', 'Semana -2', 'Semana -1', 'Esta semana'];
+    const data = [4, 6, 5, 8, reportes.filter(r => {
+      const d = new Date(r.fecha);
+      const w = new Date(); w.setDate(w.getDate() - 7);
+      return d >= w;
+    }).length];
+    if (charts.trend) charts.trend.destroy();
+    charts.trend = new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels: weeks,
+        datasets: [{
+          label: 'Reportes',
+          data,
+          borderColor: '#EA580C',
+          backgroundColor: 'rgba(234,88,12,0.1)',
+          fill: true, tension: 0.3,
+          pointRadius: 5, pointBackgroundColor: '#EA580C', pointBorderColor: '#FFF', pointBorderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#F5F5F4' }, ticks: { font: { family: 'Inter', size: 11 } } },
+          x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 } } }
+        }
+      }
+    });
+  }
+}
+
+// ---------- TABLA ----------
+function renderTabla() {
+  const tipo = document.getElementById('filter-tipo').value;
+  const sector = document.getElementById('filter-sector').value;
+  const estado = document.getElementById('filter-estado').value;
+  const search = document.getElementById('search-input').value.toLowerCase();
+
+  let filtered = allElements.filter(e => {
+    if (tipo !== 'all') {
+      if (tipo === 'reporte' && !e.tipo.startsWith('reporte_')) return false;
+      if (tipo !== 'reporte' && e.tipo !== tipo) return false;
+    }
+    if (sector !== 'all' && e.sector !== sector) return false;
+    if (estado !== 'all') {
+      if (estado === 'pendiente_sync' && !pendingSync.includes(e.id)) return false;
+      if (estado !== 'pendiente_sync' && e.estado !== estado) return false;
+    }
+    if (search) {
+      const blob = `${e.nombre} ${e.direccion} ${e.rut || ''} ${e.notas || ''}`.toLowerCase();
+      if (!blob.includes(search)) return false;
+    }
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    const col = sortState.column;
+    let va = a[col] || '', vb = b[col] || '';
+    if (col === 'fecha') { va = new Date(va).getTime() || 0; vb = new Date(vb).getTime() || 0; }
+    else { va = String(va).toLowerCase(); vb = String(vb).toLowerCase(); }
+    return sortState.dir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+  });
+
+  document.getElementById('result-count').textContent = filtered.length;
+  document.getElementById('total-count').textContent = allElements.length;
+
+  const estadoColor = {
+    activo: 'background:#DCFCE7;color:#15803D',
+    en_revision: 'background:#FEF3C7;color:#CA8A04',
+    cerrado: 'background:#F1F5F9;color:#64748B',
+    pendiente_sync: 'background:#FED7AA;color:#C2410C'
+  };
+
+  document.getElementById('tabla-body').innerHTML = filtered.map(e => {
+    const t = TIPOS[e.tipo];
+    const est = pendingSync.includes(e.id) ? 'pendiente_sync' : (e.estado || 'activo');
+    const estLabel = { activo: 'Activo', en_revision: 'En revisión', cerrado: 'Cerrado', pendiente_sync: 'Pendiente sync' }[est];
+    return `<tr>
+      <td><span class="badge-inline" style="background:${t.color}22;color:${t.color}">${t.nombre}</span></td>
+      <td><strong>${e.nombre}</strong>${e.notas ? `<div style="font-size:11px;color:var(--stone-500);margin-top:2px">${e.notas.slice(0,80)}${e.notas.length > 80 ? '...' : ''}</div>` : ''}</td>
+      <td>${e.sector || '—'}</td>
+      <td>${e.direccion}</td>
+      <td>${formatDate(e.fecha)}</td>
+      <td><span class="badge-inline" style="${estadoColor[est]}">${estLabel}</span></td>
+      <td>${e.by}</td>
+    </tr>`;
+  }).join('');
+}
+
+function sortTabla(col) {
+  if (sortState.column === col) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+  else { sortState.column = col; sortState.dir = 'asc'; }
+  renderTabla();
+}
+
+function formatDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// ---------- ADD MODAL ----------
+function openAddModal() {
+  selectedNewType = null;
+  document.getElementById('add-modal-title').textContent = 'Agregar elemento';
+  document.getElementById('add-modal-body').innerHTML = renderTypeGrid();
+  document.getElementById('add-modal-save').style.display = 'none';
+  document.getElementById('add-modal').classList.remove('hidden');
+}
+
+function closeAddModal() {
+  document.getElementById('add-modal').classList.add('hidden');
+}
+
+function renderTypeGrid() {
+  const groups = [
+    { title: 'Infraestructura comunitaria', types: ['centro_acopio', 'sede_comunitaria', 'infraestructura'] },
+    { title: 'Seguridad pública', types: ['zona_peligro', 'reporte_robo', 'reporte_vandalismo', 'reporte_accidente'] },
+    { title: 'Incidentes urbanos', types: ['arbol_caido', 'poste_caido', 'sector_sin_luz', 'cable_colgando', 'semaforo_dañado', 'socavon', 'fuga_agua', 'microbasural'] },
+    { title: 'Cobertura y fiscalización', types: ['patente', 'luminaria', 'camara'] }
+  ];
+  let html = '<p style="font-size:12.5px;color:var(--stone-600);margin-bottom:14px">Selecciona el tipo de elemento a agregar. El GPS capturará tu ubicación actual automáticamente.</p>';
+  groups.forEach(g => {
+    html += `<h4 style="font-size:11px;font-weight:700;color:var(--stone-500);text-transform:uppercase;letter-spacing:0.06em;margin:14px 0 8px">${g.title}</h4>`;
+    html += '<div class="type-grid">';
+    g.types.forEach(k => {
+      const t = TIPOS[k];
+      const paths = t.iconPath.split('|').map(p => `<path d="${p}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`).join('');
+      html += `<button class="type-card" onclick="selectType('${k}')">
+        <div class="type-card-icon" style="background:${t.color}22;color:${t.color}">
+          <svg viewBox="0 0 24 24" fill="none">${paths}</svg>
+        </div>
+        <span class="type-card-name">${t.nombre}</span>
+      </button>`;
+    });
+    html += '</div>';
+  });
+  return html;
+}
+
+function selectType(tipo) {
+  selectedNewType = tipo;
+  const t = TIPOS[tipo];
+  document.getElementById('add-modal-title').textContent = `Nuevo: ${t.nombre}`;
+  document.getElementById('add-modal-save').style.display = 'inline-flex';
+
+  const sugerencia = buscarSugerencia(tipo, currentGPS);
+
+  let body = '';
+  if (sugerencia) {
+    body += `<div class="suggestion-card">
+      <div class="suggestion-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9.66 17h4.68M12 3v1M18.36 5.64l-.71.71M21 12h-1M3 12H2M5.64 5.64l.71.71M16 11a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Sugerencia encontrada · ${sugerencia.distancia}m
+      </div>
+      <div class="suggestion-data">
+        <strong>${sugerencia.nombre}</strong>
+        <div class="meta">${sugerencia.direccion}${sugerencia.rut ? ' · RUT ' + sugerencia.rut : ''}</div>
+        <div class="meta">${sugerencia.tipo_nombre} · ${formatDate(sugerencia.fecha)}</div>
+      </div>
+      <div class="suggestion-actions">
+        <button class="btn-mini primary" onclick="usarSugerencia('${sugerencia.id}')">Usar estos datos</button>
+        <button class="btn-mini secondary" onclick="descartarSugerencia()">Descartar</button>
+      </div>
+    </div>`;
+  }
+
+  body += `<div class="gps-capture">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 00-8 8c0 4.7 8 12 8 12s8-7.3 8-12a8 8 0 00-8-8z"/></svg>
+    <div class="text">
+      <div class="label">Ubicación capturada</div>
+      <div class="coords">${currentGPS.lat.toFixed(5)}, ${currentGPS.lng.toFixed(5)}</div>
+    </div>
+  </div>`;
+
+  body += `<div class="form-section">
+    <label>Nombre / Descripción</label>
+    <input type="text" id="new-nombre" placeholder="Ej: Almacén Don Pedro" />
+  </div>`;
+
+  body += `<div class="form-section">
+    <label>Dirección</label>
+    <input type="text" id="new-direccion" placeholder="Ej: Carlos Cousiño 340, Lota" />
+  </div>`;
+
+  if (tipo === 'zona_peligro') {
+    body += `<div class="form-row">
+      <div class="form-section">
+        <label>Tipo de peligro</label>
+        <select id="new-tipo-peligro">
+          ${Object.entries(TIPOS_PELIGRO).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-section">
+        <label>Horario crítico</label>
+        <select id="new-horario">
+          <option value="24/7">24/7</option>
+          <option value="Nocturno (22:00-06:00)">Nocturno</option>
+          <option value="Tarde/Noche">Tarde/Noche</option>
+          <option value="Fines de semana">Fines de semana</option>
+          <option value="Días hábiles">Días hábiles</option>
+        </select>
+      </div>
+    </div>`;
+    body += `<div class="form-section">
+      <label>Nivel de riesgo</label>
+      <div class="risk-scale">
+        <button class="risk-level" data-level="1" onclick="setRisk(1)">1</button>
+        <button class="risk-level" data-level="2" onclick="setRisk(2)">2</button>
+        <button class="risk-level selected" data-level="3" onclick="setRisk(3)">3</button>
+        <button class="risk-level" data-level="4" onclick="setRisk(4)">4</button>
+        <button class="risk-level" data-level="5" onclick="setRisk(5)">5</button>
+      </div>
+      <input type="hidden" id="new-nivel" value="3" />
+    </div>`;
+  }
+
+  if (tipo === 'centro_acopio') {
+    body += `<div class="form-section">
+      <label>Capacidad (personas)</label>
+      <input type="number" id="new-capacidad" placeholder="200" />
+    </div>`;
+  }
+
+  body += `<div class="form-section">
+    <label>Notas / Observaciones</label>
+    <textarea id="new-notas" placeholder="Detalles, horario, observaciones..."></textarea>
+  </div>`;
+
+  document.getElementById('add-modal-body').innerHTML = body;
+}
+
+function buscarSugerencia(tipo, gps) {
+  const candidatos = allElements.filter(e => {
+    if (tipo === 'patente') return e.tipo === 'patente';
+    if (tipo === 'zona_peligro') return e.tipo === 'zona_peligro';
+    return false;
+  });
+  let mejor = null, mejorDist = Infinity;
+  candidatos.forEach(e => {
+    const d = haversine(gps.lat, gps.lng, e.lat, e.lng);
+    if (d < 50 && d < mejorDist) { mejorDist = d; mejor = e; }
+  });
+  if (!mejor) return null;
+  return {
+    id: mejor.id, nombre: mejor.nombre, direccion: mejor.direccion,
+    rut: mejor.rut, fecha: mejor.fecha, tipo_nombre: TIPOS[mejor.tipo].nombre,
+    distancia: Math.round(mejorDist)
+  };
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function usarSugerencia(id) {
+  const s = allElements.find(e => e.id === id);
+  if (!s) return;
+  document.getElementById('new-nombre').value = s.nombre;
+  document.getElementById('new-direccion').value = s.direccion;
+  document.getElementById('new-notas').value = 'Verificación en terreno de registro existente.\n' + (s.notas || '');
+}
+
+function descartarSugerencia() {
+  document.querySelector('.suggestion-card')?.remove();
+}
+
+function setRisk(level) {
+  document.querySelectorAll('.risk-level').forEach(b => b.classList.toggle('selected', parseInt(b.dataset.level) === level));
+  document.getElementById('new-nivel').value = level;
+}
+
+function saveElement() {
+  const nombre = document.getElementById('new-nombre').value.trim();
+  const direccion = document.getElementById('new-direccion').value.trim();
+  if (!nombre || !direccion) { alert('Completa nombre y dirección'); return; }
+
+  const sector = inferirSector(currentGPS);
+  const id = 'user-' + Date.now();
+  const el = {
+    id, tipo: selectedNewType, nombre, direccion, sector,
+    lat: currentGPS.lat, lng: currentGPS.lng,
+    fecha: new Date().toISOString().slice(0, 10),
+    estado: 'activo', by: currentUser.name + ' · Terreno',
+    notas: document.getElementById('new-notas').value.trim() || null
+  };
+  if (selectedNewType === 'zona_peligro') {
+    el.tipo_peligro = document.getElementById('new-tipo-peligro').value;
+    el.nivel = parseInt(document.getElementById('new-nivel').value);
+    el.horario = document.getElementById('new-horario').value;
+  }
+  if (selectedNewType === 'centro_acopio') {
+    el.capacidad = parseInt(document.getElementById('new-capacidad').value) || null;
+  }
+
+  allElements.push(el);
+  saveToStorage(el);
+  closeAddModal();
+  renderMarkers();
+  renderTabla();
+  renderResumen();
+
+  // Flash to new marker
+  map.flyTo([el.lat, el.lng], 17, { duration: 0.8 });
+}
+
+function inferirSector(gps) {
+  for (const s of SECTORES) {
+    if (pointInPolygon([gps.lat, gps.lng], s.coords)) return s.code;
+  }
+  return 'Centro';
+}
+
+function pointInPolygon(point, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    const intersect = ((yi > point[1]) !== (yj > point[1])) && (point[0] < (xj - xi) * (point[1] - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// ---------- CONNECTION ----------
+function toggleConnection() {
+  isOnline = !isOnline;
+  const status = document.getElementById('conn-status');
+  const banner = document.getElementById('offline-banner');
+  const toggleLabel = document.getElementById('conn-toggle-label');
+
+  if (!isOnline) {
+    status.className = 'conn-status offline';
+    status.querySelector('.label').textContent = 'Sin conexión';
+    banner.classList.remove('hidden');
+    toggleLabel.textContent = 'Simular reconexión';
+    updatePendingCount();
+  } else {
+    status.className = 'conn-status syncing';
+    status.querySelector('.label').textContent = 'Sincronizando...';
+    toggleLabel.textContent = 'Simular offline';
+    setTimeout(() => {
+      pendingSync = [];
+      localStorage.setItem(PENDING_KEY, '[]');
+      status.className = 'conn-status online';
+      status.querySelector('.label').textContent = 'En línea';
+      banner.classList.add('hidden');
+      renderMarkers();
+      renderTabla();
+    }, 1500);
+  }
+}
+
+// ---------- EXPORT PDF ----------
+function openExportPreview() {
+  const now = new Date();
+  const fechaFmt = now.toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  const tipo = currentView === 'tabla' ? document.getElementById('filter-tipo').value : 'all';
+  const sector = currentView === 'tabla' ? document.getElementById('filter-sector').value : 'all';
+
+  let filtered = allElements;
+  if (tipo !== 'all') {
+    filtered = filtered.filter(e => tipo === 'reporte' ? e.tipo.startsWith('reporte_') : e.tipo === tipo);
+  }
+  if (sector !== 'all') filtered = filtered.filter(e => e.sector === sector);
+
+  const zonas = filtered.filter(e => e.tipo === 'zona_peligro');
+  const reportes = filtered.filter(e => e.tipo.startsWith('reporte_'));
+  const patentes = filtered.filter(e => e.tipo === 'patente');
+
+  const html = `<div class="pdf-preview" id="pdf-content">
+    <div class="pdf-header">
+      <svg class="logo" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="22" fill="#1E3A8A"/>
+        <path d="M12 30 L12 20 Q12 14 18 14 L30 14 Q36 14 36 20 L36 30 Z" fill="#EA580C"/>
+      </svg>
+      <div style="flex:1">
+        <h1>SIGESPU Lota · Informe operativo</h1>
+        <div class="sub">Dirección de Seguridad Pública · I. Municipalidad de Lota</div>
+      </div>
+      <div style="text-align:right;font-size:9px;color:var(--stone-500)">
+        <div style="font-weight:600;color:var(--stone-900);font-size:11px">Documento N° ${Date.now().toString().slice(-6)}</div>
+        <div>${fechaFmt}</div>
+      </div>
+    </div>
+
+    <div class="pdf-meta">
+      <div><strong>Generado por</strong>${currentUser.name}</div>
+      <div><strong>Rol</strong>${currentUser.role}</div>
+      <div><strong>Filtros aplicados</strong>Tipo: ${tipo === 'all' ? 'Todos' : tipo} · Sector: ${sector === 'all' ? 'Todos' : sector}</div>
+    </div>
+
+    <h2>Resumen</h2>
+    <p style="margin-bottom:12px;line-height:1.6">
+      Total de registros consultados: <strong>${filtered.length}</strong>.
+      ${zonas.length} zona${zonas.length === 1 ? '' : 's'} de peligro identificadas,
+      ${reportes.length} reporte${reportes.length === 1 ? '' : 's'} de seguridad,
+      ${patentes.length} patente${patentes.length === 1 ? '' : 's'} comercial${patentes.length === 1 ? '' : 'es'}.
+    </p>
+
+    ${zonas.length > 0 ? `
+      <h2>Zonas de peligro activas</h2>
+      <table>
+        <thead><tr><th>Nombre</th><th>Tipo</th><th>Nivel</th><th>Sector</th><th>Registrado</th></tr></thead>
+        <tbody>
+          ${zonas.slice(0, 10).map(z => `<tr>
+            <td><strong>${z.nombre}</strong><br><span style="font-size:9px;color:var(--stone-500)">${z.direccion}</span></td>
+            <td>${TIPOS_PELIGRO[z.tipo_peligro] || 'Otro'}</td>
+            <td style="font-weight:700;color:${z.nivel >= 4 ? '#B91C1C' : '#CA8A04'}">Nivel ${z.nivel}</td>
+            <td>${z.sector}</td>
+            <td>${formatDate(z.fecha)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    ` : ''}
+
+    ${reportes.length > 0 ? `
+      <h2>Reportes de seguridad</h2>
+      <table>
+        <thead><tr><th>Descripción</th><th>Tipo</th><th>Dirección</th><th>Fecha</th><th>Estado</th></tr></thead>
+        <tbody>
+          ${reportes.slice(0, 15).map(r => `<tr>
+            <td><strong>${r.nombre}</strong></td>
+            <td>${TIPOS[r.tipo].nombre}</td>
+            <td>${r.direccion}</td>
+            <td>${formatDate(r.fecha)}</td>
+            <td>${r.estado}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    ` : ''}
+
+    ${patentes.length > 0 ? `
+      <h2>Patentes comerciales</h2>
+      <table>
+        <thead><tr><th>Razón social</th><th>RUT</th><th>Giro</th><th>Dirección</th><th>Otorgada</th></tr></thead>
+        <tbody>
+          ${patentes.slice(0, 10).map(p => `<tr>
+            <td><strong>${p.nombre}</strong></td>
+            <td>${p.rut}</td>
+            <td style="font-size:9px">${p.giro}</td>
+            <td>${p.direccion}</td>
+            <td>${formatDate(p.fecha)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    ` : ''}
+
+    <div class="pdf-footer">
+      <div>SIGESPU Lota · Documento generado digitalmente · Hash: ${btoa(Date.now().toString()).slice(0, 12)}</div>
+      <div>Página 1 de 1</div>
+    </div>
+  </div>`;
+
+  document.getElementById('export-body').innerHTML = html;
+  document.getElementById('export-modal').classList.remove('hidden');
+}
+
+function closeExportPreview() {
+  document.getElementById('export-modal').classList.add('hidden');
+}
+
+function printPreview() {
+  const content = document.getElementById('pdf-content').outerHTML;
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>SIGESPU Lota · Informe</title>
+    <style>
+      body { font-family: 'Inter', -apple-system, sans-serif; margin: 2rem; color: #1C1917; font-size: 11px; }
+      .pdf-preview { max-width: 760px; margin: 0 auto; }
+      .pdf-header { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 2px solid #EA580C; margin-bottom: 16px; }
+      .pdf-header .logo { width: 42px; height: 42px; }
+      .pdf-header h1 { font-size: 16px; font-weight: 700; margin: 0; }
+      .pdf-header .sub { font-size: 9px; color: #78716C; text-transform: uppercase; letter-spacing: 0.05em; }
+      .pdf-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; font-size: 10px; margin-bottom: 16px; padding: 8px 12px; background: #FAFAF9; border-radius: 6px; }
+      .pdf-meta strong { display: block; color: #78716C; font-size: 8px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; font-weight: 600; }
+      h2 { font-size: 12px; font-weight: 700; margin: 16px 0 8px; color: #C2410C; }
+      table { width: 100%; border-collapse: collapse; font-size: 10px; }
+      table th { text-align: left; padding: 6px 8px; background: #F5F5F4; border-bottom: 1px solid #D6D3D1; font-weight: 600; }
+      table td { padding: 5px 8px; border-bottom: 1px solid #E7E5E4; }
+      .pdf-footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #D6D3D1; font-size: 9px; color: #78716C; display: flex; justify-content: space-between; }
+      @media print { body { margin: 0.5cm; } }
+    </style>
+  </head><body>${content}<script>setTimeout(() => window.print(), 300);<\/script></body></html>`);
+  w.document.close();
+}
+
+// ==========================================================
+// SIDEBAR COLAPSABLE
+// ==========================================================
+let sidebarOpen = true;
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  const sidebar = document.querySelector('.sidebar-layers');
+  const btn = document.getElementById('sidebar-toggle');
+  const icon = document.getElementById('sidebar-toggle-icon');
+  sidebar.classList.toggle('collapsed', !sidebarOpen);
+  btn.classList.toggle('sidebar-open', sidebarOpen);
+  btn.classList.toggle('sidebar-closed', !sidebarOpen);
+  icon.innerHTML = sidebarOpen
+    ? '<polyline points="15 18 9 12 15 6"/>'
+    : '<polyline points="9 18 15 12 9 6"/>';
+  if (map) setTimeout(() => map.invalidateSize(), 300);
+}
+
+// ==========================================================
+// DIBUJAR POLÍGONO PERSONALIZADO (capa custom)
+// ==========================================================
+let drawingMode = false;
+let drawingVertices = [];
+let drawingVertexMarkers = [];
+let drawingPreviewLine = null;
+let customZones = [];
+
+function loadCustomZones() {
+  try {
+    const stored = localStorage.getItem('sigespu_custom_zones');
+    if (stored) customZones = JSON.parse(stored);
+  } catch (e) {}
+}
+
+function saveCustomZones() {
+  try {
+    localStorage.setItem('sigespu_custom_zones', JSON.stringify(customZones));
+  } catch (e) {}
+}
+
+function startDrawing() {
+  if (drawingMode) { cancelDrawing(); return; }
+  drawingMode = true;
+  drawingVertices = [];
+  drawingVertexMarkers = [];
+  document.getElementById('draw-hint').classList.remove('hidden');
+  document.getElementById('vertex-count').textContent = '0 pts';
+  document.getElementById('btn-finish-draw').disabled = true;
+  document.getElementById('map').classList.add('map-cursor-drawing');
+  map.on('click', addDrawVertex);
+}
+
+function addDrawVertex(e) {
+  if (!drawingMode) return;
+  const latlng = [e.latlng.lat, e.latlng.lng];
+  drawingVertices.push(latlng);
+
+  const marker = L.circleMarker(latlng, {
+    radius: 6, color: '#EA580C', weight: 2, fillColor: '#FFFFFF', fillOpacity: 1
+  }).addTo(map);
+  drawingVertexMarkers.push(marker);
+
+  document.getElementById('vertex-count').textContent = `${drawingVertices.length} pts`;
+  document.getElementById('btn-finish-draw').disabled = drawingVertices.length < 3;
+
+  if (drawingPreviewLine) map.removeLayer(drawingPreviewLine);
+  if (drawingVertices.length >= 2) {
+    drawingPreviewLine = L.polyline(drawingVertices, {
+      color: '#EA580C', weight: 2, dashArray: '6, 4', opacity: 0.8
+    }).addTo(map);
+  }
+}
+
+function cancelDrawing() {
+  drawingMode = false;
+  drawingVertexMarkers.forEach(m => map.removeLayer(m));
+  if (drawingPreviewLine) { map.removeLayer(drawingPreviewLine); drawingPreviewLine = null; }
+  drawingVertices = [];
+  drawingVertexMarkers = [];
+  document.getElementById('draw-hint').classList.add('hidden');
+  document.getElementById('map').classList.remove('map-cursor-drawing');
+  map.off('click', addDrawVertex);
+}
+
+function finishDrawing() {
+  if (drawingVertices.length < 3) return;
+  const verts = [...drawingVertices];
+  cancelDrawing();
+  openCustomZoneModal(verts);
+}
+
+function openCustomZoneModal(vertices) {
+  selectedNewType = 'custom_zone';
+  document.getElementById('add-modal-title').textContent = 'Nueva zona personalizada';
+  document.getElementById('add-modal-save').style.display = 'inline-flex';
+  document.getElementById('add-modal-save').onclick = () => saveCustomZone(vertices);
+
+  const body = `
+    <div style="background:var(--orange-50);border:1px dashed var(--orange-500);border-radius:8px;padding:10px 12px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--orange-900)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:18px;height:18px;flex-shrink:0;color:var(--orange-600)"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0116 0z"/></svg>
+      <div>Polígono con <strong>${vertices.length} vértices</strong> listo. Completa los datos para guardar esta zona en el mapa.</div>
+    </div>
+    <div class="form-section">
+      <label>Nombre de la zona</label>
+      <input type="text" id="cz-nombre" placeholder="Ej: Sector operativo nocturno Los Aromos" />
+    </div>
+    <div class="form-row">
+      <div class="form-section">
+        <label>Categoría</label>
+        <select id="cz-categoria">
+          <option value="operativo">Operativo de patrullaje</option>
+          <option value="fiscalizacion">Fiscalización comercial</option>
+          <option value="emergencia">Zona de emergencia</option>
+          <option value="evento">Evento masivo</option>
+          <option value="peligro_alto">Zona de peligro alto</option>
+          <option value="restringida">Zona restringida</option>
+          <option value="monitoreo">Monitoreo especial</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+      <div class="form-section">
+        <label>Color del área</label>
+        <select id="cz-color">
+          <option value="#EA580C">Naranjo · Operativo</option>
+          <option value="#B91C1C">Rojo · Peligro</option>
+          <option value="#1E3A8A">Azul · Monitoreo</option>
+          <option value="#16A34A">Verde · Seguridad</option>
+          <option value="#A855F7">Púrpura · Evento</option>
+          <option value="#CA8A04">Amarillo · Restricción</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-section">
+      <label>Nivel de intensidad</label>
+      <div class="risk-scale">
+        <button class="risk-level" data-level="1" onclick="setRisk(1)">1</button>
+        <button class="risk-level" data-level="2" onclick="setRisk(2)">2</button>
+        <button class="risk-level selected" data-level="3" onclick="setRisk(3)">3</button>
+        <button class="risk-level" data-level="4" onclick="setRisk(4)">4</button>
+        <button class="risk-level" data-level="5" onclick="setRisk(5)">5</button>
+      </div>
+      <input type="hidden" id="cz-nivel" value="3" />
+    </div>
+    <div class="form-section">
+      <label>Vigencia hasta (opcional)</label>
+      <input type="date" id="cz-vigencia" />
+    </div>
+    <div class="form-section">
+      <label>Descripción</label>
+      <textarea id="cz-notas" placeholder="Motivo, observaciones, instrucciones operativas..."></textarea>
+    </div>
+  `;
+  document.getElementById('add-modal-body').innerHTML = body;
+  document.getElementById('add-modal').classList.remove('hidden');
+}
+
+function saveCustomZone(vertices) {
+  const nombre = document.getElementById('cz-nombre').value.trim();
+  if (!nombre) { alert('Ingresa un nombre para la zona'); return; }
+
+  const zone = {
+    id: 'cz-' + Date.now(),
+    nombre,
+    categoria: document.getElementById('cz-categoria').value,
+    color: document.getElementById('cz-color').value,
+    nivel: parseInt(document.getElementById('cz-nivel').value),
+    vigencia: document.getElementById('cz-vigencia').value || null,
+    notas: document.getElementById('cz-notas').value.trim(),
+    vertices,
+    fecha: new Date().toISOString().slice(0, 10),
+    by: currentUser.name,
+    sector: inferirSector({ lat: vertices[0][0], lng: vertices[0][1] })
+  };
+  customZones.push(zone);
+  saveCustomZones();
+  closeAddModal();
+  document.getElementById('add-modal-save').onclick = saveElement;
+  renderCustomZones();
+}
+
+function renderCustomZones() {
+  if (!layerGroups.custom_zones) layerGroups.custom_zones = L.layerGroup().addTo(map);
+  layerGroups.custom_zones.clearLayers();
+  customZones.forEach(z => {
+    const poly = L.polygon(z.vertices, {
+      color: z.color, weight: 2.5, opacity: 0.85,
+      fillColor: z.color, fillOpacity: 0.15 + (z.nivel * 0.04)
+    });
+    const catLabels = {
+      operativo: 'Operativo de patrullaje', fiscalizacion: 'Fiscalización',
+      emergencia: 'Zona de emergencia', evento: 'Evento masivo',
+      peligro_alto: 'Peligro alto', restringida: 'Restringida',
+      monitoreo: 'Monitoreo', otro: 'Otro'
+    };
+    poly.bindPopup(`
+      <div class="popup-type" style="color:${z.color}">Zona personalizada · ${catLabels[z.categoria]}</div>
+      <h4>${z.nombre}</h4>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <span class="badge-inline" style="background:${z.color}22;color:${z.color}">Nivel ${z.nivel}</span>
+        ${z.vigencia ? `<span class="badge-inline" style="background:#F5F5F4;color:#57534E">Hasta ${formatDate(z.vigencia)}</span>` : ''}
+      </div>
+      ${z.notas ? `<div class="popup-meta">${z.notas}</div>` : ''}
+      <div class="popup-meta"><strong>Creada:</strong> ${formatDate(z.fecha)} · ${z.by}</div>
+      <button onclick="deleteCustomZone('${z.id}')" style="margin-top:8px;padding:4px 10px;border-radius:6px;background:#FEE2E2;color:#B91C1C;font-size:11px;font-weight:600;cursor:pointer;border:none">Eliminar zona</button>
+    `);
+    layerGroups.custom_zones.addLayer(poly);
+  });
+}
+
+function deleteCustomZone(id) {
+  if (!confirm('¿Eliminar esta zona personalizada?')) return;
+  customZones = customZones.filter(z => z.id !== id);
+  saveCustomZones();
+  renderCustomZones();
+  map.closePopup();
+}
+
+// ==========================================================
+// VIEW SCRAPING
+// ==========================================================
+let currentScrapingTab = 'patentes';
+
+function setScrapingTab(tab) {
+  currentScrapingTab = tab;
+  document.querySelectorAll('.scraping-tab').forEach(t => t.classList.toggle('active', t.dataset.scrapeTab === tab));
+  renderScrapingTable();
+}
+
+function renderScrapingTable() {
+  const tab = currentScrapingTab;
+  const data = DATOS_SCRAPING[tab] || [];
+  const year = document.getElementById('scrape-filter-year').value;
+  const month = document.getElementById('scrape-filter-month').value;
+  const geo = document.getElementById('scrape-filter-geo').value;
+  const search = document.getElementById('scrape-search').value.toLowerCase();
+
+  let filtered = [...data];
+  if (year !== 'all') {
+    filtered = filtered.filter(d => {
+      const fecha = d.fecha_decreto || d.fecha || d.fecha_inicio || '';
+      return fecha.startsWith(year);
+    });
+  }
+  if (month !== 'all') {
+    const m = month.padStart(2, '0');
+    filtered = filtered.filter(d => {
+      const fecha = d.fecha_decreto || d.fecha || d.fecha_inicio || '';
+      return fecha.slice(5, 7) === m;
+    });
+  }
+  if (geo !== 'all' && (tab === 'patentes' || tab === 'permisos')) {
+    filtered = filtered.filter(d => d.confianza === geo || (geo === 'failed' && d.confianza === 'failed'));
+  }
+  if (search) {
+    filtered = filtered.filter(d => JSON.stringify(d).toLowerCase().includes(search));
+  }
+
+  // Actualizar contadores
+  document.getElementById('count-patentes-scrape').textContent = DATOS_SCRAPING.patentes.length;
+  document.getElementById('count-permisos-scrape').textContent = DATOS_SCRAPING.permisos.length;
+  document.getElementById('count-transito-scrape').textContent = DATOS_SCRAPING.transito.length;
+  document.getElementById('count-orgs-scrape').textContent = DATOS_SCRAPING.organizaciones.length;
+  document.getElementById('scrape-result-count').textContent = filtered.length;
+  document.getElementById('scrape-total-count').textContent = data.length;
+
+  // Meta bar
+  const urlsByTab = {
+    patentes: 'lotatransparente.cl · ig=164',
+    permisos: 'lotatransparente.cl · ig=172',
+    transito: 'lotatransparente.cl · ig=269',
+    organizaciones: 'lotatransparente.cl · ig=351'
+  };
+  const descByTab = {
+    patentes: 'Patentes comerciales otorgadas mensualmente',
+    permisos: 'Permisos de Dirección de Obras Municipales',
+    transito: 'Decretos de tránsito y cortes de calle',
+    organizaciones: 'Organizaciones sociales con personalidad jurídica vigente'
+  };
+  document.getElementById('scraping-meta-bar').innerHTML = `
+    <div class="scraping-meta-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+      <span>Fuente:</span><strong>${urlsByTab[tab]}</strong>
+    </div>
+    <div class="scraping-meta-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>Última ejecución:</span><strong>hoy 03:02 AM</strong>
+    </div>
+    <div class="scraping-meta-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+      <span>${descByTab[tab]}</span>
+    </div>
+    <div class="scraping-meta-item" style="margin-left:auto">
+      <a href="https://www.lotatransparente.cl" target="_blank">Ir al portal oficial ↗</a>
+    </div>
+  `;
+
+  // Render table
+  const table = document.getElementById('scraping-table');
+  if (tab === 'patentes') {
+    table.innerHTML = `
+      <thead><tr>
+        <th>N° Decreto</th><th>Fecha</th><th>Tipo</th><th>RUT</th>
+        <th>Razón social</th><th>Giro</th><th>Dirección</th><th>Geocoding</th><th>Fuente</th>
+      </tr></thead>
+      <tbody>${filtered.map(p => `<tr>
+        <td style="font-family:monospace;font-weight:600">${p.n_decreto}</td>
+        <td>${formatDate(p.fecha_decreto)}</td>
+        <td><span class="badge-inline" style="background:var(--amber-100);color:var(--amber-600)">${p.tipo}</span></td>
+        <td style="font-family:monospace">${p.rut}</td>
+        <td><strong>${p.razon_social}</strong></td>
+        <td style="font-size:11.5px;color:var(--stone-600)">${p.giro}</td>
+        <td>${p.direccion}</td>
+        <td>${confidenceBadge(p.confianza)}</td>
+        <td><a href="${p.url}" target="_blank" style="font-size:10px;color:var(--blue-800);text-decoration:none">ver ↗</a></td>
+      </tr>`).join('')}</tbody>
+    `;
+  } else if (tab === 'permisos') {
+    table.innerHTML = `
+      <thead><tr>
+        <th>N° Permiso</th><th>Tipo</th><th>Dirección</th><th>Sector</th>
+        <th>Descripción</th><th>Fecha</th><th>Estado</th><th>Geocoding</th><th>Fuente</th>
+      </tr></thead>
+      <tbody>${filtered.map(p => `<tr>
+        <td style="font-family:monospace;font-weight:600">${p.n_permiso}</td>
+        <td><span class="badge-inline" style="background:#DBEAFE;color:#1E40AF">${p.tipo}</span></td>
+        <td>${p.direccion}</td>
+        <td>${p.sector}</td>
+        <td style="font-size:11.5px;color:var(--stone-600)">${p.descripcion}</td>
+        <td>${formatDate(p.fecha)}</td>
+        <td><span class="badge-inline" style="background:${p.estado === 'activo' ? 'var(--green-100);color:var(--green-700)' : p.estado === 'vencido' ? 'var(--red-100);color:var(--red-700)' : 'var(--stone-100);color:var(--stone-600)'}">${p.estado}</span></td>
+        <td>${confidenceBadge(p.confianza)}</td>
+        <td><a href="${p.url}" target="_blank" style="font-size:10px;color:var(--blue-800);text-decoration:none">ver ↗</a></td>
+      </tr>`).join('')}</tbody>
+    `;
+  } else if (tab === 'transito') {
+    table.innerHTML = `
+      <thead><tr>
+        <th>N° Decreto</th><th>Tipo</th><th>Dirección afectada</th>
+        <th>Motivo</th><th>Inicio</th><th>Fin</th><th>Estado</th><th>Fuente</th>
+      </tr></thead>
+      <tbody>${filtered.map(d => `<tr>
+        <td style="font-family:monospace;font-weight:600">${d.n_decreto}</td>
+        <td><span class="badge-inline" style="background:#FED7AA;color:var(--orange-700)">${d.tipo}</span></td>
+        <td><strong>${d.direccion}</strong></td>
+        <td style="font-size:11.5px;color:var(--stone-600)">${d.motivo}</td>
+        <td>${formatDate(d.fecha_inicio)}</td>
+        <td>${d.fecha_fin === 'indefinido' ? '<em style="color:var(--stone-500)">indefinido</em>' : formatDate(d.fecha_fin)}</td>
+        <td><span class="badge-inline" style="background:${d.estado === 'vigente' ? 'var(--red-100);color:var(--red-700)' : 'var(--stone-100);color:var(--stone-600)'}">${d.estado}</span></td>
+        <td><a href="${d.url}" target="_blank" style="font-size:10px;color:var(--blue-800);text-decoration:none">ver ↗</a></td>
+      </tr>`).join('')}</tbody>
+    `;
+  } else if (tab === 'organizaciones') {
+    table.innerHTML = `
+      <thead><tr>
+        <th>N° Pers. Jurídica</th><th>Tipo</th><th>Nombre</th>
+        <th>Dirección</th><th>Representante</th><th>RUT Rep.</th><th>Vigencia</th><th>Sector</th>
+      </tr></thead>
+      <tbody>${filtered.map(o => `<tr>
+        <td style="font-family:monospace;font-weight:600">${o.n_personalidad}</td>
+        <td><span class="badge-inline" style="background:var(--green-100);color:var(--green-700)">${o.tipo}</span></td>
+        <td><strong>${o.nombre}</strong></td>
+        <td>${o.direccion}</td>
+        <td>${o.representante}</td>
+        <td style="font-family:monospace">${o.rut_rep}</td>
+        <td style="font-size:11px">${o.vigencia}</td>
+        <td>${o.sector}</td>
+      </tr>`).join('')}</tbody>
+    `;
+  }
+}
+
+function confidenceBadge(level) {
+  if (level === 'high') return '<span class="confidence-badge high">Alta</span>';
+  if (level === 'med') return '<span class="confidence-badge med">Media</span>';
+  if (level === 'low') return '<span class="confidence-badge low">Baja</span>';
+  return '<span class="confidence-badge low">Fallo</span>';
+}
+
+
+</script>
+</body>
+</html>

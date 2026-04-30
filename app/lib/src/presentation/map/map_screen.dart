@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:flutter_map_heatmap/flutter_map_heatmap.dart';
 import '../../config/constants.dart';
 import '../../config/theme.dart';
 import '../../data/seed_data.dart';
 import '../../data/providers.dart';
 import 'layers/plan_regulador_layer.dart';
 import 'layers/custom_markers.dart';
+import 'widgets/element_detail_sheet.dart';
 
 // ── Providers de estado del mapa ──────────────────────────────────────────────
 
@@ -54,7 +56,9 @@ class MapScreen extends ConsumerWidget {
     final collapsed = ref.watch(sidebarCollapsedProvider);
     final dangerFilter = ref.watch(dangerFilterProvider);
     final dateRange = ref.watch(dateRangeProvider);
+    final heatmapOn = ref.watch(heatmapOnProvider);
     final reportesAsync = ref.watch(reportesStreamProvider);
+    final allElems = ref.watch(allElementsProvider);
 
     // Filtrar elementos por fecha y capa
     final dateLimit = _dateLimit(dateRange);
@@ -68,11 +72,22 @@ class MapScreen extends ConsumerWidget {
       return true;
     }).toList();
 
-    final List<Marker> markers = elementos.map((e) => CustomMarkers.buildMarker(
-      point: e.latLng,
-      icon: CustomMarkers.getIconForTipo(e.tipo),
-      color: CustomMarkers.getColorForTipo(e.tipo),
-    )).toList();
+    final userElements = ref.watch(userElementsProvider);
+    final List<Marker> markers = elementos.map((e) {
+      final isPending = userElements.any((u) => u.id == e.id);
+      return CustomMarkers.buildMarker(
+        point: e.latLng,
+        icon: CustomMarkers.getIconForTipo(e.tipo),
+        color: CustomMarkers.getColorForTipo(e.tipo),
+        isPending: isPending,
+        onTap: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => ElementDetailSheet(elemento: e, isPending: isPending),
+        ),
+      );
+    }).toList();
 
     // Reportes guardados localmente
     if (activeLayers.contains('reporte')) {
@@ -129,6 +144,21 @@ class MapScreen extends ConsumerWidget {
                     subdomains: AppConstants.mapSubdomains,
                     userAgentPackageName: 'cl.lota.sigespu',
                   ),
+                  if (heatmapOn)
+                    HeatMapLayer(
+                      heatMapDataSource: _buildHeatMapDataSource(allElems),
+                      heatMapOptions: HeatMapOptions(
+                        radius: 35,
+                        blurFactor: 0.25,
+                        gradient: {
+                          0.2: Colors.orange,
+                          0.4: Colors.orange,
+                          0.6: Colors.orange,
+                          0.8: Colors.deepOrange,
+                          1.0: Colors.deepOrange,
+                        },
+                      ),
+                    ),
                   if (activeLayers.contains('plan_regulador'))
                     PolygonLayer(polygons: PlanReguladorLayer.buildPolygons()),
                   if (isDrawing && drawingPoints.length >= 3)
@@ -207,6 +237,19 @@ class MapScreen extends ConsumerWidget {
   DateTime? _dateLimit(String range) {
     if (range == 'all') return null;
     return DateTime.now().subtract(Duration(days: int.parse(range)));
+  }
+
+  HeatMapDataSource _buildHeatMapDataSource(List<ElementoMapa> allElems) {
+    final dataList = allElems
+        .where((e) => e.tipo.startsWith('reporte_') || e.tipo == 'zona_peligro')
+        .map((e) => WeightedLatLng(
+              e.latLng,
+              e.tipo == 'zona_peligro'
+                  ? ((e.nivel ?? 3) * 0.2).clamp(0.2, 1.0)
+                  : 0.7,
+            ))
+        .toList();
+    return _ListHeatMapDataSource(dataList);
   }
 
   void _showGuardarZona(BuildContext context, WidgetRef ref, List<LatLng> points) {
@@ -609,6 +652,18 @@ class _LegendPanel extends StatelessWidget {
     );
   }
 }
+
+// ── HeatMap Data Source implementation ────────────────────────────────────────
+
+class _ListHeatMapDataSource extends HeatMapDataSource {
+  final List<WeightedLatLng> data;
+  _ListHeatMapDataSource(this.data);
+
+  @override
+  List<WeightedLatLng> getData(LatLngBounds bounds, double zoom) => data;
+}
+
+// ── FAB Group ─────────────────────────────────────────────────────────────────
 
 class _FabGroup extends StatelessWidget {
   final bool isDrawing;

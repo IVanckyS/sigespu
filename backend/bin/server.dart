@@ -7,6 +7,9 @@ import '../lib/src/auth/jwt_service.dart';
 import '../lib/src/auth/auth_handler.dart';
 import '../lib/src/middleware/rate_limit_middleware.dart';
 import '../lib/src/middleware/cors_middleware.dart';
+import '../lib/src/middleware/auth_middleware.dart';
+import '../lib/src/routes/sismos_route.dart';
+import '../lib/src/routes/capas_route.dart';
 
 void main(List<String> args) async {
   final ip = InternetAddress.anyIPv4;
@@ -27,6 +30,14 @@ void main(List<String> args) async {
   router.mount('/auth', Pipeline()
     .addMiddleware(rateLimitMiddleware(dbService, limit: 20, windowSecs: 60, prefix: 'auth'))
     .addHandler(authHandler.router.call));
+
+  router.mount('/api/sismos', Pipeline()
+    .addMiddleware(authMiddleware(jwtService))
+    .addHandler(buildSismosRouter(dbService).call));
+
+  router.mount('/api/capas', Pipeline()
+    .addMiddleware(authMiddleware(jwtService))
+    .addHandler(buildCapasRouter(dbService).call));
 
   final handler = Pipeline()
       .addMiddleware(corsMiddleware())

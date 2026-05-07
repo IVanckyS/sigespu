@@ -1,22 +1,21 @@
-import 'dart:convert';
-import 'dart:io';
+﻿import 'dart:convert';
 import 'dart:typed_data';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
-import 'package:archive/archive.dart';
-import 'package:xml/xml.dart';
-import 'package:uuid/uuid.dart';
 import 'package:postgres/postgres.dart';
+import 'package:uuid/uuid.dart';
 import '../database/db_pool.dart';
 import '../middleware/auth_middleware.dart';
+import '../services/capas_service.dart';
 
 Router buildCapasRouter(DatabaseService db) {
   final router = Router();
+  final service = CapasService(db);
   const uuid = Uuid();
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // GET / — list all capas metadata (any authenticated role)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // GET / â€” list all capas metadata (any authenticated role)
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   router.get('/', (Request req) async {
     try {
       final rows = await db.db.execute(r'''
@@ -51,10 +50,10 @@ Router buildCapasRouter(DatabaseService db) {
     }
   });
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // GET /<id>/geometrias — GeoJSON FeatureCollection for a capa
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // GET /<id>/geometrias â€” GeoJSON FeatureCollection for a capa
   // Optional query param: bbox=xmin,ymin,xmax,ymax
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   router.get('/<id>/geometrias', (Request req, String id) async {
     try {
       final bbox = req.url.queryParameters['bbox'];
@@ -125,15 +124,15 @@ Router buildCapasRouter(DatabaseService db) {
       );
     } catch (e) {
       return Response.internalServerError(
-        body: jsonEncode({'error': 'Error al obtener geometrías: $e'}),
+        body: jsonEncode({'error': 'Error al obtener geometrÃ­as: $e'}),
         headers: {'content-type': 'application/json'},
       );
     }
   });
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // GET /<id>/export — Export as GeoJSON file for download
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // GET /<id>/export â€” Export as GeoJSON file for download
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   router.get('/<id>/export', (Request req, String id) async {
     try {
       final capaRows = await db.db.execute(
@@ -178,11 +177,11 @@ Router buildCapasRouter(DatabaseService db) {
     }
   });
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // POST /upload — director only
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // POST /upload â€” director only
   // Accepts multipart/form-data with fields: nombre, descripcion, color, archivo
   // Supported formats: geojson, kmz, shp (zip)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   router.post(
     '/upload',
     Pipeline()
@@ -236,7 +235,7 @@ Router buildCapasRouter(DatabaseService db) {
         }
 
         // Determine format from filename
-        final formato = _detectFormato(archivoNombre);
+        final formato = CapasService.detectFormato(archivoNombre);
         if (formato == null) {
           return Response(
             400,
@@ -269,20 +268,10 @@ Router buildCapasRouter(DatabaseService db) {
           },
         );
 
-        // Parse and insert geometries based on format
-        int geomCount = 0;
-        switch (formato) {
-          case 'geojson':
-            geomCount =
-                await _insertGeoJson(db, uuid, capaId, utf8.decode(archivoBytes));
-            break;
-          case 'kmz':
-            geomCount = await _insertKmz(db, uuid, capaId, archivoBytes);
-            break;
-          case 'shp':
-            geomCount = await _insertShp(db, uuid, capaId, archivoBytes);
-            break;
-        }
+        // Parse and insert geometries via service
+        final geomCount = await service.insertByFormat(
+          formato, capaId, archivoBytes, archivoNombre,
+        );
 
         return Response(
           201,
@@ -303,22 +292,22 @@ Router buildCapasRouter(DatabaseService db) {
     }),
   );
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // PATCH /<id> — director only (update nombre, descripcion, color, opacidad, visible)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // PATCH /<id> â€” director only (update nombre, descripcion, color, opacidad, visible)
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   router.patch(
     '/<id>',
     Pipeline()
         .addMiddleware(requireRole(['director']))
         .addHandler((Request req) async {
-      // Extract id from URL — shelf_router does not pass params to inner Pipeline handlers
+      // Extract id from URL â€” shelf_router does not pass params to inner Pipeline handlers
       final segments = req.url.pathSegments;
       final id = segments.isNotEmpty ? segments.last : null;
 
       if (id == null || id.isEmpty) {
         return Response(
           400,
-          body: jsonEncode({'error': 'ID inválido'}),
+          body: jsonEncode({'error': 'ID invÃ¡lido'}),
           headers: {'content-type': 'application/json'},
         );
       }
@@ -341,7 +330,7 @@ Router buildCapasRouter(DatabaseService db) {
         if (setClauses.isEmpty) {
           return Response(
             400,
-            body: jsonEncode({'error': 'No hay campos válidos para actualizar'}),
+            body: jsonEncode({'error': 'No hay campos vÃ¡lidos para actualizar'}),
             headers: {'content-type': 'application/json'},
           );
         }
@@ -372,22 +361,22 @@ Router buildCapasRouter(DatabaseService db) {
     }),
   );
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // DELETE /<id> — director only
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // DELETE /<id> â€” director only
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   router.delete(
     '/<id>',
     Pipeline()
         .addMiddleware(requireRole(['director']))
         .addHandler((Request req) async {
-      // Extract id from URL — shelf_router does not pass params to inner Pipeline handlers
+      // Extract id from URL â€” shelf_router does not pass params to inner Pipeline handlers
       final segments = req.url.pathSegments;
       final id = segments.isNotEmpty ? segments.last : null;
 
       if (id == null || id.isEmpty) {
         return Response(
           400,
-          body: jsonEncode({'error': 'ID inválido'}),
+          body: jsonEncode({'error': 'ID invÃ¡lido'}),
           headers: {'content-type': 'application/json'},
         );
       }
@@ -423,18 +412,9 @@ Router buildCapasRouter(DatabaseService db) {
   return router;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Detects the upload format from the file name extension.
-String? _detectFormato(String filename) {
-  final lower = filename.toLowerCase();
-  if (lower.endsWith('.geojson') || lower.endsWith('.json')) return 'geojson';
-  if (lower.endsWith('.kmz')) return 'kmz';
-  if (lower.endsWith('.zip')) return 'shp'; // assume shapefile zip
-  return null;
-}
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Multipart parser (HTTP layer â€” permanece en el route)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Minimal multipart/form-data parser that handles both text fields and a
 /// single binary file part.  Returns a flat map where text fields are stored
@@ -443,7 +423,6 @@ String? _detectFormato(String filename) {
 Map<String, dynamic> _parseMultipart(Uint8List body, String boundary) {
   final result = <String, dynamic>{};
   final delimBytes = utf8.encode('--$boundary');
-  final crlf = [13, 10]; // \r\n
 
   // Split body on boundary markers
   final parts = _splitBytes(body, delimBytes);
@@ -529,318 +508,4 @@ int _indexOfSeq(List<int> data, List<int> seq, [int offset = 0]) {
     return i;
   }
   return -1;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Format-specific geometry inserters
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Parses a GeoJSON FeatureCollection (or plain Feature/Geometry) and inserts
-/// its geometries into [geometrias_capa].  Returns the count inserted.
-Future<int> _insertGeoJson(
-  DatabaseService db,
-  Uuid uuid,
-  String capaId,
-  String geojsonText,
-) async {
-  final Map<String, dynamic> parsed;
-  try {
-    parsed = jsonDecode(geojsonText) as Map<String, dynamic>;
-  } catch (_) {
-    throw FormatException('El archivo no es JSON válido');
-  }
-
-  final features = <Map<String, dynamic>>[];
-  final type = parsed['type'] as String?;
-
-  if (type == 'FeatureCollection') {
-    for (final f in (parsed['features'] as List)) {
-      features.add(f as Map<String, dynamic>);
-    }
-  } else if (type == 'Feature') {
-    features.add(parsed);
-  } else if (type != null) {
-    // Plain geometry — wrap in a Feature
-    features.add({'type': 'Feature', 'geometry': parsed, 'properties': {}});
-  }
-
-  int count = 0;
-  for (final feature in features) {
-    final geom = feature['geometry'];
-    if (geom == null) continue;
-    final props = (feature['properties'] as Map<String, dynamic>?) ?? {};
-    final nombre = props['name'] as String? ??
-        props['nombre'] as String? ??
-        props['Name'] as String?;
-
-    await db.db.execute(
-      Sql.named(r'''
-        INSERT INTO geometrias_capa (id, capa_id, nombre, propiedades, geom)
-        VALUES (
-          @id::uuid, @capaId::uuid, @nombre,
-          @props::jsonb,
-          ST_SetSRID(ST_GeomFromGeoJSON(@geomJson), 4326)
-        )
-      '''),
-      parameters: {
-        'id': uuid.v4(),
-        'capaId': capaId,
-        'nombre': nombre,
-        'props': jsonEncode(props),
-        'geomJson': jsonEncode(geom),
-      },
-    );
-    count++;
-  }
-  return count;
-}
-
-/// Extracts KML from a KMZ (zipped KML) archive and inserts its Placemark
-/// geometries into [geometrias_capa].  Returns the count inserted.
-Future<int> _insertKmz(
-  DatabaseService db,
-  Uuid uuid,
-  String capaId,
-  Uint8List kmzBytes,
-) async {
-  final archive = ZipDecoder().decodeBytes(kmzBytes);
-  // Find the main KML file (usually doc.kml)
-  final kmlFile = archive.firstWhere(
-    (f) => f.isFile && f.name.toLowerCase().endsWith('.kml'),
-    orElse: () => throw FormatException('No se encontró archivo .kml dentro del KMZ'),
-  );
-
-  final kmlText = utf8.decode(kmlFile.content as List<int>, allowMalformed: true);
-  return await _insertKml(db, uuid, capaId, kmlText);
-}
-
-/// Parses a KML string and inserts Point/LineString/Polygon Placemarks into
-/// [geometrias_capa].  Returns the count inserted.
-Future<int> _insertKml(
-  DatabaseService db,
-  Uuid uuid,
-  String capaId,
-  String kmlText,
-) async {
-  final XmlDocument doc;
-  try {
-    doc = XmlDocument.parse(kmlText);
-  } catch (_) {
-    throw FormatException('KML inválido o malformado');
-  }
-
-  final placemarks = doc.findAllElements('Placemark');
-  int count = 0;
-
-  for (final pm in placemarks) {
-    final nombre = pm.findElements('name').firstOrNull?.innerText;
-    
-    // Extract basic properties and color if available
-    final props = <String, dynamic>{};
-    final styleUrl = pm.findElements('styleUrl').firstOrNull?.innerText;
-    if (styleUrl != null) props['styleUrl'] = styleUrl;
-    
-    // Look for color in inline Style if present
-    final colorEl = pm.findAllElements('color').firstOrNull;
-    if (colorEl != null) {
-      // KML color is aabbggrr (hex)
-      props['kml_color'] = colorEl.innerText;
-    }
-
-    // Extract ExtendedData if present
-    final extData = pm.findElements('ExtendedData').firstOrNull;
-    if (extData != null) {
-      for (final data in extData.findElements('Data')) {
-        final name = data.getAttribute('name');
-        final value = data.findElements('value').firstOrNull?.innerText;
-        if (name != null && value != null) props[name] = value;
-      }
-      for (final sData in extData.findElements('SimpleData')) {
-        final name = sData.getAttribute('name');
-        final value = sData.innerText;
-        if (name != null) props[name] = value;
-      }
-    }
-
-    final propsJson = jsonEncode(props);
-
-    // Try Point
-    final pointEl = pm.findAllElements('Point').firstOrNull;
-    if (pointEl != null) {
-      final coords = _parseKmlCoords(
-        pointEl.findElements('coordinates').firstOrNull?.innerText ?? '',
-      );
-      if (coords.isEmpty) continue;
-      final lon = coords[0][0];
-      final lat = coords[0][1];
-
-      await db.db.execute(
-        Sql.named(r'''
-          INSERT INTO geometrias_capa (id, capa_id, nombre, propiedades, geom)
-          VALUES (
-            @id::uuid, @capaId::uuid, @nombre, @props::jsonb,
-            ST_SetSRID(ST_MakePoint(@lon, @lat), 4326)
-          )
-        '''),
-        parameters: {
-          'id': uuid.v4(),
-          'capaId': capaId,
-          'nombre': nombre,
-          'props': propsJson,
-          'lon': lon,
-          'lat': lat,
-        },
-      );
-      count++;
-      continue;
-    }
-
-    // Try LineString
-    final lineEl = pm.findAllElements('LineString').firstOrNull;
-    if (lineEl != null) {
-      final rawCoords =
-          lineEl.findElements('coordinates').firstOrNull?.innerText ?? '';
-      final wkt = _kmlCoordsToLineStringWkt(rawCoords);
-      if (wkt == null) continue;
-
-      await db.db.execute(
-        Sql.named(r'''
-          INSERT INTO geometrias_capa (id, capa_id, nombre, propiedades, geom)
-          VALUES (
-            @id::uuid, @capaId::uuid, @nombre, @props::jsonb,
-            ST_SetSRID(ST_GeomFromText(@wkt), 4326)
-          )
-        '''),
-        parameters: {
-          'id': uuid.v4(),
-          'capaId': capaId,
-          'nombre': nombre,
-          'props': propsJson,
-          'wkt': wkt,
-        },
-      );
-      count++;
-      continue;
-    }
-
-    // Try Polygon
-    final polyEl = pm.findAllElements('Polygon').firstOrNull;
-    if (polyEl != null) {
-      final outerEl = polyEl.findAllElements('outerBoundaryIs').firstOrNull;
-      final ringEl = outerEl?.findAllElements('LinearRing').firstOrNull;
-      final rawCoords = ringEl?.findElements('coordinates').firstOrNull?.innerText ?? '';
-      final wkt = _kmlCoordsToPolygonWkt(rawCoords);
-      if (wkt == null) continue;
-
-      await db.db.execute(
-        Sql.named(r'''
-          INSERT INTO geometrias_capa (id, capa_id, nombre, propiedades, geom)
-          VALUES (
-            @id::uuid, @capaId::uuid, @nombre, @props::jsonb,
-            ST_SetSRID(ST_GeomFromText(@wkt), 4326)
-          )
-        '''),
-        parameters: {
-          'id': uuid.v4(),
-          'capaId': capaId,
-          'nombre': nombre,
-          'props': propsJson,
-          'wkt': wkt,
-        },
-      );
-      count++;
-    }
-  }
-
-  return count;
-}
-
-/// Uploads a shapefile ZIP to a temp directory and runs ogr2ogr to convert it
-/// to GeoJSON, then delegates to [_insertGeoJson].
-///
-/// Requires `ogr2ogr` (gdal-bin) to be installed in the Docker container.
-Future<int> _insertShp(
-  DatabaseService db,
-  Uuid uuid,
-  String capaId,
-  Uint8List zipBytes,
-) async {
-  final tmpDir = await Directory.systemTemp.createTemp('sigespu_shp_');
-  try {
-    // Extract the zip in-process using the archive package
-    final archive = ZipDecoder().decodeBytes(zipBytes);
-    final extractDir = Directory('${tmpDir.path}/extracted');
-    await extractDir.create();
-    for (final file in archive.files) {
-      if (file.isFile) {
-        final outFile = File('${extractDir.path}/${file.name}');
-        await outFile.parent.create(recursive: true);
-        await outFile.writeAsBytes(file.content as List<int>);
-      }
-    }
-
-    // Find the .shp file
-    final shpEntry = archive.files.firstWhere(
-      (f) => f.isFile && f.name.toLowerCase().endsWith('.shp'),
-      orElse: () => throw FormatException('No se encontró archivo .shp en el ZIP'),
-    );
-
-    // Convert to GeoJSON using ogr2ogr
-    final shpPath = '${extractDir.path}/${shpEntry.name}';
-    final outputGeojson = '${tmpDir.path}/output.geojson';
-    final ogrResult = await Process.run('ogr2ogr', [
-      '-f', 'GeoJSON',
-      '-t_srs', 'EPSG:4326',
-      outputGeojson,
-      shpPath,
-    ]);
-
-    if (ogrResult.exitCode != 0) {
-      throw Exception('ogr2ogr falló: ${ogrResult.stderr}');
-    }
-
-    final geojsonText = await File(outputGeojson).readAsString();
-    return await _insertGeoJson(db, uuid, capaId, geojsonText);
-  } finally {
-    // Clean up temp files regardless of success/failure
-    await tmpDir.delete(recursive: true);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// KML coordinate helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Parses a KML coordinates string ("lon,lat,alt lon,lat,alt ...") into a list
-/// of [lon, lat] pairs.
-List<List<double>> _parseKmlCoords(String raw) {
-  final result = <List<double>>[];
-  for (final token in raw.trim().split(RegExp(r'\s+'))) {
-    if (token.isEmpty) continue;
-    final parts = token.split(',');
-    if (parts.length < 2) continue;
-    final lon = double.tryParse(parts[0]);
-    final lat = double.tryParse(parts[1]);
-    if (lon != null && lat != null) result.add([lon, lat]);
-  }
-  return result;
-}
-
-String? _kmlCoordsToLineStringWkt(String raw) {
-  final coords = _parseKmlCoords(raw);
-  if (coords.length < 2) return null;
-  final pts = coords.map((c) => '${c[0]} ${c[1]}').join(', ');
-  return 'LINESTRING($pts)';
-}
-
-String? _kmlCoordsToPolygonWkt(String raw) {
-  final coords = _parseKmlCoords(raw);
-  if (coords.length < 3) return null;
-  // Ensure ring is closed
-  final ring = [...coords];
-  if (ring.first[0] != ring.last[0] || ring.first[1] != ring.last[1]) {
-    ring.add(ring.first);
-  }
-  final pts = ring.map((c) => '${c[0]} ${c[1]}').join(', ');
-  return 'POLYGON(($pts))';
 }

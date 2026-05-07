@@ -6,6 +6,7 @@ import 'package:flutter_map_heatmap/flutter_map_heatmap.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared/shared.dart';
 import '../../config/constants.dart';
+import '../../config/map_config.dart';
 import '../../config/theme.dart';
 import '../../data/seed_data.dart';
 import '../../data/providers.dart';
@@ -686,24 +687,8 @@ class _MapSidebar extends StatelessWidget {
   final WidgetRef ref;
   const _MapSidebar({required this.activeLayers, required this.ref});
 
-  static const _layers = [
-    ('centro_acopio', 'Centros de acopio', Color(0xFFEA580C)),
-    ('sede_comunitaria', 'Sedes comunitarias', Color(0xFF16A34A)),
-    ('zona_peligro', 'Zonas de peligro', Color(0xFFB91C1C)),
-    ('reporte', 'Reportes de seguridad', Color(0xFFEF4444)),
-    ('patente', 'Patentes comerciales', Color(0xFFD97706)),
-    ('infraestructura', 'Infraestructura', Color(0xFF1E3A8A)),
-    ('plan_regulador', 'Plan Regulador', Color(0xFFCA8A04)),
-  ];
-
-  static const _dangerFilters = [
-    ('all', 'Todos'),
-    ('drogas', 'Tráfico drogas'),
-    ('robos', 'Robos'),
-    ('vivienda_ilegal', 'Vivienda ilegal'),
-    ('vandalismo', 'Vandalismo'),
-    ('riña', 'Riñas'),
-  ];
+  static const _layers = MapLayerConfig.layers;
+  static const _dangerFilters = MapLayerConfig.dangerFilters;
 
   @override
   Widget build(BuildContext context) {
@@ -815,13 +800,7 @@ class _MapSidebar extends StatelessWidget {
                 const _SectionHeader('Categorías de Zonas', null),
                 ...(() {
                   final activeCats = ref.watch(activeZoneCategoriesProvider);
-                  const cats = [
-                    ('Seguridad', AppTheme.redDanger),
-                    ('Infraestructura', AppTheme.blue800),
-                    ('Vialidad', AppTheme.orange500),
-                    ('Comercio', AppTheme.amberWarning),
-                    ('Comunitario', AppTheme.greenSuccess),
-                  ];
+                  const cats = MapLayerConfig.zoneCategories;
                   return cats.map((c) {
                     final (name, color) = c;
                     final isActive = activeCats.contains(name);

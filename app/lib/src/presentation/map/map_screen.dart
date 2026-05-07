@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map_heatmap/flutter_map_heatmap.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared/shared.dart';
 import '../../config/constants.dart';
 import '../../config/theme.dart';
 import '../../data/seed_data.dart';
@@ -14,6 +15,13 @@ import 'widgets/add_element_modal.dart';
 import 'widgets/element_detail_sheet.dart';
 import 'widgets/zona_form_sheet.dart';
 import 'widgets/plan_regulador_sheet.dart';
+import 'widgets/barra_visor.dart';
+import 'widgets/panel_capas.dart';
+import 'widgets/panel_mapa_base.dart';
+import 'widgets/panel_leyenda.dart';
+import 'widgets/panel_imprimir.dart';
+import 'screens/subir_capa_screen.dart';
+import 'providers/visor_provider.dart';
 
 // ── Providers de estado del mapa ──────────────────────────────────────────────
 
@@ -120,7 +128,7 @@ final filteredUserPolygonsProvider = Provider<List<({List<LatLng> points, Elemen
   return userPolygons.where((p) {
     // Filtrar por capa (la mayoría son 'zona_peligro' o 'infraestructura')
     if (!activeLayers.contains(p.zona.layerKey)) return false;
-    
+
     // Filtrar por categoría de zona
     final cat = _mapTipoToCat(p.zona.tipo);
     if (!activeZoneCats.contains(cat)) return false;
@@ -130,7 +138,7 @@ final filteredUserPolygonsProvider = Provider<List<({List<LatLng> points, Elemen
       final d = DateTime.tryParse(p.zona.fecha);
       if (d != null && d.isBefore(dateLimit)) return false;
     }
-    
+
     return true;
   }).toList();
 });
@@ -155,11 +163,18 @@ final mapControllerProvider = Provider<MapController>((ref) => MapController());
 
 // ── MapScreen ─────────────────────────────────────────────────────────────────
 
-class MapScreen extends ConsumerWidget {
+class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MapScreen> createState() => _MapScreenState();
+}
+
+class _MapScreenState extends ConsumerState<MapScreen> {
+  final _mapKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
     final activeLayers = ref.watch(activeLayersProvider);
     final isDrawing = ref.watch(isDrawingModeProvider);
     final drawingPoints = ref.watch(drawingPointsProvider);
@@ -226,68 +241,218 @@ class MapScreen extends ConsumerWidget {
         Expanded(
           child: Stack(
             children: [
-              FlutterMap(
-                mapController: mapCtrl,
-                options: MapOptions(
-                  initialCenter: AppConstants.lotaCenter,
-                  initialZoom: AppConstants.lotaDefaultZoom,
-                  maxZoom: 19.0,
-                  onTap: (_, point) {
-                    if (isDrawing) {
-                      ref.read(drawingPointsProvider.notifier).update((s) => [...s, point]);
-                    }
-                  },
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate: AppConstants.mapTileUrl,
-                    subdomains: AppConstants.mapSubdomains,
-                    userAgentPackageName: 'cl.lota.sigespu',
+              RepaintBoundary(
+                key: _mapKey,
+                child: FlutterMap(
+                  mapController: mapCtrl,
+                  options: MapOptions(
+                    initialCenter: AppConstants.lotaCenter,
+                    initialZoom: AppConstants.lotaDefaultZoom,
+                    maxZoom: 19.0,
+                    onTap: (_, point) {
+                      if (isDrawing) {
+                        ref.read(drawingPointsProvider.notifier).update((s) => [...s, point]);
+                      }
+                    },
                   ),
-                  if (heatmapOn)
-                    HeatMapLayer(
-                      heatMapDataSource: _buildHeatMapDataSource(allElems),
-                      heatMapOptions: HeatMapOptions(
-                        radius: 35,
-                        blurFactor: 0.25,
-                        gradient: {
-                          0.2: Colors.orange,
-                          0.4: Colors.orange,
-                          0.6: Colors.orange,
-                          0.8: Colors.deepOrange,
-                          1.0: Colors.deepOrange,
-                        },
-                      ),
+                  children: [
+                    Consumer(
+                      builder: (ctx, r, _) {
+                        final base = r.watch(mapaBaseProvider);
+                        final url = mapaBaseUrls[base]!;
+                        final subs = mapaBaseSubdomains[base]!;
+                        return TileLayer(
+                          urlTemplate: url,
+                          subdomains: subs,
+                          userAgentPackageName: 'cl.lota.sigespu',
+                        );
+                      },
                     ),
-                  if (activeLayers.contains('plan_regulador')) ...[
-                    PolygonLayer(polygons: ref.watch(planReguladorPolygonsProvider)),
-                    MarkerLayer(
-                      markers: ref.watch(planReguladorMarkersProvider),
+                    if (heatmapOn)
+                      HeatMapLayer(
+                        heatMapDataSource: _buildHeatMapDataSource(allElems),
+                        heatMapOptions: HeatMapOptions(
+                          radius: 35,
+                          blurFactor: 0.25,
+                          gradient: {
+                            0.2: Colors.orange,
+                            0.4: Colors.orange,
+                            0.6: Colors.orange,
+                            0.8: Colors.deepOrange,
+                            1.0: Colors.deepOrange,
+                          },
+                        ),
+                      ),
+                    if (activeLayers.contains('plan_regulador')) ...[
+                      PolygonLayer(polygons: ref.watch(planReguladorPolygonsProvider)),
+                      MarkerLayer(
+                        markers: ref.watch(planReguladorMarkersProvider),
+                      ),
+                    ],
+                    if (isDrawing && drawingPoints.length >= 3)
+                      PolygonLayer(polygons: [
+                        Polygon(
+                          points: drawingPoints,
+                          color: AppTheme.redDanger.withValues(alpha: 0.25),
+                          borderColor: AppTheme.redDanger,
+                          borderStrokeWidth: 2,
+                        ),
+                      ]),
+                    if (filteredUserPolygons.isNotEmpty)
+                      PolygonLayer(
+                        polygons: filteredUserPolygons.map((p) {
+                          final color = CustomMarkers.getColorForTipo(p.zona.tipo);
+                          return Polygon(
+                            points: p.points,
+                            color: color.withValues(alpha: 0.2),
+                            borderColor: color,
+                            borderStrokeWidth: 2,
+                          );
+                        }).toList(),
+                      ),
+                    MarkerLayer(markers: markers),
+                    // Sismos layer
+                    Consumer(
+                      builder: (ctx, r, _) {
+                        final visible = r.watch(sismosVisibleProvider);
+                        if (!visible) return const SizedBox.shrink();
+                        return r.watch(sismosProvider).when(
+                          data: (sismos) => MarkerLayer(
+                            markers: sismos.map((s) {
+                              final color = s.magnitude >= 6.0
+                                  ? const Color(0xFFE53935)
+                                  : s.magnitude >= 5.0
+                                      ? const Color(0xFFFF8F00)
+                                      : s.magnitude >= 4.0
+                                          ? const Color(0xFFFDD835)
+                                          : const Color(0xFF43A047);
+                              final radius = (s.magnitude * 4).clamp(8.0, 30.0);
+                              return Marker(
+                                point: LatLng(s.latitude, s.longitude),
+                                width: radius * 2,
+                                height: radius * 2,
+                                child: GestureDetector(
+                                  onTap: () => _showSismoPopup(ctx, s),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: color.withValues(alpha: 0.85),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 1.5),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        s.magnitude.toStringAsFixed(1),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, __) => const SizedBox.shrink(),
+                        );
+                      },
+                    ),
+                    // Custom layers
+                    Consumer(
+                      builder: (ctx, r, _) {
+                        final capasAsync = r.watch(capasPersonalizadasProvider);
+                        final customVisible = r.watch(customLayersVisibleProvider);
+                        return capasAsync.when(
+                          data: (capas) {
+                            final visibleCapas =
+                                capas.where((c) => customVisible[c.id] ?? c.visible).toList();
+                            if (visibleCapas.isEmpty) return const SizedBox.shrink();
+                            return Stack(
+                              children: visibleCapas.map((capa) {
+                                final colorVal =
+                                    int.tryParse(capa.color.replaceFirst('#', '0xFF')) ??
+                                        0xFFFF5722;
+                                final color = Color(colorVal);
+                                return r.watch(capaGeoJsonProvider(capa.id)).when(
+                                  data: (fc) {
+                                    if (fc == null) return const SizedBox.shrink();
+                                    final features =
+                                        (fc['features'] as List).cast<Map<String, dynamic>>();
+                                    final markers = <Marker>[];
+                                    final polygons = <Polygon>[];
+                                    final polylines = <Polyline>[];
+                                    for (final f in features) {
+                                      final geom = f['geometry'] as Map<String, dynamic>?;
+                                      if (geom == null) continue;
+                                      final type = geom['type'] as String;
+                                      final coords = geom['coordinates'];
+                                      if (type == 'Point') {
+                                        final c = coords as List;
+                                        markers.add(Marker(
+                                          point: LatLng(
+                                              (c[1] as num).toDouble(),
+                                              (c[0] as num).toDouble()),
+                                          width: 20,
+                                          height: 20,
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: color,
+                                              shape: BoxShape.circle,
+                                              border:
+                                                  Border.all(color: Colors.white, width: 1.5),
+                                            ),
+                                          ),
+                                        ));
+                                      } else if (type == 'Polygon') {
+                                        final rings = (coords as List).cast<List>();
+                                        final pts = rings.first
+                                            .cast<List>()
+                                            .map((c) => LatLng(
+                                                (c[1] as num).toDouble(),
+                                                (c[0] as num).toDouble()))
+                                            .toList();
+                                        polygons.add(Polygon(
+                                          points: pts,
+                                          color: color.withValues(alpha: capa.opacidad),
+                                          borderColor: color,
+                                          borderStrokeWidth: 2,
+                                        ));
+                                      } else if (type == 'LineString') {
+                                        final pts = (coords as List)
+                                            .cast<List>()
+                                            .map((c) => LatLng(
+                                                (c[1] as num).toDouble(),
+                                                (c[0] as num).toDouble()))
+                                            .toList();
+                                        polylines.add(Polyline(
+                                          points: pts,
+                                          color: color,
+                                          strokeWidth: 2.5,
+                                        ));
+                                      }
+                                    }
+                                    return Stack(children: [
+                                      if (polygons.isNotEmpty) PolygonLayer(polygons: polygons),
+                                      if (polylines.isNotEmpty)
+                                        PolylineLayer(polylines: polylines),
+                                      if (markers.isNotEmpty) MarkerLayer(markers: markers),
+                                    ]);
+                                  },
+                                  loading: () => const SizedBox.shrink(),
+                                  error: (_, __) => const SizedBox.shrink(),
+                                );
+                              }).toList(),
+                            );
+                          },
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, __) => const SizedBox.shrink(),
+                        );
+                      },
                     ),
                   ],
-                  if (isDrawing && drawingPoints.length >= 3)
-                    PolygonLayer(polygons: [
-                      Polygon(
-                        points: drawingPoints,
-                        color: AppTheme.redDanger.withValues(alpha: 0.25),
-                        borderColor: AppTheme.redDanger,
-                        borderStrokeWidth: 2,
-                      ),
-                    ]),
-                  if (filteredUserPolygons.isNotEmpty)
-                    PolygonLayer(
-                      polygons: filteredUserPolygons.map((p) {
-                        final color = CustomMarkers.getColorForTipo(p.zona.tipo);
-                        return Polygon(
-                          points: p.points,
-                          color: color.withValues(alpha: 0.2),
-                          borderColor: color,
-                          borderStrokeWidth: 2,
-                        );
-                      }).toList(),
-                    ),
-                  MarkerLayer(markers: markers),
-                ],
+                ),
               ),
 
               // Toggle sidebar btn
@@ -322,29 +487,63 @@ class MapScreen extends ConsumerWidget {
                 Positioned(
                   top: 16,
                   left: collapsed ? 64 : 16,
-                  child: const _InfoPanel(count: elementos.length),
-                  ),
+                  child: _InfoPanel(count: elementos.length),
+                ),
 
-                  // Legend bottom-left
-                  const Positioned(
-                  bottom: 24,
-                  left: 16,
-                  child: _LegendPanel(),
-                  ),
+              // Legend bottom-left
+              const Positioned(
+                bottom: 24,
+                left: 16,
+                child: _LegendPanel(),
+              ),
 
-                  // FABs bottom-right
-                  Positioned(
-                  bottom: 24, right: 16,
-                  child: _FabGroup(
+              // BarraVisor — bottom center
+              const Positioned(
+                bottom: 96,
+                left: 0,
+                right: 0,
+                child: Center(child: BarraVisor()),
+              ),
+
+              // Visor panels
+              Consumer(
+                builder: (ctx, r, _) {
+                  final panel = r.watch(activePanelProvider);
+                  if (panel == VisorPanel.none) return const SizedBox.shrink();
+                  return Positioned(
+                    bottom: 150,
+                    left: 16,
+                    child: switch (panel) {
+                      VisorPanel.capas => PanelCapas(
+                          isDirector: false, // TODO(sprint-3): read from auth provider
+                          onSubirCapa: () => showModalBottomSheet(
+                            context: ctx,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => const SubirCapaScreen(),
+                          ),
+                        ),
+                      VisorPanel.mapaBase => const PanelMapaBase(),
+                      VisorPanel.leyenda => const PanelLeyenda(),
+                      VisorPanel.imprimir => PanelImprimir(mapKey: _mapKey),
+                      VisorPanel.none => const SizedBox.shrink(),
+                    },
+                  );
+                },
+              ),
+
+              // FABs bottom-right
+              Positioned(
+                bottom: 24, right: 16,
+                child: _FabGroup(
                   isDrawing: isDrawing,
                   canFinish: drawingPoints.length >= 3,
                   ref: ref,
                   context: context,
                   drawingPoints: drawingPoints,
                   mapController: mapCtrl,
-                  ),
-                  ),
-
+                ),
+              ),
             ],
           ),
         ),
@@ -365,6 +564,72 @@ class MapScreen extends ConsumerWidget {
     return _ListHeatMapDataSource(dataList);
   }
 
+  void _showSismoPopup(BuildContext ctx, SismoDto s) {
+    showModalBottomSheet(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E2327),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sismo M${s.magnitude.toStringAsFixed(1)} ${s.magType ?? ''}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (s.place != null)
+              Text(s.place!,
+                  style: const TextStyle(
+                      color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 6),
+            Text(
+              'Fecha: ${s.timeUtc.toLocal()}',
+              style:
+                  const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+            if (s.depthKm != null)
+              Text(
+                'Profundidad: ${s.depthKm!.toStringAsFixed(1)} km',
+                style: const TextStyle(
+                    color: Colors.white54, fontSize: 12),
+              ),
+            if (s.tsunami == 1)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Row(children: [
+                  Icon(Icons.warning, color: Colors.amber, size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    'Posible alerta de tsunami',
+                    style: TextStyle(
+                        color: Colors.amber, fontSize: 12),
+                  ),
+                ]),
+              ),
+            if (s.urlUsgs != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Ver en USGS: ${s.urlUsgs}',
+                  style: const TextStyle(
+                      color: Color(0xFF00897B), fontSize: 11),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 void _showGuardarZona(BuildContext context, WidgetRef ref, List<LatLng> points) {
@@ -475,143 +740,146 @@ class _MapSidebar extends StatelessWidget {
               children: [
                 // Sección capas
                 _SectionHeader('Capas del sistema', '$activeCount/${_layers.length}'),
-          ...(() {
-            final counts = <String, int>{};
-            for (final e in kElementosSeed) {
-              counts[e.layerKey] = (counts[e.layerKey] ?? 0) + 1;
-            }
-            return _layers.map((l) {
-              final (key, name, color) = l;
-              final isActive = activeLayers.contains(key);
-              final count = counts[key] ?? 0;
-              return _LayerToggle(
-                layerKey: key, name: name, color: color,
-                isActive: isActive, count: count,
-                onTap: () {
-                  final next = Set<String>.from(activeLayers);
-                  isActive ? next.remove(key) : next.add(key);
-                  ref.read(activeLayersProvider.notifier).state = next;
-                },
-              );
-            });
-          })(),
+                ...(() {
+                  final counts = <String, int>{};
+                  for (final e in kElementosSeed) {
+                    counts[e.layerKey] = (counts[e.layerKey] ?? 0) + 1;
+                  }
+                  return _layers.map((l) {
+                    final (key, name, color) = l;
+                    final isActive = activeLayers.contains(key);
+                    final count = counts[key] ?? 0;
+                    return _LayerToggle(
+                      layerKey: key, name: name, color: color,
+                      isActive: isActive, count: count,
+                      onTap: () {
+                        final next = Set<String>.from(activeLayers);
+                        isActive ? next.remove(key) : next.add(key);
+                        ref.read(activeLayersProvider.notifier).state = next;
+                      },
+                    );
+                  });
+                })(),
 
-          const Divider(height: 1, color: AppTheme.stone100),
+                const Divider(height: 1, color: AppTheme.stone100),
 
-          // Tipos de peligro
-          _SectionHeader('Tipos de peligro', null),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            child: Wrap(
-              spacing: 6, runSpacing: 6,
-              children: _dangerFilters.map((f) {
-                final (key, label) = f;
-                final isActive = dangerFilter == key;
-                return GestureDetector(
-                  onTap: () => ref.read(dangerFilterProvider.notifier).state = key,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isActive ? AppTheme.orange600 : AppTheme.stone100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(label, style: TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w500,
-                      color: isActive ? Colors.white : AppTheme.stone600,
-                    )),
+                // Tipos de peligro
+                const _SectionHeader('Tipos de peligro', null),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: Wrap(
+                    spacing: 6, runSpacing: 6,
+                    children: _dangerFilters.map((f) {
+                      final (key, label) = f;
+                      final isActive = dangerFilter == key;
+                      return GestureDetector(
+                        onTap: () => ref.read(dangerFilterProvider.notifier).state = key,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 120),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isActive ? AppTheme.orange600 : AppTheme.stone100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(label, style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w500,
+                            color: isActive ? Colors.white : AppTheme.stone600,
+                          )),
+                        ),
+                      );
+                    }).toList(),
                   ),
-                );
-              }).toList(),
-            ),
-          ),
-
-          const Divider(height: 1, color: AppTheme.stone100),
-
-          // Filtros de Zonas dibujadas
-          _SectionHeader('Categorías de Zonas', null),
-          ...(() {
-            final activeCats = ref.watch(activeZoneCategoriesProvider);
-            const cats = [
-              ('Seguridad', AppTheme.redDanger),
-              ('Infraestructura', AppTheme.blue800),
-              ('Vialidad', AppTheme.orange500),
-              ('Comercio', AppTheme.amberWarning),
-              ('Comunitario', AppTheme.greenSuccess),
-            ];
-            return cats.map((c) {
-              final (name, color) = c;
-              final isActive = activeCats.contains(name);
-              return _ZoneCatToggle(
-                name: name,
-                color: color,
-                isActive: isActive,
-                onTap: () {
-                  final next = Set<String>.from(activeCats);
-                  isActive ? next.remove(name) : next.add(name);
-                  ref.read(activeZoneCategoriesProvider.notifier).state = next;
-                },
-              );
-            });
-          })(),
-
-          const Divider(height: 1, color: AppTheme.stone100),
-
-          // Mapa de calor
-          _SectionHeader('Mapa de calor', null),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            child: GestureDetector(
-              onTap: () => ref.read(heatmapOnProvider.notifier).state = !heatmapOn,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppTheme.stone50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.stone200),
                 ),
-                child: Row(children: [
-                  const Icon(Icons.blur_on, size: 16, color: AppTheme.orange600),
-                  const SizedBox(width: 8),
-                  const Expanded(child: Text('Densidad de reportes', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppTheme.stone800))),
-                  Switch(
-                    value: heatmapOn,
-                    onChanged: (v) => ref.read(heatmapOnProvider.notifier).state = v,
-                    activeTrackColor: AppTheme.orange600,
-                    activeThumbColor: Colors.white,
-                    inactiveTrackColor: AppTheme.stone300,
-                    inactiveThumbColor: Colors.white,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+
+                const Divider(height: 1, color: AppTheme.stone100),
+
+                // Filtros de Zonas dibujadas
+                const _SectionHeader('Categorías de Zonas', null),
+                ...(() {
+                  final activeCats = ref.watch(activeZoneCategoriesProvider);
+                  const cats = [
+                    ('Seguridad', AppTheme.redDanger),
+                    ('Infraestructura', AppTheme.blue800),
+                    ('Vialidad', AppTheme.orange500),
+                    ('Comercio', AppTheme.amberWarning),
+                    ('Comunitario', AppTheme.greenSuccess),
+                  ];
+                  return cats.map((c) {
+                    final (name, color) = c;
+                    final isActive = activeCats.contains(name);
+                    return _ZoneCatToggle(
+                      name: name,
+                      color: color,
+                      isActive: isActive,
+                      onTap: () {
+                        final next = Set<String>.from(activeCats);
+                        isActive ? next.remove(name) : next.add(name);
+                        ref.read(activeZoneCategoriesProvider.notifier).state = next;
+                      },
+                    );
+                  });
+                })(),
+
+                const Divider(height: 1, color: AppTheme.stone100),
+
+                // Mapa de calor
+                const _SectionHeader('Mapa de calor', null),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: GestureDetector(
+                    onTap: () => ref.read(heatmapOnProvider.notifier).state = !heatmapOn,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.stone50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.stone200),
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.blur_on, size: 16, color: AppTheme.orange600),
+                        const SizedBox(width: 8),
+                        const Expanded(child: Text('Densidad de reportes', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppTheme.stone800))),
+                        Switch(
+                          value: heatmapOn,
+                          onChanged: (v) => ref.read(heatmapOnProvider.notifier).state = v,
+                          activeTrackColor: AppTheme.orange600,
+                          activeThumbColor: Colors.white,
+                          inactiveTrackColor: AppTheme.stone300,
+                          inactiveThumbColor: Colors.white,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ]),
+                    ),
                   ),
-                ]),
-              ),
-            ),
-          ),
+                ),
 
-          const Divider(height: 1, color: AppTheme.stone100),
+                const Divider(height: 1, color: AppTheme.stone100),
 
-          // Rango de fechas
-          _SectionHeader('Rango de fechas', null),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            child: DropdownButtonFormField<String>(
-              // ignore: deprecated_member_use
-              value: dateRange,
-              decoration: InputDecoration(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
-                isDense: true,
-              ),
-              style: const TextStyle(fontSize: 11.5, color: AppTheme.stone800),
-              items: const [
-                DropdownMenuItem(value: '7', child: Text('Últimos 7 días')),
-                DropdownMenuItem(value: '30', child: Text('Últimos 30 días')),
-                DropdownMenuItem(value: '90', child: Text('Últimos 90 días')),
-                DropdownMenuItem(value: '365', child: Text('Último año')),
-                DropdownMenuItem(value: 'all', child: Text('Histórico completo')),
+                // Rango de fechas
+                const _SectionHeader('Rango de fechas', null),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: DropdownButtonFormField<String>(
+                    // ignore: deprecated_member_use
+                    value: dateRange,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
+                      isDense: true,
+                    ),
+                    style: const TextStyle(fontSize: 11.5, color: AppTheme.stone800),
+                    items: const [
+                      DropdownMenuItem(value: '7', child: Text('Últimos 7 días')),
+                      DropdownMenuItem(value: '30', child: Text('Últimos 30 días')),
+                      DropdownMenuItem(value: '90', child: Text('Últimos 90 días')),
+                      DropdownMenuItem(value: '365', child: Text('Último año')),
+                      DropdownMenuItem(value: 'all', child: Text('Histórico completo')),
+                    ],
+                    onChanged: (v) { if (v != null) ref.read(dateRangeProvider.notifier).state = v; },
+                  ),
+                ),
               ],
-              onChanged: (v) { if (v != null) ref.read(dateRangeProvider.notifier).state = v; },
             ),
           ),
         ],

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/visor_provider.dart';
-import '../map_screen.dart' show activeLayersProvider;
+import '../providers/map_providers.dart';
 
 class PanelLeyenda extends ConsumerWidget {
   const PanelLeyenda({super.key});

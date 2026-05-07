@@ -5,7 +5,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:printing/printing.dart';
 import '../../config/theme.dart';
 import '../auth/auth_provider.dart';
-import '../map/map_screen.dart';
+import '../map/providers/map_providers.dart';
 import 'pdf_export_service.dart';
 
 // ── Connectivity provider ─────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/visor_provider.dart';
 import '../../../config/theme.dart';
 
@@ -9,6 +10,7 @@ class BarraVisor extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activePanel = ref.watch(activePanelProvider);
+    final selectedCapaId = ref.watch(selectedCapaIdProvider);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -54,6 +56,22 @@ class BarraVisor extends ConsumerWidget {
             active: activePanel == VisorPanel.leyenda,
             onTap: () => _toggle(ref, VisorPanel.leyenda),
           ),
+          if (selectedCapaId != null)
+            _VisorBtn(
+              icon: Icons.download_outlined,
+              color: const Color(0xFF2E7D32),
+              label: 'Descargar capa',
+              active: false,
+              onTap: () async {
+                final url = await exportCapa(selectedCapaId);
+                if (url != null) {
+                  final uri = Uri.parse(url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                }
+              },
+            ),
         ],
       ),
     );

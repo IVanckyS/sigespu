@@ -101,41 +101,66 @@ class _PanelCapasState extends ConsumerState<PanelCapas> {
                 children: [
                   // Native layer groups
                   ..._nativeLayers.entries.map((entry) {
+                    final groupName = entry.key;
+                    final nativeWidgets = entry.value.map((l) {
+                      final (key, name, color) = l;
+                      final isActive = key == 'sismos'
+                          ? sismosVisible
+                          : activeLayers.contains(key);
+                      return _LayerRow(
+                        color: color,
+                        name: name,
+                        isActive: isActive,
+                        onToggle: () {
+                          if (key == 'sismos') {
+                            ref.read(sismosVisibleProvider.notifier).state =
+                                !sismosVisible;
+                          } else {
+                            final next = Set<String>.from(activeLayers);
+                            isActive ? next.remove(key) : next.add(key);
+                            ref.read(activeLayersProvider.notifier).state =
+                                next;
+                          }
+                        },
+                      );
+                    }).toList();
+
                     return _buildGroup(
-                      entry.key,
-                      entry.value.map((l) {
-                        final (key, name, color) = l;
-                        final isActive = key == 'sismos'
-                            ? sismosVisible
-                            : activeLayers.contains(key);
-                        return _LayerRow(
-                          color: color,
-                          name: name,
-                          isActive: isActive,
-                          onToggle: () {
-                            if (key == 'sismos') {
-                              ref
-                                  .read(sismosVisibleProvider.notifier)
-                                  .state = !sismosVisible;
-                            } else {
-                              final next =
-                                  Set<String>.from(activeLayers);
-                              isActive
-                                  ? next.remove(key)
-                                  : next.add(key);
-                              ref
-                                  .read(activeLayersProvider.notifier)
-                                  .state = next;
-                            }
-                          },
-                        );
-                      }).toList(),
+                      groupName,
+                      [
+                        ...nativeWidgets,
+                        // Custom layers for this category
+                        ...capasAsync.maybeWhen(
+                          data: (capas) => capas
+                              .where((c) => c.categoria == groupName)
+                              .map((c) => _buildCustomRow(c, customVisible, ref)),
+                          orElse: () => [],
+                        ),
+                      ],
                     );
                   }),
 
-                  // Custom layers section
-                  _buildGroupHeader(
+                  // Catch-all for "Personalizadas" or any category not in _nativeLayers
+                  _buildGroup(
                     'Personalizadas',
+                    capasAsync.maybeWhen(
+                      data: (capas) => capas
+                          .where((c) =>
+                              !_nativeLayers.containsKey(c.categoria) ||
+                              c.categoria == 'Personalizadas')
+                          .map((c) => _buildCustomRow(c, customVisible, ref))
+                          .toList(),
+                      loading: () => [
+                        const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white38,
+                          ),
+                        )
+                      ],
+                      orElse: () => [],
+                    ),
                     trailing: widget.isDirector
                         ? IconButton(
                             onPressed: widget.onSubirCapa,
@@ -146,49 +171,6 @@ class _PanelCapasState extends ConsumerState<PanelCapas> {
                           )
                         : null,
                   ),
-                  if (_expanded['Personalizadas'] == true)
-                    capasAsync.when(
-                      data: (capas) => Column(
-                        children: capas.map((c) {
-                          final isActive =
-                              customVisible[c.id] ?? c.visible;
-                          final colorVal = int.tryParse(
-                                  c.color.replaceFirst('#', '0xFF')) ??
-                              0xFFFF5722;
-                          return _LayerRow(
-                            color: Color(colorVal),
-                            name: c.nombre,
-                            isActive: isActive,
-                            onToggle: () {
-                              final next =
-                                  Map<int, bool>.from(customVisible);
-                              next[c.id] = !isActive;
-                              ref
-                                  .read(customLayersVisibleProvider
-                                      .notifier)
-                                  .state = next;
-                            },
-                          );
-                        }).toList(),
-                      ),
-                      loading: () => const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white38,
-                        ),
-                      ),
-                      error: (_, __) => const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Text(
-                          'Error al cargar capas',
-                          style: TextStyle(
-                            color: Colors.white38,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -198,9 +180,76 @@ class _PanelCapasState extends ConsumerState<PanelCapas> {
     );
   }
 
-  Widget _buildGroup(String title, List<Widget> rows) {
+  Widget _buildCustomRow(dynamic c, Map<String, bool> customVisible, WidgetRef ref) {
+    final isActive = customVisible[c.id] ?? c.visible;
+    final colorVal = int.tryParse(c.color.replaceFirst('#', '0xFF')) ?? 0xFFFF5722;
+    return _LayerRow(
+      color: Color(colorVal),
+      name: c.nombre,
+      isActive: isActive,
+      onToggle: () {
+        final next = Map<String, bool>.from(customVisible);
+        final newState = !isActive;
+        next[c.id] = newState;
+        ref.read(customLayersVisibleProvider.notifier).state = next;
+        
+        // Mark as selected for download if toggled ON
+        if (newState) {
+          ref.read(selectedCapaIdProvider.notifier).state = c.id;
+        } else if (ref.read(selectedCapaIdProvider) == c.id) {
+          ref.read(selectedCapaIdProvider.notifier).state = null;
+        }
+      },
+      trailing: widget.isDirector
+          ? IconButton(
+              onPressed: () => _confirmDelete(c.id, c.nombre),
+              icon: const Icon(Icons.delete_outline,
+                  color: Colors.white30, size: 16),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: 'Eliminar capa',
+            )
+          : null,
+    );
+  }
+
+  void _confirmDelete(String id, String nombre) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2327),
+        title: const Text('Eliminar capa',
+            style: TextStyle(color: Colors.white, fontSize: 14)),
+        content: Text('¿Estás seguro de eliminar "$nombre"?',
+            style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white38)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final ok = await deleteCapa(ref, id);
+              if (mounted) {
+                Navigator.pop(ctx);
+                if (!ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Error al eliminar la capa')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroup(String title, List<Widget> rows, {Widget? trailing}) {
     return Column(children: [
-      _buildGroupHeader(title),
+      _buildGroupHeader(title, trailing: trailing),
       if (_expanded[title] == true) ...rows,
     ]);
   }
@@ -243,12 +292,14 @@ class _LayerRow extends StatelessWidget {
   final String name;
   final bool isActive;
   final VoidCallback onToggle;
+  final Widget? trailing;
 
   const _LayerRow({
     required this.color,
     required this.name,
     required this.isActive,
     required this.onToggle,
+    this.trailing,
   });
 
   @override
@@ -286,6 +337,7 @@ class _LayerRow extends StatelessWidget {
               ),
             ),
           ),
+          if (trailing != null) trailing!,
         ]),
       ),
     );

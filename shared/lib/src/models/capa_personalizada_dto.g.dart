@@ -9,13 +9,14 @@ part of 'capa_personalizada_dto.dart';
 _$CapaPersonalizadaDtoImpl _$$CapaPersonalizadaDtoImplFromJson(
         Map<String, dynamic> json) =>
     _$CapaPersonalizadaDtoImpl(
-      id: (json['id'] as num).toInt(),
+      id: json['id'] as String,
       nombre: json['nombre'] as String,
       descripcion: json['descripcion'] as String?,
       color: json['color'] as String,
       opacidad: (json['opacidad'] as num).toDouble(),
       visible: json['visible'] as bool,
       formato: json['formato'] as String,
+      categoria: json['categoria'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
 
@@ -29,5 +30,6 @@ Map<String, dynamic> _$$CapaPersonalizadaDtoImplToJson(
       'opacidad': instance.opacidad,
       'visible': instance.visible,
       'formato': instance.formato,
+      'categoria': instance.categoria,
       'createdAt': instance.createdAt.toIso8601String(),
     };

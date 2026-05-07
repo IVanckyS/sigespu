@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared/shared.dart';
 import '../../../config/constants.dart';
+import '../../auth/auth_provider.dart';
 
 // ── Active panel ──────────────────────────────────────────────────────────────
 
@@ -32,20 +33,30 @@ const mapaBaseSubdomains = {
 
 // ── Layer visibility ──────────────────────────────────────────────────────────
 
+/// Current visible map bounds [xmin, ymin, xmax, ymax]
+final mapBoundsProvider = StateProvider<List<double>?>((ref) => null);
+
 /// Whether the sismos layer is toggled on
 final sismosVisibleProvider = StateProvider<bool>((ref) => false);
 
 /// Map of custom capa id → visible override (null = use capa.visible default)
-final customLayersVisibleProvider = StateProvider<Map<int, bool>>((ref) => {});
+final customLayersVisibleProvider = StateProvider<Map<String, bool>>((ref) => {});
+
+/// ID of the last interacted or explicitly selected layer for actions like Download
+final selectedCapaIdProvider = StateProvider<String?>((ref) => null);
 
 // ── Sismos data ───────────────────────────────────────────────────────────────
 
 final sismosProvider = FutureProvider<List<SismoDto>>((ref) async {
-  // TODO(sprint-3): replace with token from auth provider
+  final storage = ref.read(secureStorageProvider);
+  final token = await storage.read(key: 'access_token');
   const apiBase = AppConstants.apiBaseUrl;
+  
   final resp = await http.get(
     Uri.parse('$apiBase/api/sismos?dias=7&minmagnitude=3.0&maxradiuskm=500'),
+    headers: token != null ? {'Authorization': 'Bearer $token'} : null,
   ).timeout(const Duration(seconds: 15));
+  
   if (resp.statusCode != 200) return [];
   final data = jsonDecode(resp.body) as Map<String, dynamic>;
   final list = (data['sismos'] as List).cast<Map<String, dynamic>>();
@@ -56,11 +67,15 @@ final sismosProvider = FutureProvider<List<SismoDto>>((ref) async {
 
 final capasPersonalizadasProvider =
     FutureProvider<List<CapaPersonalizadaDto>>((ref) async {
-  // TODO(sprint-3): replace with token from auth provider
+  final storage = ref.read(secureStorageProvider);
+  final token = await storage.read(key: 'access_token');
   const apiBase = AppConstants.apiBaseUrl;
+  
   final resp = await http.get(
     Uri.parse('$apiBase/api/capas'),
+    headers: token != null ? {'Authorization': 'Bearer $token'} : null,
   ).timeout(const Duration(seconds: 15));
+  
   if (resp.statusCode != 200) return [];
   final data = jsonDecode(resp.body) as Map<String, dynamic>;
   final list = (data['capas'] as List).cast<Map<String, dynamic>>();
@@ -69,12 +84,49 @@ final capasPersonalizadasProvider =
 
 /// GeoJSON FeatureCollection for a specific custom capa
 final capaGeoJsonProvider =
-    FutureProvider.family<Map<String, dynamic>?, int>((ref, id) async {
-  // TODO(sprint-3): replace with token from auth provider
+    FutureProvider.family<Map<String, dynamic>?, String>((ref, id) async {
+  final storage = ref.read(secureStorageProvider);
+  final token = await storage.read(key: 'access_token');
+  final bounds = ref.watch(mapBoundsProvider);
   const apiBase = AppConstants.apiBaseUrl;
+
+  String url = '$apiBase/api/capas/$id/geometrias';
+  if (bounds != null && bounds.length == 4) {
+    url += '?bbox=${bounds.join(',')}';
+  }
+
   final resp = await http.get(
-    Uri.parse('$apiBase/api/capas/$id/geometrias'),
+    Uri.parse(url),
+    headers: token != null ? {'Authorization': 'Bearer $token'} : null,
   ).timeout(const Duration(seconds: 15));
+
   if (resp.statusCode != 200) return null;
   return jsonDecode(resp.body) as Map<String, dynamic>;
 });
+
+/// Export/Download a layer
+Future<String?> exportCapa(String id) async {
+  const apiBase = AppConstants.apiBaseUrl;
+  // This just returns the URL for the user to download
+  return '$apiBase/api/capas/$id/export';
+}
+
+/// Delete a custom layer
+Future<bool> deleteCapa(WidgetRef ref, String id) async {
+  final storage = ref.read(secureStorageProvider);
+  final token = await storage.read(key: 'access_token');
+  const apiBase = AppConstants.apiBaseUrl;
+
+  try {
+    final resp = await http.delete(
+      Uri.parse('$apiBase/api/capas/$id'),
+      headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+    );
+
+    if (resp.statusCode == 200) {
+      ref.invalidate(capasPersonalizadasProvider);
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}

@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:printing/printing.dart';
 import '../../config/theme.dart';
 import '../auth/auth_provider.dart';
+import '../map/map_screen.dart';
+import 'pdf_export_service.dart';
 
 // ── Connectivity provider ─────────────────────────────────────────────────────
 
@@ -101,6 +104,9 @@ class AppShell extends ConsumerWidget {
                 ],
               ),
             ),
+          // ── Banner solicitar acceso (solo visitante) ───────────────────────
+          if (userRole == 'visitante')
+            _SolicitarAccesoBanner(),
           // ── Content ─────────────────────────────────────────────────────────
           Expanded(child: child),
         ],
@@ -236,13 +242,18 @@ class _ConnBadge extends StatelessWidget {
 
 // ── Export button ─────────────────────────────────────────────────────────────
 
-class _ExportBtn extends StatelessWidget {
+class _ExportBtn extends ConsumerWidget {
+  const _ExportBtn();
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return TextButton.icon(
-      onPressed: () => _showExportDialog(context),
+      onPressed: () => _exportPdf(context, ref),
       icon: const Icon(Icons.picture_as_pdf_outlined, size: 14),
-      label: const Text('Exportar PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+      label: const Text(
+        'Exportar PDF',
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+      ),
       style: TextButton.styleFrom(
         backgroundColor: AppTheme.stone100,
         foregroundColor: AppTheme.stone700,
@@ -252,50 +263,35 @@ class _ExportBtn extends StatelessWidget {
     );
   }
 
-  void _showExportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('Vista previa del documento PDF', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: AppTheme.stone100, borderRadius: BorderRadius.circular(8)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Container(width: 36, height: 36, decoration: const BoxDecoration(color: AppTheme.orange600, shape: BoxShape.circle), child: const Icon(Icons.location_on, color: Colors.white, size: 18)),
-                    const SizedBox(width: 12),
-                    const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('SIGESPU Lota', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                      Text('I. Municipalidad de Lota — Dirección de Seguridad Pública', style: TextStyle(fontSize: 10, color: AppTheme.stone600)),
-                    ]),
-                  ]),
-                  const Divider(height: 20),
-                  const Text('Informe Operativo — Resumen de Elementos', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.orange700)),
-                  const SizedBox(height: 8),
-                  const Text('Generado el 29 de abril de 2026', style: TextStyle(fontSize: 11, color: AppTheme.stone600)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(ctx),
-            icon: const Icon(Icons.print_outlined, size: 16),
-            label: const Text('Descargar PDF'),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.orange600, foregroundColor: Colors.white),
-          ),
-        ],
-      ),
-    );
+  Future<void> _exportPdf(BuildContext context, WidgetRef ref) async {
+    final activeLayers = ref.read(activeLayersProvider);
+    final dangerFilter = ref.read(dangerFilterProvider);
+    final dateRange = ref.read(dateRangeProvider);
+    final elementos = ref.read(filteredElementsProvider);
+
+    final auth = ref.read(authProvider);
+    final userName = auth.user?['nombre'] as String? ?? 'Funcionario';
+
+    final filterInfo = {
+      'Capas': activeLayers.join(', '),
+      'Peligro': dangerFilter,
+      'Rango': '$dateRange días',
+    };
+
+    try {
+      final bytes = await PdfExportService.generateReport(
+        elementos,
+        userName,
+        filterInfo: filterInfo,
+      );
+      await Printing.layoutPdf(onLayout: (_) async => bytes);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al generar el PDF')),
+        );
+      }
+    }
   }
 }
 
@@ -331,6 +327,179 @@ class _UserChip extends StatelessWidget {
               Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.stone900)),
               Text(roleLabel, style: const TextStyle(fontSize: 10, color: AppTheme.stone500, letterSpacing: 0.05)),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Solicitar acceso (visitante) ──────────────────────────────────────────────
+
+class _SolicitarAccesoBanner extends ConsumerStatefulWidget {
+  const _SolicitarAccesoBanner();
+
+  @override
+  ConsumerState<_SolicitarAccesoBanner> createState() =>
+      _SolicitarAccesoBannerState();
+}
+
+class _SolicitarAccesoBannerState
+    extends ConsumerState<_SolicitarAccesoBanner> {
+  final _cargoCtrl = TextEditingController();
+  final _direccionCtrl = TextEditingController();
+  bool _formVisible = false;
+
+  @override
+  void dispose() {
+    _cargoCtrl.dispose();
+    _direccionCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = ref.watch(authProvider);
+    final solicitudEstado = auth.user?['solicitud_operativo'] as String?;
+
+    if (solicitudEstado == 'pendiente') {
+      return _banner(
+        bg: const Color(0xFFFEF3C7),
+        fg: const Color(0xFFD97706),
+        icon: Icons.hourglass_top,
+        text: 'Solicitud en revisión — el Director aprobará tu acceso operativo.',
+      );
+    }
+
+    if (solicitudEstado == 'rechazada') {
+      return _banner(
+        bg: Color(AppTheme.redDanger.toARGB32()).withValues(alpha: 0.08),
+        fg: AppTheme.redDanger,
+        icon: Icons.cancel_outlined,
+        text: 'Solicitud rechazada — contacta al Director directamente.',
+      );
+    }
+
+    if (_formVisible) {
+      return _buildForm(auth.isLoading);
+    }
+
+    return _banner(
+      bg: AppTheme.orange50,
+      fg: AppTheme.orange700,
+      icon: Icons.lock_open_outlined,
+      text: 'Tienes acceso Visitante (solo lectura).',
+      action: TextButton(
+        onPressed: () => setState(() => _formVisible = true),
+        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+        child: const Text(
+          'Solicitar acceso operativo →',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.orange700),
+        ),
+      ),
+    );
+  }
+
+  Widget _banner({
+    required Color bg,
+    required Color fg,
+    required IconData icon,
+    required String text,
+    Widget? action,
+  }) {
+    return Container(
+      color: bg,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: fg),
+            ),
+          ),
+          if (action != null) action,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildForm(bool isLoading) {
+    return Container(
+      color: AppTheme.orange50,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _cargoCtrl,
+              decoration: InputDecoration(
+                labelText: 'Cargo',
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              ),
+              style: const TextStyle(fontSize: 12.5),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _direccionCtrl,
+              decoration: InputDecoration(
+                labelText: 'Dependencia municipal',
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              ),
+              style: const TextStyle(fontSize: 12.5),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: isLoading
+                ? null
+                : () async {
+                    if (_cargoCtrl.text.trim().isEmpty ||
+                        _direccionCtrl.text.trim().isEmpty) {
+                      return;
+                    }
+                    final ok = await ref
+                        .read(authProvider.notifier)
+                        .solicitarAcceso(
+                          _cargoCtrl.text.trim(),
+                          _direccionCtrl.text.trim(),
+                        );
+                    if (ok && mounted) {
+                      setState(() => _formVisible = false);
+                    }
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.orange600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+            child: isLoading
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('Enviar', style: TextStyle(fontSize: 13)),
+          ),
+          const SizedBox(width: 4),
+          TextButton(
+            onPressed: () => setState(() => _formVisible = false),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(fontSize: 12, color: AppTheme.stone500),
+            ),
           ),
         ],
       ),

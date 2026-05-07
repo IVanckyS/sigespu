@@ -67,7 +67,7 @@ class AuthHandler {
 
     try {
       final result = await _dbService.db.execute(
-        Sql.named('INSERT INTO usuarios (email, nombre, password_hash, nivel_acceso) VALUES (@email, @nombre, @hash, @nivel) RETURNING id, nivel_acceso'),
+        Sql.named('INSERT INTO usuarios (email, nombre, password_hash, nivel_acceso) VALUES (@email, @nombre, @hash, @nivel) RETURNING id, nivel_acceso, solicitud_operativo'),
         parameters: {
           'email': email,
           'nombre': nombre,
@@ -75,10 +75,11 @@ class AuthHandler {
           'nivel': 'visitante',
         }
       );
-      
+
       final row = result.first;
       final userId = row[0] as String;
       final nivelAcceso = row[1] as String;
+      final solicitudOperativo = row[2] as String?;
 
       final accessToken = _jwtService.generateAccessToken(userId, nivelAcceso);
       final refreshData = await _jwtService.createRefreshToken(userId);
@@ -86,7 +87,13 @@ class AuthHandler {
       return Response.ok(jsonEncode({
         'access_token': accessToken,
         'refresh_token': refreshData['token'],
-        'user': {'id': userId, 'email': email, 'nombre': nombre, 'nivel_acceso': nivelAcceso}
+        'user': {
+          'id': userId,
+          'email': email,
+          'nombre': nombre,
+          'nivel_acceso': nivelAcceso,
+          'solicitud_operativo': solicitudOperativo,
+        }
       }), headers: {'Content-Type': 'application/json'});
     } catch (e) {
       if (e.toString().contains('usuarios_email_key')) {
@@ -107,7 +114,7 @@ class AuthHandler {
     }
 
     final result = await _dbService.db.execute(
-      Sql.named('SELECT id, password_hash, nivel_acceso, activo, nombre FROM usuarios WHERE email = @email'),
+      Sql.named('SELECT id, password_hash, nivel_acceso, activo, nombre, solicitud_operativo FROM usuarios WHERE email = @email'),
       parameters: {'email': email}
     );
 
@@ -121,6 +128,7 @@ class AuthHandler {
     final nivelAcceso = row[2] as String;
     final activo = row[3] as bool;
     final nombre = row[4] as String;
+    final solicitudOperativo = row[5] as String?;
 
     if (!activo) {
       return Response.forbidden(jsonEncode({'error': 'Usuario inactivo'}));
@@ -136,7 +144,13 @@ class AuthHandler {
     return Response.ok(jsonEncode({
       'access_token': accessToken,
       'refresh_token': refreshData['token'],
-      'user': {'id': userId, 'email': email, 'nombre': nombre, 'nivel_acceso': nivelAcceso}
+      'user': {
+        'id': userId,
+        'email': email,
+        'nombre': nombre,
+        'nivel_acceso': nivelAcceso,
+        'solicitud_operativo': solicitudOperativo,
+      }
     }), headers: {'Content-Type': 'application/json'});
   }
 

@@ -21,90 +21,11 @@ import 'widgets/panel_mapa_base.dart';
 import 'widgets/panel_leyenda.dart';
 import 'widgets/panel_imprimir.dart';
 import 'screens/subir_capa_screen.dart';
+import 'providers/map_providers.dart';
 import 'providers/visor_provider.dart';
 import '../auth/auth_provider.dart';
 
-// ── Providers de estado del mapa ──────────────────────────────────────────────
-
-final activeLayersProvider = StateProvider<Set<String>>((ref) => {});
-
-final isDrawingModeProvider = StateProvider<bool>((ref) => false);
-final drawingPointsProvider = StateProvider<List<LatLng>>((ref) => []);
-final drawingTargetProvider = StateProvider<String?>((ref) => null); // null = nueva zona, 'S-2', etc = sector PR
-final sidebarCollapsedProvider = StateProvider<bool>((ref) => false);
-final dangerFilterProvider = StateProvider<String>((ref) => 'all');
-final heatmapOnProvider = StateProvider<bool>((ref) => false);
-final dateRangeProvider = StateProvider<String>((ref) => '30');
-final mapCenterCoordsProvider = StateProvider<(double, double)>((ref) => (-37.0896, -73.1584));
-
-final activeZoneCategoriesProvider = StateProvider<Set<String>>((ref) => {
-  'Seguridad', 'Infraestructura', 'Vialidad', 'Comercio', 'Comunitario',
-});
-
-// Elementos creados por el usuario en esta sesión (en memoria)
-final userElementsProvider = StateProvider<List<ElementoMapa>>((ref) => []);
-
-// Todos los elementos: seed + usuario
-final allElementsProvider = Provider<List<ElementoMapa>>((ref) {
-  return [...kElementosSeed, ...ref.watch(userElementsProvider)];
-});
-
-final dateLimitProvider = Provider<DateTime?>((ref) {
-  final range = ref.watch(dateRangeProvider);
-  if (range == 'all') return null;
-  final days = int.tryParse(range) ?? 30;
-  return DateTime.now().subtract(Duration(days: days));
-});
-
-final filteredElementsProvider = Provider<List<ElementoMapa>>((ref) {
-  final activeLayers = ref.watch(activeLayersProvider);
-  final dangerFilter = ref.watch(dangerFilterProvider);
-  final activeZoneCats = ref.watch(activeZoneCategoriesProvider);
-  final dateLimit = ref.watch(dateLimitProvider);
-  final allElements = ref.watch(allElementsProvider);
-  final userPolygons = ref.watch(userPolygonsProvider);
-
-  return allElements.where((e) {
-    if (!activeLayers.contains(e.layerKey)) {
-      return false;
-    }
-
-    // Si es una zona dibujada (está en userPolygons), filtrar por categoría de zona
-    final isUserPolygon = userPolygons.any((p) => p.zona.id == e.id);
-    if (isUserPolygon) {
-      final cat = _mapTipoToCat(e.tipo);
-      if (!activeZoneCats.contains(cat)) {
-        return false;
-      }
-    }
-
-    if (dateLimit != null) {
-      final d = DateTime.tryParse(e.fecha);
-      if (d != null && d.isBefore(dateLimit)) {
-        return false;
-      }
-    }
-    if (e.tipo == 'zona_peligro' &&
-        dangerFilter != 'all' &&
-        e.tipoPeligro != dangerFilter) {
-      return false;
-    }
-    return true;
-  }).toList();
-});
-
-// Polígonos dibujados por el usuario con su zona asociada
-final userPolygonsProvider =
-    StateProvider<List<({List<LatLng> points, ElementoMapa zona})>>((ref) => []);
-
-// Formas personalizadas del Plan Regulador (sobreescriben las por defecto)
-final planReguladorEditsProvider = StateProvider<Map<String, List<LatLng>>>((ref) => {});
-
-final planReguladorPolygonsProvider = Provider<List<Polygon>>((ref) {
-  final edits = ref.watch(planReguladorEditsProvider);
-  return PlanReguladorLayer.buildPolygons(edits: edits);
-});
-
+// planReguladorMarkersProvider queda aquí: crea UI (PlanReguladorSheet) → evita dep circular
 final planReguladorMarkersProvider = Provider<List<Marker>>((ref) {
   final edits = ref.watch(planReguladorEditsProvider);
   return PlanReguladorLayer.buildCentroidMarkers(
@@ -117,48 +38,6 @@ final planReguladorMarkersProvider = Provider<List<Marker>>((ref) {
     ),
   );
 });
-
-final filteredUserPolygonsProvider = Provider<List<({List<LatLng> points, ElementoMapa zona})>>((ref) {
-  final activeLayers = ref.watch(activeLayersProvider);
-  final activeZoneCats = ref.watch(activeZoneCategoriesProvider);
-  final userPolygons = ref.watch(userPolygonsProvider);
-  final dateLimit = ref.watch(dateLimitProvider);
-
-  return userPolygons.where((p) {
-    // Filtrar por capa (la mayoría son 'zona_peligro' o 'infraestructura')
-    if (!activeLayers.contains(p.zona.layerKey)) return false;
-
-    // Filtrar por categoría de zona
-    final cat = _mapTipoToCat(p.zona.tipo);
-    if (!activeZoneCats.contains(cat)) return false;
-
-    // Filtrar por fecha
-    if (dateLimit != null) {
-      final d = DateTime.tryParse(p.zona.fecha);
-      if (d != null && d.isBefore(dateLimit)) return false;
-    }
-
-    return true;
-  }).toList();
-});
-
-String _mapTipoToCat(String tipo) {
-  if (tipo == 'zona_peligro' || tipo.startsWith('reporte_')) return 'Seguridad';
-  if (tipo == 'infraestructura' || tipo == 'luminaria' || tipo == 'camara') return 'Infraestructura';
-  if (tipo == 'reporte_accidente' || tipo == 'vialidad') return 'Vialidad';
-  if (tipo == 'patente') return 'Comercio';
-  if (tipo == 'sede_comunitaria' || tipo == 'centro_acopio') return 'Comunitario';
-  return 'Seguridad';
-}
-
-// Observaciones de funcionarios por sector del Plan Regulador
-final planReguladorObsProvider = StateProvider<Map<String, String>>((ref) => {});
-
-// Atribución de observaciones del Plan Regulador
-final planReguladorAttrProvider = StateProvider<Map<String, String>>((ref) => {});
-
-// MapController compartido para acceso desde el FAB de GPS
-final mapControllerProvider = Provider<MapController>((ref) => MapController());
 
 // ── MapScreen ─────────────────────────────────────────────────────────────────
 

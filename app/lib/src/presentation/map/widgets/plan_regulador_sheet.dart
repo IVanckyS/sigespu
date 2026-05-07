@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../config/theme.dart';
 import '../../../presentation/auth/auth_provider.dart';
-import '../map_screen.dart';
+import '../providers/map_providers.dart';
 
 class PlanReguladorSheet extends ConsumerStatefulWidget {
   final Map<String, dynamic> sector;

@@ -7,7 +7,7 @@ import '../../../config/theme.dart';
 import '../../../data/seed_data.dart';
 import '../../../presentation/auth/auth_provider.dart';
 import '../layers/custom_markers.dart';
-import '../map_screen.dart';
+import '../providers/map_providers.dart';
 import 'location_picker.dart';
 
 class AddElementModal extends ConsumerStatefulWidget {

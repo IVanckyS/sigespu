@@ -219,7 +219,7 @@ Router buildCapasRouter(DatabaseService db) {
             'id': capaId,
             'nombre': nombre,
             'formato': formato,
-            'geometriasInsertadas': geomCount,
+            'totalGeometrias': geomCount,
           }),
           headers: {'content-type': 'application/json'},
         );
@@ -664,36 +664,32 @@ Future<int> _insertShp(
 ) async {
   final tmpDir = await Directory.systemTemp.createTemp('sigespu_shp_');
   try {
-    // Write the zip to disk
-    final zipFile = File('${tmpDir.path}/upload.zip');
-    await zipFile.writeAsBytes(zipBytes);
-
-    // Extract the zip
+    // Extract the zip in-process using the archive package
+    final archive = ZipDecoder().decodeBytes(zipBytes);
     final extractDir = Directory('${tmpDir.path}/extracted');
     await extractDir.create();
-    final result = await Process.run('unzip', ['-q', zipFile.path, '-d', extractDir.path]);
-    if (result.exitCode != 0) {
-      throw Exception('No se pudo descomprimir el shapefile: ${result.stderr}');
+    for (final file in archive.files) {
+      if (file.isFile) {
+        final outFile = File('${extractDir.path}/${file.name}');
+        await outFile.parent.create(recursive: true);
+        await outFile.writeAsBytes(file.content as List<int>);
+      }
     }
 
     // Find the .shp file
-    final shpFiles = extractDir
-        .listSync(recursive: true)
-        .whereType<File>()
-        .where((f) => f.path.toLowerCase().endsWith('.shp'))
-        .toList();
-
-    if (shpFiles.isEmpty) {
-      throw FormatException('No se encontró archivo .shp en el ZIP');
-    }
+    final shpEntry = archive.files.firstWhere(
+      (f) => f.isFile && f.name.toLowerCase().endsWith('.shp'),
+      orElse: () => throw FormatException('No se encontró archivo .shp en el ZIP'),
+    );
 
     // Convert to GeoJSON using ogr2ogr
+    final shpPath = '${extractDir.path}/${shpEntry.name}';
     final outputGeojson = '${tmpDir.path}/output.geojson';
     final ogrResult = await Process.run('ogr2ogr', [
       '-f', 'GeoJSON',
       '-t_srs', 'EPSG:4326',
       outputGeojson,
-      shpFiles.first.path,
+      shpPath,
     ]);
 
     if (ogrResult.exitCode != 0) {

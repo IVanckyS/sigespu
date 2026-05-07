@@ -110,6 +110,39 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> solicitarAcceso(String cargo, String direccionMunicipal) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final token = await _storage.read(key: 'access_token');
+      final response = await http.post(
+        Uri.parse('$baseUrl/solicitar-acceso'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'cargo': cargo,
+          'direccion_municipal': direccionMunicipal,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final updatedUser = Map<String, dynamic>.from(state.user ?? {});
+        updatedUser['solicitud_operativo'] = 'pendiente';
+        await _storage.write(key: 'user_info', value: jsonEncode(updatedUser));
+        state = state.copyWith(isLoading: false, user: updatedUser);
+        return true;
+      } else {
+        final data = jsonDecode(response.body);
+        state = state.copyWith(isLoading: false, error: data['error'] ?? 'Error al enviar solicitud');
+        return false;
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Error de conexión con el servidor');
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
     await _storage.delete(key: 'access_token');

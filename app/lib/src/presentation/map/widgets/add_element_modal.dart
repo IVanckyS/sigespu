@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../config/constants.dart';
 import '../../../config/theme.dart';
 import '../../../data/seed_data.dart';
 import '../../../presentation/auth/auth_provider.dart';
 import '../layers/custom_markers.dart';
 import '../map_screen.dart';
+import 'location_picker.dart';
 
 class AddElementModal extends ConsumerStatefulWidget {
   const AddElementModal({super.key});
@@ -109,6 +111,24 @@ class _AddElementModalState extends ConsumerState<AddElementModal> {
       }
     } catch (_) {
       if (mounted) setState(() => _gpsLoading = false);
+    }
+  }
+
+  Future<void> _pickOnMap() async {
+    final result = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PickLocationPage(
+          initialLocation: LatLng(_lat, _lng),
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _lat = result.latitude;
+        _lng = result.longitude;
+      });
     }
   }
 
@@ -327,36 +347,47 @@ class _AddElementModalState extends ConsumerState<AddElementModal> {
                     size: 20,
                   ),
                   const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'UBICACIÓN CAPTURADA',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.stone500,
-                          letterSpacing: 0.04,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'UBICACIÓN CAPTURADA',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.stone500,
+                            letterSpacing: 0.04,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      _gpsLoading
-                          ? const Text(
-                              'Obteniendo ubicación…',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.stone500,
+                        const SizedBox(height: 2),
+                        _gpsLoading
+                            ? const Text(
+                                'Obteniendo ubicación…',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.stone500,
+                                ),
+                              )
+                            : Text(
+                                '${_lat.toStringAsFixed(5)}, ${_lng.toStringAsFixed(5)}',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.stone800,
+                                ),
                               ),
-                            )
-                          : Text(
-                              '${_lat.toStringAsFixed(5)}, ${_lng.toStringAsFixed(5)}',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.stone800,
-                              ),
-                            ),
-                    ],
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _gpsLoading ? null : _pickOnMap,
+                    icon: const Icon(Icons.map_outlined, size: 16),
+                    label: const Text('Cambiar', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.orange600,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
                   ),
                 ],
               ),

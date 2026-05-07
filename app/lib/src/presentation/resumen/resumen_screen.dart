@@ -49,12 +49,12 @@ class ResumenScreen extends StatelessWidget {
           _KpiGrid(reportes: reportes, zonas: zonas, patentes: patentes, acopios: acopios, sedes: sedes),
           const SizedBox(height: 12),
 
-          // ── Row 1: Bar chart + Sector list ───────────────────────────────
+          // ── Row 1: Doughnut chart + Sector list ───────────────────────────────
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(flex: 2, child: _DashCard(
               title: 'Reportes por tipo',
               subtitle: 'últimos 30 días',
-              child: SizedBox(height: 220, child: _BarChartTipos(data: reportesPorTipo)),
+              child: SizedBox(height: 220, child: _DoughnutChartTipos(data: reportesPorTipo)),
             )),
             const SizedBox(width: 12),
             Expanded(child: _DashCard(
@@ -197,68 +197,79 @@ class _DashCard extends StatelessWidget {
   }
 }
 
-// ── Bar chart: reportes por tipo ──────────────────────────────────────────────
+// ── Doughnut chart: reportes por tipo ────────────────────────────────────────
 
-class _BarChartTipos extends StatelessWidget {
+class _DoughnutChartTipos extends StatelessWidget {
   final Map<String, int> data;
-  const _BarChartTipos({required this.data});
+  const _DoughnutChartTipos({required this.data});
 
   @override
   Widget build(BuildContext context) {
     final entries = data.entries.toList();
-    final maxY = (data.values.fold(0, (a, b) => a > b ? a : b) + 1).toDouble();
+    final colors = [
+      AppTheme.redDanger,
+      const Color(0xFFA855F7),
+      AppTheme.orange600
+    ];
+    final total = data.values.fold(0, (a, b) => a + b);
 
-    final colors = [AppTheme.redDanger, const Color(0xFFA855F7), AppTheme.orange600];
-
-    return BarChart(
-      BarChartData(
-        maxY: maxY,
-        barTouchData: BarTouchData(
-          touchTooltipData: BarTouchTooltipData(
-            getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
-              '${entries[groupIndex].key}\n${rod.toY.toInt()}',
-              const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+    return Row(
+      children: [
+        Expanded(
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 2,
+              centerSpaceRadius: 40,
+              sections: List.generate(entries.length, (i) {
+                final value = entries[i].value.toDouble();
+                final percentage = total > 0
+                    ? (value / total * 100).toStringAsFixed(0)
+                    : '0';
+                return PieChartSectionData(
+                  color: colors[i % colors.length],
+                  value: value,
+                  title: '$percentage%',
+                  radius: 50,
+                  titleStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                );
+              }),
             ),
           ),
         ),
-        titlesData: FlTitlesData(
-          bottomTitles: AxisTitles(sideTitles: SideTitles(
-            showTitles: true,
-            getTitlesWidget: (value, meta) {
-              final i = value.toInt();
-              if (i >= entries.length) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(entries[i].key, style: const TextStyle(fontSize: 11, color: AppTheme.stone600)),
-              );
-            },
-          )),
-          leftTitles: AxisTitles(sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 28,
-            getTitlesWidget: (value, meta) => Text(
-              value.toInt().toString(),
-              style: const TextStyle(fontSize: 10, color: AppTheme.stone400),
-            ),
-          )),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        const SizedBox(width: 16),
+        // Leyenda
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: List.generate(entries.length, (i) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: colors[i % colors.length],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${entries[i].key}: ${entries[i].value}',
+                    style:
+                        const TextStyle(fontSize: 11, color: AppTheme.stone600),
+                  ),
+                ],
+              ),
+            );
+          }),
         ),
-        gridData: FlGridData(
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (_) => const FlLine(color: AppTheme.stone100, strokeWidth: 1),
-        ),
-        borderData: FlBorderData(show: false),
-        barGroups: List.generate(entries.length, (i) => BarChartGroupData(
-          x: i,
-          barRods: [BarChartRodData(
-            toY: entries[i].value.toDouble(),
-            color: colors[i % colors.length],
-            width: 40,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-          )],
-        )),
-      ),
+      ],
     );
   }
 }

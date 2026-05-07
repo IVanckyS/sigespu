@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../config/theme.dart';
 import '../../../presentation/auth/auth_provider.dart';
 import '../map_screen.dart';
@@ -99,8 +100,43 @@ class _PlanReguladorSheetState extends ConsumerState<PlanReguladorSheet> {
         ],
 
         const SizedBox(height: 16),
-        SizedBox(width: double.infinity,
-          child: ElevatedButton(
+        const Divider(height: 1, color: AppTheme.stone100),
+        const SizedBox(height: 12),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              final coords = widget.sector['coords'] as List;
+              final points = coords.map((c) => LatLng(c[0] as double, c[1] as double)).toList();
+
+              ref.read(isDrawingModeProvider.notifier).state = true;
+              ref.read(drawingPointsProvider.notifier).state = points;
+              ref.read(drawingTargetProvider.notifier).state = widget.sector['code'];
+
+              ScaffoldMessenger.of(context).showSnackBar(
+
+                SnackBar(
+                  content: Text('Editando contorno de ${widget.sector['code']}'),
+                  backgroundColor: AppTheme.amberWarning,
+                ),
+              );
+            },
+            icon: const Icon(Icons.edit, size: 16),
+            label: const Text('Re-dibujar sector'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.amberWarning,
+              side: const BorderSide(color: AppTheme.amberWarning),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+
             onPressed: _save,
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.amberWarning, foregroundColor: Colors.white),
             child: const Text('Guardar observación'),

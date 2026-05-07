@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../config/theme.dart';
 import '../../../data/seed_data.dart';
+import '../map_screen.dart';
 
-class ElementDetailSheet extends StatelessWidget {
+class ElementDetailSheet extends ConsumerWidget {
   final ElementoMapa elemento;
   final bool isPending;
 
@@ -13,11 +16,18 @@ class ElementDetailSheet extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tipoColor = colorParaTipo(elemento.tipo);
     final tipoLabel = nombreParaTipo(elemento.tipo);
     final estadoColor = colorParaEstado(elemento.estado);
     final estadoBg = bgParaEstado(elemento.estado);
+
+    // Buscar si es una zona dibujada
+    final userPolygons = ref.watch(userPolygonsProvider);
+    final existingPolygon = userPolygons.cast<({List<LatLng> points, ElementoMapa zona})?>().firstWhere(
+      (p) => p?.zona.id == elemento.id,
+      orElse: () => null,
+    );
 
     return Container(
       decoration: const BoxDecoration(
@@ -127,6 +137,15 @@ class ElementDetailSheet extends StatelessWidget {
                       style: const TextStyle(fontSize: 12.5, color: AppTheme.stone700)),
                 ],
 
+                if (elemento.vigenciaHasta != null) ...[
+                  const SizedBox(height: 8),
+                  _InfoChip(
+                    label: 'Vigencia hasta: ${_formatFecha(elemento.vigenciaHasta!)}',
+                    bg: AppTheme.amberWarning.withValues(alpha: 0.1),
+                    fg: AppTheme.amberWarning,
+                  ),
+                ],
+
                 if (elemento.notas.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(elemento.notas,
@@ -135,6 +154,36 @@ class ElementDetailSheet extends StatelessWidget {
                 ],
 
                 const SizedBox(height: 14),
+                
+                if (existingPolygon != null) ...[
+                  const Divider(height: 1, color: AppTheme.stone100),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        ref.read(isDrawingModeProvider.notifier).state = true;
+                        ref.read(drawingPointsProvider.notifier).state = List.from(existingPolygon.points);
+                        // Eliminar temporalmente para que el usuario pueda "actualizar"
+                        ref.read(userPolygonsProvider.notifier).update(
+                          (s) => s.where((p) => p.zona.id != elemento.id).toList()
+                        );
+                        ref.read(userElementsProvider.notifier).update(
+                          (s) => s.where((e) => e.id != elemento.id).toList()
+                        );
+                      },
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('Re-dibujar zona'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.orange600,
+                        side: const BorderSide(color: AppTheme.orange600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
                 const Divider(height: 1, color: AppTheme.stone100),
                 const SizedBox(height: 10),
 

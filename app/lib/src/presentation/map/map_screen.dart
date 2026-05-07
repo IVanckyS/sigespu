@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map_heatmap/flutter_map_heatmap.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../config/constants.dart';
 import '../../config/theme.dart';
 import '../../data/seed_data.dart';
@@ -23,10 +24,15 @@ final activeLayersProvider = StateProvider<Set<String>>((ref) => {
 
 final isDrawingModeProvider = StateProvider<bool>((ref) => false);
 final drawingPointsProvider = StateProvider<List<LatLng>>((ref) => []);
+final drawingTargetProvider = StateProvider<String?>((ref) => null); // null = nueva zona, 'S-2', etc = sector PR
 final sidebarCollapsedProvider = StateProvider<bool>((ref) => false);
 final dangerFilterProvider = StateProvider<String>((ref) => 'all');
 final heatmapOnProvider = StateProvider<bool>((ref) => false);
 final dateRangeProvider = StateProvider<String>((ref) => '30');
+
+final activeZoneCategoriesProvider = StateProvider<Set<String>>((ref) => {
+  'Seguridad', 'Infraestructura', 'Vialidad', 'Comercio', 'Comunitario',
+});
 
 // Elementos creados por el usuario en esta sesión (en memoria)
 final userElementsProvider = StateProvider<List<ElementoMapa>>((ref) => []);
@@ -36,15 +42,116 @@ final allElementsProvider = Provider<List<ElementoMapa>>((ref) {
   return [...kElementosSeed, ...ref.watch(userElementsProvider)];
 });
 
+final dateLimitProvider = Provider<DateTime?>((ref) {
+  final range = ref.watch(dateRangeProvider);
+  if (range == 'all') return null;
+  final days = int.tryParse(range) ?? 30;
+  return DateTime.now().subtract(Duration(days: days));
+});
+
+final filteredElementsProvider = Provider<List<ElementoMapa>>((ref) {
+  final activeLayers = ref.watch(activeLayersProvider);
+  final dangerFilter = ref.watch(dangerFilterProvider);
+  final activeZoneCats = ref.watch(activeZoneCategoriesProvider);
+  final dateLimit = ref.watch(dateLimitProvider);
+  final allElements = ref.watch(allElementsProvider);
+  final userPolygons = ref.watch(userPolygonsProvider);
+
+  return allElements.where((e) {
+    if (!activeLayers.contains(e.layerKey)) {
+      return false;
+    }
+
+    // Si es una zona dibujada (está en userPolygons), filtrar por categoría de zona
+    final isUserPolygon = userPolygons.any((p) => p.zona.id == e.id);
+    if (isUserPolygon) {
+      final cat = _mapTipoToCat(e.tipo);
+      if (!activeZoneCats.contains(cat)) {
+        return false;
+      }
+    }
+
+    if (dateLimit != null) {
+      final d = DateTime.tryParse(e.fecha);
+      if (d != null && d.isBefore(dateLimit)) {
+        return false;
+      }
+    }
+    if (e.tipo == 'zona_peligro' &&
+        dangerFilter != 'all' &&
+        e.tipoPeligro != dangerFilter) {
+      return false;
+    }
+    return true;
+  }).toList();
+});
+
 // Polígonos dibujados por el usuario con su zona asociada
 final userPolygonsProvider =
     StateProvider<List<({List<LatLng> points, ElementoMapa zona})>>((ref) => []);
+
+// Formas personalizadas del Plan Regulador (sobreescriben las por defecto)
+final planReguladorEditsProvider = StateProvider<Map<String, List<LatLng>>>((ref) => {});
+
+final planReguladorPolygonsProvider = Provider<List<Polygon>>((ref) {
+  final edits = ref.watch(planReguladorEditsProvider);
+  return PlanReguladorLayer.buildPolygons(edits: edits);
+});
+
+final planReguladorMarkersProvider = Provider<List<Marker>>((ref) {
+  final edits = ref.watch(planReguladorEditsProvider);
+  return PlanReguladorLayer.buildCentroidMarkers(
+    edits: edits,
+    onTap: (sector, context) => showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => PlanReguladorSheet(sector: sector),
+    ),
+  );
+});
+
+final filteredUserPolygonsProvider = Provider<List<({List<LatLng> points, ElementoMapa zona})>>((ref) {
+  final activeLayers = ref.watch(activeLayersProvider);
+  final activeZoneCats = ref.watch(activeZoneCategoriesProvider);
+  final userPolygons = ref.watch(userPolygonsProvider);
+  final dateLimit = ref.watch(dateLimitProvider);
+
+  return userPolygons.where((p) {
+    // Filtrar por capa (la mayoría son 'zona_peligro' o 'infraestructura')
+    if (!activeLayers.contains(p.zona.layerKey)) return false;
+    
+    // Filtrar por categoría de zona
+    final cat = _mapTipoToCat(p.zona.tipo);
+    if (!activeZoneCats.contains(cat)) return false;
+
+    // Filtrar por fecha
+    if (dateLimit != null) {
+      final d = DateTime.tryParse(p.zona.fecha);
+      if (d != null && d.isBefore(dateLimit)) return false;
+    }
+    
+    return true;
+  }).toList();
+});
+
+String _mapTipoToCat(String tipo) {
+  if (tipo == 'zona_peligro' || tipo.startsWith('reporte_')) return 'Seguridad';
+  if (tipo == 'infraestructura' || tipo == 'luminaria' || tipo == 'camara') return 'Infraestructura';
+  if (tipo == 'reporte_accidente' || tipo == 'vialidad') return 'Vialidad';
+  if (tipo == 'patente') return 'Comercio';
+  if (tipo == 'sede_comunitaria' || tipo == 'centro_acopio') return 'Comunitario';
+  return 'Seguridad';
+}
 
 // Observaciones de funcionarios por sector del Plan Regulador
 final planReguladorObsProvider = StateProvider<Map<String, String>>((ref) => {});
 
 // Atribución de observaciones del Plan Regulador
 final planReguladorAttrProvider = StateProvider<Map<String, String>>((ref) => {});
+
+// MapController compartido para acceso desde el FAB de GPS
+final mapControllerProvider = Provider<MapController>((ref) => MapController());
 
 // ── MapScreen ─────────────────────────────────────────────────────────────────
 
@@ -57,25 +164,13 @@ class MapScreen extends ConsumerWidget {
     final isDrawing = ref.watch(isDrawingModeProvider);
     final drawingPoints = ref.watch(drawingPointsProvider);
     final collapsed = ref.watch(sidebarCollapsedProvider);
-    final dangerFilter = ref.watch(dangerFilterProvider);
-    final dateRange = ref.watch(dateRangeProvider);
     final heatmapOn = ref.watch(heatmapOnProvider);
     final reportesAsync = ref.watch(reportesStreamProvider);
     final allElems = ref.watch(allElementsProvider);
+    final elementos = ref.watch(filteredElementsProvider);
+    final filteredUserPolygons = ref.watch(filteredUserPolygonsProvider);
+    final mapCtrl = ref.watch(mapControllerProvider);
 
-    // Filtrar elementos por fecha y capa
-    final dateLimit = _dateLimit(dateRange);
-    final elementos = ref.watch(allElementsProvider).where((e) {
-      if (!activeLayers.contains(e.layerKey)) return false;
-      if (dateLimit != null) {
-        final d = DateTime.tryParse(e.fecha);
-        if (d != null && d.isBefore(dateLimit)) return false;
-      }
-      if (e.tipo == 'zona_peligro' && dangerFilter != 'all' && e.tipoPeligro != dangerFilter) return false;
-      return true;
-    }).toList();
-
-    final userPolygons = ref.watch(userPolygonsProvider);
     final userElements = ref.watch(userElementsProvider);
     final List<Marker> markers = elementos.map((e) {
       final isPending = userElements.any((u) => u.id == e.id);
@@ -132,6 +227,7 @@ class MapScreen extends ConsumerWidget {
           child: Stack(
             children: [
               FlutterMap(
+                mapController: mapCtrl,
                 options: MapOptions(
                   initialCenter: AppConstants.lotaCenter,
                   initialZoom: AppConstants.lotaDefaultZoom,
@@ -164,16 +260,9 @@ class MapScreen extends ConsumerWidget {
                       ),
                     ),
                   if (activeLayers.contains('plan_regulador')) ...[
-                    PolygonLayer(polygons: PlanReguladorLayer.buildPolygons()),
+                    PolygonLayer(polygons: ref.watch(planReguladorPolygonsProvider)),
                     MarkerLayer(
-                      markers: PlanReguladorLayer.buildCentroidMarkers(
-                        (sector) => showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => PlanReguladorSheet(sector: sector),
-                        ),
-                      ),
+                      markers: ref.watch(planReguladorMarkersProvider),
                     ),
                   ],
                   if (isDrawing && drawingPoints.length >= 3)
@@ -185,14 +274,17 @@ class MapScreen extends ConsumerWidget {
                         borderStrokeWidth: 2,
                       ),
                     ]),
-                  if (userPolygons.isNotEmpty)
+                  if (filteredUserPolygons.isNotEmpty)
                     PolygonLayer(
-                      polygons: userPolygons.map((p) => Polygon(
-                        points: p.points,
-                        color: AppTheme.redDanger.withValues(alpha: 0.2),
-                        borderColor: AppTheme.redDanger,
-                        borderStrokeWidth: 2,
-                      )).toList(),
+                      polygons: filteredUserPolygons.map((p) {
+                        final color = CustomMarkers.getColorForTipo(p.zona.tipo);
+                        return Polygon(
+                          points: p.points,
+                          color: color.withValues(alpha: 0.2),
+                          borderColor: color,
+                          borderStrokeWidth: 2,
+                        );
+                      }).toList(),
                     ),
                   MarkerLayer(markers: markers),
                 ],
@@ -230,37 +322,34 @@ class MapScreen extends ConsumerWidget {
                 Positioned(
                   top: 16,
                   left: collapsed ? 64 : 16,
-                  child: _InfoPanel(count: elementos.length),
-                ),
+                  child: const _InfoPanel(count: elementos.length),
+                  ),
 
-              // Legend bottom-left
-              const Positioned(
-                bottom: 24,
-                left: 16,
-                child: _LegendPanel(),
-              ),
+                  // Legend bottom-left
+                  const Positioned(
+                  bottom: 24,
+                  left: 16,
+                  child: _LegendPanel(),
+                  ),
 
-              // FABs bottom-right
-              Positioned(
-                bottom: 24, right: 16,
-                child: _FabGroup(
+                  // FABs bottom-right
+                  Positioned(
+                  bottom: 24, right: 16,
+                  child: _FabGroup(
                   isDrawing: isDrawing,
                   canFinish: drawingPoints.length >= 3,
                   ref: ref,
                   context: context,
                   drawingPoints: drawingPoints,
-                ),
-              ),
+                  mapController: mapCtrl,
+                  ),
+                  ),
+
             ],
           ),
         ),
       ],
     );
-  }
-
-  DateTime? _dateLimit(String range) {
-    if (range == 'all') return null;
-    return DateTime.now().subtract(Duration(days: int.parse(range)));
   }
 
   HeatMapDataSource _buildHeatMapDataSource(List<ElementoMapa> allElems) {
@@ -279,6 +368,24 @@ class MapScreen extends ConsumerWidget {
 }
 
 void _showGuardarZona(BuildContext context, WidgetRef ref, List<LatLng> points) {
+  final target = ref.read(drawingTargetProvider);
+
+  if (target != null) {
+    // Es una edición del Plan Regulador
+    ref.read(planReguladorEditsProvider.notifier).update((m) => {...m, target: points});
+    ref.read(isDrawingModeProvider.notifier).state = false;
+    ref.read(drawingPointsProvider.notifier).state = [];
+    ref.read(drawingTargetProvider.notifier).state = null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Contorno del Plan Regulador actualizado'),
+        backgroundColor: AppTheme.amberWarning,
+      ),
+    );
+    return;
+  }
+
+  // Es una nueva zona
   ref.read(isDrawingModeProvider.notifier).state = false;
   ref.read(drawingPointsProvider.notifier).state = [];
   showModalBottomSheet(
@@ -328,10 +435,46 @@ class _MapSidebar extends StatelessWidget {
         color: Colors.white,
         border: Border(right: BorderSide(color: AppTheme.stone200)),
       ),
-      child: ListView(
+      child: Column(
         children: [
-          // Sección capas
-          _SectionHeader('Capas del sistema', '$activeCount/${_layers.length}'),
+          // Branding Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+            decoration: const BoxDecoration(
+              color: AppTheme.stone900,
+              border: Border(bottom: BorderSide(color: Colors.white10)),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SIGESPU LOTA',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  'I. MUNICIPALIDAD DE LOTA',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: AppTheme.stone500,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                // Sección capas
+                _SectionHeader('Capas del sistema', '$activeCount/${_layers.length}'),
           ...(() {
             final counts = <String, int>{};
             for (final e in kElementosSeed) {
@@ -382,6 +525,35 @@ class _MapSidebar extends StatelessWidget {
               }).toList(),
             ),
           ),
+
+          const Divider(height: 1, color: AppTheme.stone100),
+
+          // Filtros de Zonas dibujadas
+          _SectionHeader('Categorías de Zonas', null),
+          ...(() {
+            final activeCats = ref.watch(activeZoneCategoriesProvider);
+            const cats = [
+              ('Seguridad', AppTheme.redDanger),
+              ('Infraestructura', AppTheme.blue800),
+              ('Vialidad', AppTheme.orange500),
+              ('Comercio', AppTheme.amberWarning),
+              ('Comunitario', AppTheme.greenSuccess),
+            ];
+            return cats.map((c) {
+              final (name, color) = c;
+              final isActive = activeCats.contains(name);
+              return _ZoneCatToggle(
+                name: name,
+                color: color,
+                isActive: isActive,
+                onTap: () {
+                  final next = Set<String>.from(activeCats);
+                  isActive ? next.remove(name) : next.add(name);
+                  ref.read(activeZoneCategoriesProvider.notifier).state = next;
+                },
+              );
+            });
+          })(),
 
           const Divider(height: 1, color: AppTheme.stone100),
 
@@ -678,6 +850,45 @@ class _LegendPanel extends StatelessWidget {
   }
 }
 
+class _ZoneCatToggle extends StatelessWidget {
+  final String name;
+  final Color color;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _ZoneCatToggle({
+    required this.name,
+    required this.color,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Row(children: [
+          Checkbox(
+            value: isActive,
+            onChanged: (_) => onTap(),
+            activeColor: AppTheme.orange600,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
+          Container(
+            width: 8, height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(name, style: const TextStyle(fontSize: 12, color: AppTheme.stone700)),
+        ]),
+      ),
+    );
+  }
+}
+
 // ── HeatMap Data Source implementation ────────────────────────────────────────
 
 class _ListHeatMapDataSource extends HeatMapDataSource {
@@ -696,10 +907,12 @@ class _FabGroup extends StatelessWidget {
   final WidgetRef ref;
   final BuildContext context;
   final List<LatLng> drawingPoints;
+  final MapController mapController;
 
   const _FabGroup({
     required this.isDrawing, required this.canFinish,
     required this.ref, required this.context, required this.drawingPoints,
+    required this.mapController,
   });
 
   @override
@@ -749,7 +962,7 @@ class _FabGroup extends StatelessWidget {
         mini: true,
         backgroundColor: Colors.white,
         foregroundColor: AppTheme.stone700,
-        onPressed: () {},
+        onPressed: () => _centerOnGps(context, mapController),
         child: const Icon(Icons.my_location),
       ),
       const SizedBox(height: 10),
@@ -770,5 +983,34 @@ class _FabGroup extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => const AddElementModal(),
     );
+  }
+
+  Future<void> _centerOnGps(BuildContext ctx, MapController mapCtrl) async {
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.deniedForever) {
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(
+              content: Text('Permiso de ubicación denegado permanentemente'),
+            ),
+          );
+        }
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(const Duration(seconds: 6));
+      mapCtrl.move(LatLng(pos.latitude, pos.longitude), 17.0);
+    } catch (_) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(content: Text('No se pudo obtener la ubicación')),
+        );
+      }
+    }
   }
 }

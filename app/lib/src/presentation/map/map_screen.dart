@@ -37,6 +37,7 @@ final sidebarCollapsedProvider = StateProvider<bool>((ref) => false);
 final dangerFilterProvider = StateProvider<String>((ref) => 'all');
 final heatmapOnProvider = StateProvider<bool>((ref) => false);
 final dateRangeProvider = StateProvider<String>((ref) => '30');
+final mapCenterCoordsProvider = StateProvider<(double, double)>((ref) => (-37.0896, -73.1584));
 
 final activeZoneCategoriesProvider = StateProvider<Set<String>>((ref) => {
   'Seguridad', 'Infraestructura', 'Vialidad', 'Comercio', 'Comunitario',
@@ -252,6 +253,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     onTap: (_, point) {
                       if (isDrawing) {
                         ref.read(drawingPointsProvider.notifier).update((s) => [...s, point]);
+                      }
+                    },
+                    onPositionChanged: (camera, hasGesture) {
+                      final c = camera.center;
+                      if (c != null) {
+                        ref.read(mapCenterCoordsProvider.notifier).state =
+                            (c.latitude, c.longitude);
                       }
                     },
                   ),
@@ -487,7 +495,57 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 Positioned(
                   top: 16,
                   left: collapsed ? 64 : 16,
-                  child: _InfoPanel(count: elementos.length),
+                  child: Consumer(
+                    builder: (ctx, r, _) {
+                      final coords = r.watch(mapCenterCoordsProvider);
+                      final count = r.watch(filteredElementsProvider).length;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.stone200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Text(
+                            'Lota, Biobío',
+                            style: TextStyle(fontSize: 12, color: AppTheme.stone600),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            '${coords.$1.toStringAsFixed(4)}, ${coords.$2.toStringAsFixed(4)} Grados',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.stone900,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.orange100,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$count elementos',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.orange700,
+                              ),
+                            ),
+                          ),
+                        ]),
+                      );
+                    },
+                  ),
                 ),
 
               // Legend bottom-left
@@ -1046,34 +1104,6 @@ class _DrawHintPanel extends StatelessWidget {
   }
 }
 
-class _InfoPanel extends StatelessWidget {
-  final int count;
-  const _InfoPanel({required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.stone200),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4)],
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Lota, Biobío', style: TextStyle(fontSize: 12, color: AppTheme.stone600)),
-        const SizedBox(width: 10),
-        const Text('-37.090, -73.158', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.stone900, fontFeatures: [FontFeature.tabularFigures()])),
-        const SizedBox(width: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(color: AppTheme.orange100, borderRadius: BorderRadius.circular(10)),
-          child: Text('$count elementos', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.orange700)),
-        ),
-      ]),
-    );
-  }
-}
 
 class _LegendPanel extends StatelessWidget {
   const _LegendPanel();

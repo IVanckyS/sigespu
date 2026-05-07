@@ -7,4 +7,6 @@ class AppConstants {
 
   static const String mapTileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
   static const List<String> mapSubdomains = ['a', 'b', 'c', 'd'];
+
+  static const String apiBaseUrl = 'http://localhost:8080';
 }

@@ -1,11 +1,11 @@
 -- backend/migrations/003_visor_tables.sql
 
 CREATE TABLE capas_personalizadas (
-  id          SERIAL PRIMARY KEY,
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   nombre      TEXT NOT NULL,
   descripcion TEXT,
   color       TEXT NOT NULL DEFAULT '#FF5722',
-  opacidad    FLOAT NOT NULL DEFAULT 0.5,
+  opacidad    FLOAT NOT NULL DEFAULT 0.5 CHECK (opacidad BETWEEN 0.0 AND 1.0),
   visible     BOOLEAN NOT NULL DEFAULT true,
   formato     TEXT NOT NULL CHECK (formato IN ('kmz', 'shp', 'geojson')),
   subido_por  UUID REFERENCES usuarios(id) ON DELETE SET NULL,
@@ -13,8 +13,8 @@ CREATE TABLE capas_personalizadas (
 );
 
 CREATE TABLE geometrias_capa (
-  id          SERIAL PRIMARY KEY,
-  capa_id     INTEGER REFERENCES capas_personalizadas(id) ON DELETE CASCADE,
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  capa_id     UUID NOT NULL REFERENCES capas_personalizadas(id) ON DELETE CASCADE,
   nombre      TEXT,
   propiedades JSONB DEFAULT '{}',
   geom        GEOMETRY(GEOMETRY, 4326) NOT NULL
@@ -29,7 +29,7 @@ CREATE TABLE sismos_cache (
   time_utc    TIMESTAMPTZ NOT NULL,
   depth_km    FLOAT,
   alert       TEXT,
-  tsunami     INTEGER,
+  tsunami     BOOLEAN DEFAULT false,
   url_usgs    TEXT,
   geom        GEOMETRY(POINT, 4326) NOT NULL,
   fetched_at  TIMESTAMPTZ DEFAULT NOW()

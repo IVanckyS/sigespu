@@ -20,13 +20,14 @@ CapaPersonalizadaDto _$CapaPersonalizadaDtoFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$CapaPersonalizadaDto {
-  int get id => throw _privateConstructorUsedError;
+  String get id => throw _privateConstructorUsedError;
   String get nombre => throw _privateConstructorUsedError;
   String? get descripcion => throw _privateConstructorUsedError;
   String get color => throw _privateConstructorUsedError;
   double get opacidad => throw _privateConstructorUsedError;
   bool get visible => throw _privateConstructorUsedError;
   String get formato => throw _privateConstructorUsedError;
+  String get categoria => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
 
   /// Serializes this CapaPersonalizadaDto to a JSON map.
@@ -46,13 +47,14 @@ abstract class $CapaPersonalizadaDtoCopyWith<$Res> {
       _$CapaPersonalizadaDtoCopyWithImpl<$Res, CapaPersonalizadaDto>;
   @useResult
   $Res call(
-      {int id,
+      {String id,
       String nombre,
       String? descripcion,
       String color,
       double opacidad,
       bool visible,
       String formato,
+      String categoria,
       DateTime createdAt});
 }
 
@@ -79,13 +81,14 @@ class _$CapaPersonalizadaDtoCopyWithImpl<$Res,
     Object? opacidad = null,
     Object? visible = null,
     Object? formato = null,
+    Object? categoria = null,
     Object? createdAt = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
           ? _value.id
           : id // ignore: cast_nullable_to_non_nullable
-              as int,
+              as String,
       nombre: null == nombre
           ? _value.nombre
           : nombre // ignore: cast_nullable_to_non_nullable
@@ -110,6 +113,10 @@ class _$CapaPersonalizadaDtoCopyWithImpl<$Res,
           ? _value.formato
           : formato // ignore: cast_nullable_to_non_nullable
               as String,
+      categoria: null == categoria
+          ? _value.categoria
+          : categoria // ignore: cast_nullable_to_non_nullable
+              as String,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -127,13 +134,14 @@ abstract class _$$CapaPersonalizadaDtoImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {int id,
+      {String id,
       String nombre,
       String? descripcion,
       String color,
       double opacidad,
       bool visible,
       String formato,
+      String categoria,
       DateTime createdAt});
 }
 
@@ -157,13 +165,14 @@ class __$$CapaPersonalizadaDtoImplCopyWithImpl<$Res>
     Object? opacidad = null,
     Object? visible = null,
     Object? formato = null,
+    Object? categoria = null,
     Object? createdAt = null,
   }) {
     return _then(_$CapaPersonalizadaDtoImpl(
       id: null == id
           ? _value.id
           : id // ignore: cast_nullable_to_non_nullable
-              as int,
+              as String,
       nombre: null == nombre
           ? _value.nombre
           : nombre // ignore: cast_nullable_to_non_nullable
@@ -188,6 +197,10 @@ class __$$CapaPersonalizadaDtoImplCopyWithImpl<$Res>
           ? _value.formato
           : formato // ignore: cast_nullable_to_non_nullable
               as String,
+      categoria: null == categoria
+          ? _value.categoria
+          : categoria // ignore: cast_nullable_to_non_nullable
+              as String,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -207,13 +220,14 @@ class _$CapaPersonalizadaDtoImpl implements _CapaPersonalizadaDto {
       required this.opacidad,
       required this.visible,
       required this.formato,
+      required this.categoria,
       required this.createdAt});
 
   factory _$CapaPersonalizadaDtoImpl.fromJson(Map<String, dynamic> json) =>
       _$$CapaPersonalizadaDtoImplFromJson(json);
 
   @override
-  final int id;
+  final String id;
   @override
   final String nombre;
   @override
@@ -227,11 +241,13 @@ class _$CapaPersonalizadaDtoImpl implements _CapaPersonalizadaDto {
   @override
   final String formato;
   @override
+  final String categoria;
+  @override
   final DateTime createdAt;
 
   @override
   String toString() {
-    return 'CapaPersonalizadaDto(id: $id, nombre: $nombre, descripcion: $descripcion, color: $color, opacidad: $opacidad, visible: $visible, formato: $formato, createdAt: $createdAt)';
+    return 'CapaPersonalizadaDto(id: $id, nombre: $nombre, descripcion: $descripcion, color: $color, opacidad: $opacidad, visible: $visible, formato: $formato, categoria: $categoria, createdAt: $createdAt)';
   }
 
   @override
@@ -248,6 +264,8 @@ class _$CapaPersonalizadaDtoImpl implements _CapaPersonalizadaDto {
                 other.opacidad == opacidad) &&
             (identical(other.visible, visible) || other.visible == visible) &&
             (identical(other.formato, formato) || other.formato == formato) &&
+            (identical(other.categoria, categoria) ||
+                other.categoria == categoria) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt));
   }
@@ -255,7 +273,7 @@ class _$CapaPersonalizadaDtoImpl implements _CapaPersonalizadaDto {
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, id, nombre, descripcion, color,
-      opacidad, visible, formato, createdAt);
+      opacidad, visible, formato, categoria, createdAt);
 
   /// Create a copy of CapaPersonalizadaDto
   /// with the given fields replaced by the non-null parameter values.
@@ -277,20 +295,21 @@ class _$CapaPersonalizadaDtoImpl implements _CapaPersonalizadaDto {
 
 abstract class _CapaPersonalizadaDto implements CapaPersonalizadaDto {
   const factory _CapaPersonalizadaDto(
-      {required final int id,
+      {required final String id,
       required final String nombre,
       final String? descripcion,
       required final String color,
       required final double opacidad,
       required final bool visible,
       required final String formato,
+      required final String categoria,
       required final DateTime createdAt}) = _$CapaPersonalizadaDtoImpl;
 
   factory _CapaPersonalizadaDto.fromJson(Map<String, dynamic> json) =
       _$CapaPersonalizadaDtoImpl.fromJson;
 
   @override
-  int get id;
+  String get id;
   @override
   String get nombre;
   @override
@@ -303,6 +322,8 @@ abstract class _CapaPersonalizadaDto implements CapaPersonalizadaDto {
   bool get visible;
   @override
   String get formato;
+  @override
+  String get categoria;
   @override
   DateTime get createdAt;
 

@@ -22,13 +22,11 @@ import 'widgets/panel_leyenda.dart';
 import 'widgets/panel_imprimir.dart';
 import 'screens/subir_capa_screen.dart';
 import 'providers/visor_provider.dart';
+import '../auth/auth_provider.dart';
 
 // ── Providers de estado del mapa ──────────────────────────────────────────────
 
-final activeLayersProvider = StateProvider<Set<String>>((ref) => {
-  'centro_acopio', 'sede_comunitaria', 'zona_peligro', 'patente',
-  'reporte', 'infraestructura', 'plan_regulador',
-});
+final activeLayersProvider = StateProvider<Set<String>>((ref) => {});
 
 final isDrawingModeProvider = StateProvider<bool>((ref) => false);
 final drawingPointsProvider = StateProvider<List<LatLng>>((ref) => []);
@@ -261,6 +259,33 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         ref.read(mapCenterCoordsProvider.notifier).state =
                             (c.latitude, c.longitude);
                       }
+                      
+                      // Actualizar límites para filtrado espacial (lazy loading)
+                      final bounds = camera.bounds;
+                      if (bounds != null) {
+                        final next = <double>[
+                          bounds.west,
+                          bounds.south,
+                          bounds.east,
+                          bounds.north
+                        ];
+                        
+                        // Solo actualizamos si el cambio es significativo (ej. > 0.005 grados)
+                        final current = ref.read(mapBoundsProvider);
+                        bool significant = current == null;
+                        if (current != null) {
+                          for (int i = 0; i < 4; i++) {
+                            if ((current[i] - next[i]).abs() > 0.005) {
+                              significant = true;
+                              break;
+                            }
+                          }
+                        }
+                        
+                        if (significant) {
+                          ref.read(mapBoundsProvider.notifier).state = next;
+                        }
+                      }
                     },
                   ),
                   children: [
@@ -379,10 +404,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             if (visibleCapas.isEmpty) return const SizedBox.shrink();
                             return Stack(
                               children: visibleCapas.map((capa) {
-                                final colorVal =
+                                final baseColorVal =
                                     int.tryParse(capa.color.replaceFirst('#', '0xFF')) ??
                                         0xFFFF5722;
-                                final color = Color(colorVal);
+                                final baseColor = Color(baseColorVal);
                                 return r.watch(capaGeoJsonProvider(capa.id)).when(
                                   data: (fc) {
                                     if (fc == null) return const SizedBox.shrink();
@@ -391,11 +416,35 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                     final markers = <Marker>[];
                                     final polygons = <Polygon>[];
                                     final polylines = <Polyline>[];
+                                    
                                     for (final f in features) {
                                       final geom = f['geometry'] as Map<String, dynamic>?;
                                       if (geom == null) continue;
                                       final type = geom['type'] as String;
                                       final coords = geom['coordinates'];
+                                      final props = f['properties'] as Map<String, dynamic>? ?? {};
+                                      
+                                      // Determinar color de la feature (graduación)
+                                      Color featureColor = baseColor;
+                                      
+                                      if (props.containsKey('kml_color')) {
+                                        // KML: aabbggrr -> ARGB
+                                        final kml = props['kml_color'] as String;
+                                        if (kml.length == 8) {
+                                          final a = int.parse(kml.substring(0, 2), radix: 16);
+                                          final b = int.parse(kml.substring(2, 4), radix: 16);
+                                          final g = int.parse(kml.substring(4, 6), radix: 16);
+                                          final r = int.parse(kml.substring(6, 8), radix: 16);
+                                          featureColor = Color.fromARGB(a, r, g, b);
+                                        }
+                                      } else {
+                                        // Generar variación tonal basada en el nombre o ID si no hay color específico
+                                        final seed = (f['id']?.toString().hashCode ?? 0) % 100;
+                                        final hsl = HSLColor.fromColor(baseColor);
+                                        // Variar luminosidad +/- 15%
+                                        featureColor = hsl.withLightness((hsl.lightness + (seed - 50) / 330).clamp(0.1, 0.9)).toColor();
+                                      }
+
                                       if (type == 'Point') {
                                         final c = coords as List;
                                         markers.add(Marker(
@@ -406,7 +455,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                           height: 20,
                                           child: Container(
                                             decoration: BoxDecoration(
-                                              color: color,
+                                              color: featureColor,
                                               shape: BoxShape.circle,
                                               border:
                                                   Border.all(color: Colors.white, width: 1.5),
@@ -423,10 +472,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                             .toList();
                                         polygons.add(Polygon(
                                           points: pts,
-                                          color: color.withValues(alpha: capa.opacidad),
-                                          borderColor: color,
-                                          borderStrokeWidth: 2,
+                                          color: featureColor.withValues(alpha: capa.opacidad),
+                                          borderColor: featureColor,
+                                          borderStrokeWidth: 1.5,
+                                          isFilled: true,
                                         ));
+                                      } else if (type == 'MultiPolygon') {
+                                        for (final polyCoords in (coords as List)) {
+                                          final rings = (polyCoords as List).cast<List>();
+                                          final pts = rings.first
+                                              .cast<List>()
+                                              .map((c) => LatLng(
+                                                  (c[1] as num).toDouble(),
+                                                  (c[0] as num).toDouble()))
+                                              .toList();
+                                          polygons.add(Polygon(
+                                            points: pts,
+                                            color: featureColor.withValues(alpha: capa.opacidad),
+                                            borderColor: featureColor,
+                                            borderStrokeWidth: 1.5,
+                                            isFilled: true,
+                                          ));
+                                        }
                                       } else if (type == 'LineString') {
                                         final pts = (coords as List)
                                             .cast<List>()
@@ -436,9 +503,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                             .toList();
                                         polylines.add(Polyline(
                                           points: pts,
-                                          color: color,
+                                          color: featureColor,
                                           strokeWidth: 2.5,
                                         ));
+                                      } else if (type == 'MultiLineString') {
+                                        for (final lineCoords in (coords as List)) {
+                                          final pts = (lineCoords as List)
+                                              .cast<List>()
+                                              .map((c) => LatLng(
+                                                  (c[1] as num).toDouble(),
+                                                  (c[0] as num).toDouble()))
+                                              .toList();
+                                          polylines.add(Polyline(
+                                            points: pts,
+                                            color: featureColor,
+                                            strokeWidth: 2.5,
+                                          ));
+                                        }
                                       }
                                     }
                                     return Stack(children: [
@@ -573,7 +654,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     left: 16,
                     child: switch (panel) {
                       VisorPanel.capas => PanelCapas(
-                          isDirector: false, // TODO(sprint-3): read from auth provider
+                          isDirector: r.watch(authProvider).user?['nivel_acceso'] == 'director',
                           onSubirCapa: () => showModalBottomSheet(
                             context: ctx,
                             isScrollControlled: true,

@@ -6,6 +6,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 import 'package:uuid/uuid.dart';
+import 'package:postgres/postgres.dart';
 import '../database/db_pool.dart';
 import '../middleware/auth_middleware.dart';
 
@@ -20,7 +21,7 @@ Router buildCapasRouter(DatabaseService db) {
     try {
       final rows = await db.db.execute(r'''
         SELECT id, nombre, descripcion, color, opacidad, visible, formato,
-               subido_por, created_at
+               subido_por, created_at, categoria
         FROM capas_personalizadas
         ORDER BY created_at DESC
       ''');
@@ -35,6 +36,7 @@ Router buildCapasRouter(DatabaseService db) {
         'formato': r[6],
         'subidoPor': r[7]?.toString(),
         'createdAt': (r[8] as DateTime).toIso8601String(),
+        'categoria': r[9],
       }).toList();
 
       return Response.ok(
@@ -51,9 +53,12 @@ Router buildCapasRouter(DatabaseService db) {
 
   // ─────────────────────────────────────────────────────────────────────────────
   // GET /<id>/geometrias — GeoJSON FeatureCollection for a capa
+  // Optional query param: bbox=xmin,ymin,xmax,ymax
   // ─────────────────────────────────────────────────────────────────────────────
   router.get('/<id>/geometrias', (Request req, String id) async {
     try {
+      final bbox = req.url.queryParameters['bbox'];
+
       // Verify the capa exists
       final capaRows = await db.db.execute(
         Sql.named(r'''
@@ -71,15 +76,32 @@ Router buildCapasRouter(DatabaseService db) {
         );
       }
 
-      // Fetch geometries as GeoJSON features
+      // Build query with optional spatial filter
+      String query = r'''
+        SELECT id, nombre, propiedades,
+               ST_AsGeoJSON(geom)::text AS geom_json
+        FROM geometrias_capa
+        WHERE capa_id = @capaId
+      ''';
+
+      final params = <String, dynamic>{'capaId': id};
+
+      if (bbox != null) {
+        final parts = bbox.split(',').map(double.tryParse).toList();
+        if (parts.length == 4 && parts.every((p) => p != null)) {
+          query += r'''
+            AND geom && ST_MakeEnvelope(@xmin, @ymin, @xmax, @ymax, 4326)
+          ''';
+          params['xmin'] = parts[0];
+          params['ymin'] = parts[1];
+          params['xmax'] = parts[2];
+          params['ymax'] = parts[3];
+        }
+      }
+
       final rows = await db.db.execute(
-        Sql.named(r'''
-          SELECT id, nombre, propiedades,
-                 ST_AsGeoJSON(geom)::text AS geom_json
-          FROM geometrias_capa
-          WHERE capa_id = @capaId
-        '''),
-        parameters: {'capaId': id},
+        Sql.named(query),
+        parameters: params,
       );
 
       final features = rows.map((r) {
@@ -106,6 +128,53 @@ Router buildCapasRouter(DatabaseService db) {
         body: jsonEncode({'error': 'Error al obtener geometrías: $e'}),
         headers: {'content-type': 'application/json'},
       );
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // GET /<id>/export — Export as GeoJSON file for download
+  // ─────────────────────────────────────────────────────────────────────────────
+  router.get('/<id>/export', (Request req, String id) async {
+    try {
+      final capaRows = await db.db.execute(
+        Sql.named('SELECT nombre FROM capas_personalizadas WHERE id = @id'),
+        parameters: {'id': id},
+      );
+
+      if (capaRows.isEmpty) return Response.notFound('Capa no encontrada');
+
+      final nombre = capaRows.first[0] as String;
+      final fileName = '${nombre.replaceAll(RegExp(r'[^\w]'), '_')}.geojson';
+
+      final rows = await db.db.execute(
+        Sql.named(r'''
+          SELECT nombre, propiedades, ST_AsGeoJSON(geom)::text 
+          FROM geometrias_capa 
+          WHERE capa_id = @capaId
+        '''),
+        parameters: {'capaId': id},
+      );
+
+      final features = rows.map((r) => {
+            'type': 'Feature',
+            'geometry': jsonDecode(r[2] as String),
+            'properties': {...(r[1] as Map<String, dynamic>), 'nombre': r[0]},
+          }).toList();
+
+      final geojson = jsonEncode({
+        'type': 'FeatureCollection',
+        'features': features,
+      });
+
+      return Response.ok(
+        geojson,
+        headers: {
+          'content-type': 'application/json',
+          'content-disposition': 'attachment; filename="$fileName"',
+        },
+      );
+    } catch (e) {
+      return Response.internalServerError(body: 'Error al exportar: $e');
     }
   });
 
@@ -147,6 +216,7 @@ Router buildCapasRouter(DatabaseService db) {
         final nombre = parsed['nombre'];
         final descripcion = parsed['descripcion'] ?? '';
         final color = parsed['color'] ?? '#FF5722';
+        final categoria = parsed['categoria'] ?? 'Personalizadas';
         final archivoBytes = parsed['archivo_bytes'] as Uint8List?;
         final archivoNombre = parsed['archivo_nombre'] as String? ?? '';
 
@@ -184,9 +254,9 @@ Router buildCapasRouter(DatabaseService db) {
         await db.db.execute(
           Sql.named(r'''
             INSERT INTO capas_personalizadas
-              (id, nombre, descripcion, color, opacidad, visible, formato, subido_por)
+              (id, nombre, descripcion, color, opacidad, visible, formato, subido_por, categoria)
             VALUES
-              (@id, @nombre, @descripcion, @color, 0.7, true, @formato, @subidoPor::uuid)
+              (@id, @nombre, @descripcion, @color, 0.7, true, @formato, @subidoPor::uuid, @categoria)
           '''),
           parameters: {
             'id': capaId,
@@ -195,6 +265,7 @@ Router buildCapasRouter(DatabaseService db) {
             'color': color,
             'formato': formato,
             'subidoPor': userId,
+            'categoria': categoria,
           },
         );
 
@@ -256,7 +327,7 @@ Router buildCapasRouter(DatabaseService db) {
         final body = jsonDecode(await req.readAsString()) as Map<String, dynamic>;
 
         // Build dynamic SET clause from provided fields
-        final allowed = ['nombre', 'descripcion', 'color', 'opacidad', 'visible'];
+        final allowed = ['nombre', 'descripcion', 'color', 'opacidad', 'visible', 'categoria'];
         final setClauses = <String>[];
         final params = <String, dynamic>{'id': id};
 
@@ -563,6 +634,35 @@ Future<int> _insertKml(
 
   for (final pm in placemarks) {
     final nombre = pm.findElements('name').firstOrNull?.innerText;
+    
+    // Extract basic properties and color if available
+    final props = <String, dynamic>{};
+    final styleUrl = pm.findElements('styleUrl').firstOrNull?.innerText;
+    if (styleUrl != null) props['styleUrl'] = styleUrl;
+    
+    // Look for color in inline Style if present
+    final colorEl = pm.findAllElements('color').firstOrNull;
+    if (colorEl != null) {
+      // KML color is aabbggrr (hex)
+      props['kml_color'] = colorEl.innerText;
+    }
+
+    // Extract ExtendedData if present
+    final extData = pm.findElements('ExtendedData').firstOrNull;
+    if (extData != null) {
+      for (final data in extData.findElements('Data')) {
+        final name = data.getAttribute('name');
+        final value = data.findElements('value').firstOrNull?.innerText;
+        if (name != null && value != null) props[name] = value;
+      }
+      for (final sData in extData.findElements('SimpleData')) {
+        final name = sData.getAttribute('name');
+        final value = sData.innerText;
+        if (name != null) props[name] = value;
+      }
+    }
+
+    final propsJson = jsonEncode(props);
 
     // Try Point
     final pointEl = pm.findAllElements('Point').firstOrNull;
@@ -578,7 +678,7 @@ Future<int> _insertKml(
         Sql.named(r'''
           INSERT INTO geometrias_capa (id, capa_id, nombre, propiedades, geom)
           VALUES (
-            @id::uuid, @capaId::uuid, @nombre, '{}'::jsonb,
+            @id::uuid, @capaId::uuid, @nombre, @props::jsonb,
             ST_SetSRID(ST_MakePoint(@lon, @lat), 4326)
           )
         '''),
@@ -586,6 +686,7 @@ Future<int> _insertKml(
           'id': uuid.v4(),
           'capaId': capaId,
           'nombre': nombre,
+          'props': propsJson,
           'lon': lon,
           'lat': lat,
         },
@@ -606,7 +707,7 @@ Future<int> _insertKml(
         Sql.named(r'''
           INSERT INTO geometrias_capa (id, capa_id, nombre, propiedades, geom)
           VALUES (
-            @id::uuid, @capaId::uuid, @nombre, '{}'::jsonb,
+            @id::uuid, @capaId::uuid, @nombre, @props::jsonb,
             ST_SetSRID(ST_GeomFromText(@wkt), 4326)
           )
         '''),
@@ -614,6 +715,7 @@ Future<int> _insertKml(
           'id': uuid.v4(),
           'capaId': capaId,
           'nombre': nombre,
+          'props': propsJson,
           'wkt': wkt,
         },
       );
@@ -634,7 +736,7 @@ Future<int> _insertKml(
         Sql.named(r'''
           INSERT INTO geometrias_capa (id, capa_id, nombre, propiedades, geom)
           VALUES (
-            @id::uuid, @capaId::uuid, @nombre, '{}'::jsonb,
+            @id::uuid, @capaId::uuid, @nombre, @props::jsonb,
             ST_SetSRID(ST_GeomFromText(@wkt), 4326)
           )
         '''),
@@ -642,6 +744,7 @@ Future<int> _insertKml(
           'id': uuid.v4(),
           'capaId': capaId,
           'nombre': nombre,
+          'props': propsJson,
           'wkt': wkt,
         },
       );

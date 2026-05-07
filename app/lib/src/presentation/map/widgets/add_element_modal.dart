@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../config/constants.dart';
+import '../../../config/map_config.dart';
 import '../../../config/theme.dart';
 import '../../../data/seed_data.dart';
 import '../../../presentation/auth/auth_provider.dart';
@@ -35,57 +36,9 @@ class _AddElementModalState extends ConsumerState<AddElementModal> {
 
   final _formKey = GlobalKey<FormState>();
 
-  static const _tiposPeligro = [
-    ('drogas', 'Tráfico drogas'),
-    ('robos', 'Robos'),
-    ('vivienda_ilegal', 'Vivienda ilegal'),
-    ('vandalismo', 'Vandalismo'),
-    ('riña', 'Riñas'),
-    ('sin_iluminacion', 'Sin iluminación'),
-    ('microbasural', 'Microbasural'),
-    ('otro', 'Otro'),
-  ];
-
-  static const _horarios = [
-    '24/7',
-    'Nocturno (22:00-06:00)',
-    'Tarde/Noche',
-    'Fines de semana',
-    'Días hábiles',
-  ];
-
-  static const _grupos = [
-    (
-      'Infraestructura comunitaria',
-      <String>['centro_acopio', 'sede_comunitaria', 'infraestructura'],
-    ),
-    (
-      'Seguridad pública',
-      <String>[
-        'zona_peligro',
-        'reporte_robo',
-        'reporte_vandalismo',
-        'reporte_accidente',
-      ],
-    ),
-    (
-      'Incidentes urbanos',
-      <String>[
-        'arbol_caido',
-        'poste_caido',
-        'sector_sin_luz',
-        'cable_colgando',
-        'semaforo_dañado',
-        'socavon',
-        'fuga_agua',
-        'microbasural',
-      ],
-    ),
-    (
-      'Cobertura y fiscalización',
-      <String>['patente', 'luminaria', 'camara_cctv'],
-    ),
-  ];
+  static const _tiposPeligro = MapLayerConfig.tiposPeligro;
+  static const _horarios = MapLayerConfig.horarios;
+  static const _grupos = MapLayerConfig.elementGroups;
 
   @override
   void initState() {

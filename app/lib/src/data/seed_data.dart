@@ -21,6 +21,8 @@ class ElementoMapa {
   final int? nivel;
   final String? horario;
   final String? vigenciaHasta;
+  final String? rubro; // Agregado para edición
+  final String? tipoAmenaza; // Agregado para edición
 
   const ElementoMapa({
     required this.id,
@@ -41,20 +43,62 @@ class ElementoMapa {
     this.nivel,
     this.horario,
     this.vigenciaHasta,
+    this.rubro,
+    this.tipoAmenaza,
   });
 
+  LatLng get coordenadas => LatLng(lat, lng);
   LatLng get latLng => LatLng(lat, lng);
 
-  String get layerKey {
-    if (tipo.startsWith('reporte_')) return 'reporte';
-    if (tipo == 'zona_peligro') return 'zona_peligro';
-    if (tipo == 'centro_acopio') return 'centro_acopio';
-    if (tipo == 'sede_comunitaria') return 'sede_comunitaria';
-    if (tipo == 'infraestructura') return 'infraestructura';
-    if (tipo == 'patente') return 'patente';
-    return 'infraestructura';
+  String get layerKey => tipo;
+
+  ElementoMapa copyWith({
+    String? id,
+    String? tipo,
+    String? nombre,
+    String? direccion,
+    String? sector,
+    double? lat,
+    double? lng,
+    String? estado,
+    String? fecha,
+    String? by,
+    String? notas,
+    int? capacidad,
+    String? rut,
+    String? giro,
+    String? tipoPeligro,
+    int? nivel,
+    String? horario,
+    String? vigenciaHasta,
+    String? rubro,
+    String? tipoAmenaza,
+  }) {
+    return ElementoMapa(
+      id: id ?? this.id,
+      tipo: tipo ?? this.tipo,
+      nombre: nombre ?? this.nombre,
+      direccion: direccion ?? this.direccion,
+      sector: sector ?? this.sector,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      estado: estado ?? this.estado,
+      fecha: fecha ?? this.fecha,
+      by: by ?? this.by,
+      notas: notas ?? this.notas,
+      capacidad: capacidad ?? this.capacidad,
+      rut: rut ?? this.rut,
+      giro: giro ?? this.giro,
+      tipoPeligro: tipoPeligro ?? this.tipoPeligro,
+      nivel: nivel ?? this.nivel,
+      horario: horario ?? this.horario,
+      vigenciaHasta: vigenciaHasta ?? this.vigenciaHasta,
+      rubro: rubro ?? this.rubro,
+      tipoAmenaza: tipoAmenaza ?? this.tipoAmenaza,
+    );
   }
 }
+
 
 class DatoPatente {
   final int nDecreto;
@@ -173,7 +217,8 @@ Color colorParaTipo(String tipo) {
     case 'zona_peligro': return const Color(0xFFB91C1C);
     case 'patente': return const Color(0xFFD97706);
     case 'luminaria': return const Color(0xFFEAB308);
-    case 'camara': return const Color(0xFF8B5CF6);
+    case 'camara':
+    case 'camara_cctv': return const Color(0xFF8B5CF6);
     case 'arbol_caido': return const Color(0xFF65A30D);
     case 'poste_caido': return const Color(0xFFEA580C);
     case 'sector_sin_luz': return const Color(0xFF1E293B);
@@ -198,6 +243,7 @@ String nombreParaTipo(String tipo) {
     'patente': 'Patente comercial',
     'luminaria': 'Luminaria',
     'camara': 'Cámara CCTV',
+    'camara_cctv': 'Cámara CCTV',
     'arbol_caido': 'Árbol caído',
     'poste_caido': 'Poste caído',
     'sector_sin_luz': 'Sector sin luz',
@@ -209,6 +255,21 @@ String nombreParaTipo(String tipo) {
   };
   return nombres[tipo] ?? tipo;
 }
+
+String categoriaParaTipo(String tipo) {
+  const cat1 = {'centro_acopio', 'sede_comunitaria', 'infraestructura'};
+  const cat2 = {'zona_peligro', 'reporte_robo', 'reporte_vandalismo', 'reporte_accidente'};
+  const cat3 = {'arbol_caido', 'poste_caido', 'sector_sin_luz', 'cable_colgando', 'semaforo_dañado', 'socavon', 'fuga_agua', 'microbasural'};
+  const cat4 = {'patente', 'luminaria', 'camara', 'camara_cctv'};
+
+  if (cat1.contains(tipo)) return 'infraestructura';
+  if (cat2.contains(tipo)) return 'seguridad';
+  if (cat3.contains(tipo)) return 'incidente';
+  if (cat4.contains(tipo)) return 'fiscalizacion';
+  return 'otra';
+}
+
+
 
 Color colorParaConfianza(String confianza) {
   switch (confianza) {
@@ -267,104 +328,104 @@ Color bgParaEstado(String estado) {
 
 const List<ElementoMapa> kElementosSeed = [
   // Centros de acopio
-  ElementoMapa(id: 'ca-1', tipo: 'centro_acopio', nombre: 'Gimnasio Municipal Lota', direccion: 'Carlos Cousiño 135, Lota', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440001', tipo: 'centro_acopio', nombre: 'Gimnasio Municipal Lota', direccion: 'Carlos Cousiño 135, Lota', sector: 'Centro',
     lat: -37.0999, lng: -73.1559, capacidad: 200, estado: 'activo', fecha: '2024-08-12',
     by: 'Dirección Seguridad Pública', notas: 'Capacidad 200 personas. Cuenta con baños, duchas y bodega.'),
-  ElementoMapa(id: 'ca-2', tipo: 'centro_acopio', nombre: 'Escuela Carlos Cousiño', direccion: 'Pedro A. Cerda 701, Lota', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440002', tipo: 'centro_acopio', nombre: 'Escuela Carlos Cousiño', direccion: 'Pedro A. Cerda 701, Lota', sector: 'Centro',
     lat: -37.0935, lng: -73.1548, capacidad: 350, estado: 'activo', fecha: '2024-09-20',
     by: 'Dirección Seguridad Pública', notas: 'Centro educacional habilitado para emergencias. Generador propio.'),
-  ElementoMapa(id: 'ca-3', tipo: 'centro_acopio', nombre: 'Liceo Juan Antonio Ríos', direccion: 'Monseñor Fuenzalida 1050', sector: 'S-5',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440003', tipo: 'centro_acopio', nombre: 'Liceo Juan Antonio Ríos', direccion: 'Monseñor Fuenzalida 1050', sector: 'S-5',
     lat: -37.0735, lng: -73.1630, capacidad: 180, estado: 'activo', fecha: '2025-02-10',
     by: 'Dirección Seguridad Pública', notas: 'Gimnasio techado, cocina industrial.'),
 
   // Sedes comunitarias
-  ElementoMapa(id: 'sc-1', tipo: 'sede_comunitaria', nombre: 'JJ.VV. Los Aromos', direccion: 'Los Aromos 245', sector: 'S-2',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440004', tipo: 'sede_comunitaria', nombre: 'JJ.VV. Los Aromos', direccion: 'Los Aromos 245', sector: 'S-2',
     lat: -37.0845, lng: -73.1640, estado: 'activo', fecha: '2023-05-15',
     by: 'DIDECO', notas: 'Presidenta: María Hernández. Reuniones viernes 19:00.'),
-  ElementoMapa(id: 'sc-2', tipo: 'sede_comunitaria', nombre: 'Junta Vecinal El Esfuerzo', direccion: 'Pabellón 4, Lota Alto', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440005', tipo: 'sede_comunitaria', nombre: 'Junta Vecinal El Esfuerzo', direccion: 'Pabellón 4, Lota Alto', sector: 'Centro',
     lat: -37.0910, lng: -73.1515, estado: 'activo', fecha: '2023-11-03',
     by: 'DIDECO', notas: 'Sede con 45 familias asociadas.'),
-  ElementoMapa(id: 'sc-3', tipo: 'sede_comunitaria', nombre: 'Centro de Madres Nueva Vida', direccion: 'Vista Hermosa 890', sector: 'S-3',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440006', tipo: 'sede_comunitaria', nombre: 'Centro de Madres Nueva Vida', direccion: 'Vista Hermosa 890', sector: 'S-3',
     lat: -37.0805, lng: -73.1635, estado: 'activo', fecha: '2024-01-22',
     by: 'DIDECO', notas: 'Talleres de costura y repostería.'),
 
   // Patentes
-  ElementoMapa(id: 'p-1', tipo: 'patente', nombre: 'COMERCIAL TRINUM SPA', direccion: 'Vista Hermosa 1199, Lota', sector: 'S-3',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440007', tipo: 'patente', nombre: 'COMERCIAL TRINUM SPA', direccion: 'Vista Hermosa 1199, Lota', sector: 'S-3',
     lat: -37.0810, lng: -73.1622, rut: '77.173.367-0', giro: 'Bodega venta al por menor',
     estado: 'activo', fecha: '2026-03-30', by: 'Scraping Transparencia', notas: 'Patente otorgada marzo 2026.'),
-  ElementoMapa(id: 'p-2', tipo: 'patente', nombre: 'ALMACÉN DOÑA CLARA', direccion: 'P. A. Cerda 808 Local B, Lota', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440008', tipo: 'patente', nombre: 'ALMACÉN DOÑA CLARA', direccion: 'P. A. Cerda 808 Local B, Lota', sector: 'Centro',
     lat: -37.0960, lng: -73.1555, rut: '9.876.543-2', giro: 'Almacén de abarrotes',
     estado: 'activo', fecha: '2025-11-15', by: 'Scraping Transparencia', notas: 'Funcionamiento de lunes a domingo.'),
-  ElementoMapa(id: 'p-3', tipo: 'patente', nombre: 'FERRETERÍA LOS AROMOS', direccion: 'Los Aromos 412', sector: 'S-2',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440009', tipo: 'patente', nombre: 'FERRETERÍA LOS AROMOS', direccion: 'Los Aromos 412', sector: 'S-2',
     lat: -37.0840, lng: -73.1655, rut: '76.543.210-1', giro: 'Venta ferretería y materiales',
     estado: 'en_revision', fecha: '2024-06-01', by: 'Scraping Transparencia', notas: 'Patente próxima a vencer.'),
-  ElementoMapa(id: 'p-4', tipo: 'patente', nombre: 'PANADERÍA EL BUEN PAN', direccion: 'Matta 1205', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440010', tipo: 'patente', nombre: 'PANADERÍA EL BUEN PAN', direccion: 'Matta 1205', sector: 'Centro',
     lat: -37.0965, lng: -73.1578, rut: '8.123.456-7', giro: 'Elaboración y venta de pan',
     estado: 'activo', fecha: '2026-01-15', by: 'Scraping Transparencia', notas: 'Producción artesanal diaria.'),
-  ElementoMapa(id: 'p-5', tipo: 'patente', nombre: 'MINIMARKET LOTA ALTO', direccion: 'Caupolicán 560', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440011', tipo: 'patente', nombre: 'MINIMARKET LOTA ALTO', direccion: 'Caupolicán 560', sector: 'Centro',
     lat: -37.0920, lng: -73.1510, rut: '77.889.910-K', giro: 'Minimarket con venta alcoholes',
     estado: 'activo', fecha: '2025-09-01', by: 'Scraping Transparencia', notas: 'Patente alcohol restringida a viernes y sábados.'),
 
   // Zonas de peligro
-  ElementoMapa(id: 'zp-1', tipo: 'zona_peligro', nombre: 'Esquina Los Aromos / Vista Hermosa', direccion: 'Intersección Los Aromos / Vista Hermosa', sector: 'S-2',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440012', tipo: 'zona_peligro', nombre: 'Esquina Los Aromos / Vista Hermosa', direccion: 'Intersección Los Aromos / Vista Hermosa', sector: 'S-2',
     lat: -37.0820, lng: -73.1645, tipoPeligro: 'drogas', nivel: 4, estado: 'activo',
     fecha: '2026-04-15', by: 'R. Sepúlveda · Funcionario', notas: 'Presencia habitual de microtráfico en horario nocturno (22:00-04:00).',
     vigenciaHasta: '2026-07-15', horario: 'Nocturno (22:00-04:00)'),
-  ElementoMapa(id: 'zp-2', tipo: 'zona_peligro', nombre: 'Pasaje sin nombre sector norte', direccion: 'Pasaje interior S-5', sector: 'S-5',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440013', tipo: 'zona_peligro', nombre: 'Pasaje sin nombre sector norte', direccion: 'Pasaje interior S-5', sector: 'S-5',
     lat: -37.0730, lng: -73.1625, tipoPeligro: 'vivienda_ilegal', nivel: 5, estado: 'activo',
     fecha: '2026-04-10', by: 'Dir. Seguridad Pública', notas: 'Campamento con 8 viviendas sin autorización. Terreno municipal.',
     horario: '24/7'),
-  ElementoMapa(id: 'zp-3', tipo: 'zona_peligro', nombre: 'Plaza Centro – robos a transeúntes', direccion: 'Plaza de Armas Lota', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440014', tipo: 'zona_peligro', nombre: 'Plaza Centro – robos a transeúntes', direccion: 'Plaza de Armas Lota', sector: 'Centro',
     lat: -37.0985, lng: -73.1555, tipoPeligro: 'robos', nivel: 3, estado: 'activo',
     fecha: '2026-04-05', by: 'C. Muñoz · Funcionario', notas: 'Registro de 7 robos en las últimas 3 semanas.',
     vigenciaHasta: '2026-05-30', horario: 'Tarde/Noche'),
-  ElementoMapa(id: 'zp-4', tipo: 'zona_peligro', nombre: 'Sector calle peatonal', direccion: 'Calle peatonal Lota Alto', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440015', tipo: 'zona_peligro', nombre: 'Sector calle peatonal', direccion: 'Calle peatonal Lota Alto', sector: 'Centro',
     lat: -37.0915, lng: -73.1525, tipoPeligro: 'vandalismo', nivel: 2, estado: 'activo',
     fecha: '2026-03-28', by: 'P. Castro · Funcionario', notas: 'Rayados frecuentes en fachadas patrimoniales.',
     horario: 'Fines de semana'),
-  ElementoMapa(id: 'zp-5', tipo: 'zona_peligro', nombre: 'Salida Liceo JA Ríos', direccion: 'Monseñor Fuenzalida esquina', sector: 'S-5',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440016', tipo: 'zona_peligro', nombre: 'Salida Liceo JA Ríos', direccion: 'Monseñor Fuenzalida esquina', sector: 'S-5',
     lat: -37.0738, lng: -73.1625, tipoPeligro: 'riña', nivel: 3, estado: 'activo',
     fecha: '2026-04-18', by: 'R. Sepúlveda · Funcionario', notas: 'Riñas entre escolares a la salida del liceo.',
     vigenciaHasta: '2026-06-30', horario: '13:00-17:00 días hábiles'),
 
   // Reportes
-  ElementoMapa(id: 'r-1', tipo: 'reporte_robo', nombre: 'Robo con intimidación', direccion: 'Carlos Cousiño 340', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440017', tipo: 'reporte_robo', nombre: 'Robo con intimidación', direccion: 'Carlos Cousiño 340', sector: 'Centro',
     lat: -37.0995, lng: -73.1570, estado: 'activo', fecha: '2026-04-22', by: 'R. Sepúlveda', notas: 'Víctima denunció robo de celular. Derivado a Carabineros.'),
-  ElementoMapa(id: 'r-2', tipo: 'reporte_vandalismo', nombre: 'Rayado en fachada municipal', direccion: 'Plaza de Armas Lota', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440018', tipo: 'reporte_vandalismo', nombre: 'Rayado en fachada municipal', direccion: 'Plaza de Armas Lota', sector: 'Centro',
     lat: -37.0988, lng: -73.1555, estado: 'cerrado', fecha: '2026-04-19', by: 'P. Castro', notas: 'Limpieza realizada por cuadrilla municipal el 21 de abril.'),
-  ElementoMapa(id: 'r-3', tipo: 'reporte_accidente', nombre: 'Colisión vehicular', direccion: 'Av. Pedro Aguirre Cerda 850', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440019', tipo: 'reporte_accidente', nombre: 'Colisión vehicular', direccion: 'Av. Pedro Aguirre Cerda 850', sector: 'Centro',
     lat: -37.0945, lng: -73.1542, estado: 'cerrado', fecha: '2026-04-20', by: 'C. Muñoz', notas: 'Colisión sin lesionados. Vehículos retirados por grúa municipal.'),
-  ElementoMapa(id: 'r-4', tipo: 'reporte_robo', nombre: 'Robo en vivienda', direccion: 'Los Aromos 512', sector: 'S-2',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440020', tipo: 'reporte_robo', nombre: 'Robo en vivienda', direccion: 'Los Aromos 512', sector: 'S-2',
     lat: -37.0844, lng: -73.1648, estado: 'en_revision', fecha: '2026-04-21', by: 'R. Sepúlveda', notas: 'Presunto ingreso por patio trasero. Denuncia en curso.'),
-  ElementoMapa(id: 'r-5', tipo: 'reporte_vandalismo', nombre: 'Daño paradero', direccion: 'Vista Hermosa 1050', sector: 'S-3',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440021', tipo: 'reporte_vandalismo', nombre: 'Daño paradero', direccion: 'Vista Hermosa 1050', sector: 'S-3',
     lat: -37.0810, lng: -73.1625, estado: 'activo', fecha: '2026-04-23', by: 'P. Castro', notas: 'Paradero con vidrios rotos. Requiere reparación por DOM.'),
-  ElementoMapa(id: 'r-6', tipo: 'reporte_robo', nombre: 'Hurto en comercio', direccion: 'Matta 1105', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440022', tipo: 'reporte_robo', nombre: 'Hurto en comercio', direccion: 'Matta 1105', sector: 'Centro',
     lat: -37.0960, lng: -73.1572, estado: 'activo', fecha: '2026-04-15', by: 'C. Muñoz', notas: 'Comerciante reporta pérdida de mercadería. Revisan cámaras CCTV.'),
-  ElementoMapa(id: 'r-7', tipo: 'reporte_accidente', nombre: 'Caída de árbol', direccion: 'Monseñor Fuenzalida 980', sector: 'S-5',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440023', tipo: 'reporte_accidente', nombre: 'Caída de árbol', direccion: 'Monseñor Fuenzalida 980', sector: 'S-5',
     lat: -37.0740, lng: -73.1620, estado: 'cerrado', fecha: '2026-04-17', by: 'R. Sepúlveda', notas: 'Árbol caído por viento. Retirado por emergencia municipal.'),
-  ElementoMapa(id: 'r-8', tipo: 'reporte_robo', nombre: 'Robo en local comercial', direccion: 'P. A. Cerda 702', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440024', tipo: 'reporte_robo', nombre: 'Robo en local comercial', direccion: 'P. A. Cerda 702', sector: 'Centro',
     lat: -37.0940, lng: -73.1548, estado: 'activo', fecha: '2026-04-11', by: 'P. Castro', notas: 'Forzamiento de cortinas metálicas durante la madrugada.'),
 
   // Infraestructura
-  ElementoMapa(id: 'i-1', tipo: 'infraestructura', nombre: 'I. Municipalidad de Lota', direccion: 'Pedro Aguirre Cerda 302', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440025', tipo: 'infraestructura', nombre: 'I. Municipalidad de Lota', direccion: 'Pedro Aguirre Cerda 302', sector: 'Centro',
     lat: -37.0961, lng: -73.1562, estado: 'activo', fecha: '1960-01-01', by: 'Registro histórico', notas: 'Edificio principal del municipio.'),
-  ElementoMapa(id: 'i-2', tipo: 'infraestructura', nombre: 'Hospital Lota', direccion: 'Aníbal Pinto 1170', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440026', tipo: 'infraestructura', nombre: 'Hospital Lota', direccion: 'Aníbal Pinto 1170', sector: 'Centro',
     lat: -37.0929, lng: -73.1570, estado: 'activo', fecha: '1990-01-01', by: 'Registro histórico', notas: 'Hospital de baja complejidad, atención 24h.'),
-  ElementoMapa(id: 'i-3', tipo: 'infraestructura', nombre: '1ª Compañía Bomberos Lota', direccion: 'Galvarino 580', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440027', tipo: 'infraestructura', nombre: '1ª Compañía Bomberos Lota', direccion: 'Galvarino 580', sector: 'Centro',
     lat: -37.0975, lng: -73.1540, estado: 'activo', fecha: '1915-01-01', by: 'Registro histórico', notas: 'Cuartel de Bomberos.'),
 
   // Incidentes urbanos
-  ElementoMapa(id: 'arb-1', tipo: 'arbol_caido', nombre: 'Árbol caído sobre calzada', direccion: 'Los Aromos 380', sector: 'S-2',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440028', tipo: 'arbol_caido', nombre: 'Árbol caído sobre calzada', direccion: 'Los Aromos 380', sector: 'S-2',
     lat: -37.0846, lng: -73.1652, estado: 'activo', fecha: '2026-04-23', by: 'R. Sepúlveda', notas: 'Árbol de eucalipto caído por viento. Bloquea parcialmente el tránsito.'),
-  ElementoMapa(id: 'post-1', tipo: 'poste_caido', nombre: 'Poste eléctrico inclinado', direccion: 'Monseñor Fuenzalida 1020', sector: 'S-5',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440029', tipo: 'poste_caido', nombre: 'Poste eléctrico inclinado', direccion: 'Monseñor Fuenzalida 1020', sector: 'S-5',
     lat: -37.0738, lng: -73.1628, estado: 'activo', fecha: '2026-04-22', by: 'C. Muñoz', notas: 'Poste con inclinación peligrosa tras temporal. Derivado a CGE. URGENTE.'),
-  ElementoMapa(id: 'sl-1', tipo: 'sector_sin_luz', nombre: 'Sector nororiente sin luminarias', direccion: 'Sector completo Vista Hermosa alto', sector: 'S-3',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440030', tipo: 'sector_sin_luz', nombre: 'Sector nororiente sin luminarias', direccion: 'Sector completo Vista Hermosa alto', sector: 'S-3',
     lat: -37.0800, lng: -73.1620, estado: 'activo', fecha: '2026-04-20', by: 'P. Castro', notas: '8 luminarias consecutivas apagadas en 3 cuadras.'),
-  ElementoMapa(id: 'cab-1', tipo: 'cable_colgando', nombre: 'Cable telefónico colgando', direccion: 'Matta esq. Caupolicán', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440031', tipo: 'cable_colgando', nombre: 'Cable telefónico colgando', direccion: 'Matta esq. Caupolicán', sector: 'Centro',
     lat: -37.0960, lng: -73.1565, estado: 'activo', fecha: '2026-04-21', by: 'R. Sepúlveda', notas: 'Cable a baja altura, riesgo para vehículos de carga. Reportado a Movistar.'),
-  ElementoMapa(id: 'soc-1', tipo: 'socavon', nombre: 'Socavón en calzada', direccion: 'Pedro Aguirre Cerda 450', sector: 'Centro',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440032', tipo: 'socavon', nombre: 'Socavón en calzada', direccion: 'Pedro Aguirre Cerda 450', sector: 'Centro',
     lat: -37.0955, lng: -73.1553, estado: 'activo', fecha: '2026-04-19', by: 'C. Muñoz', notas: 'Hoyo de aprox. 80cm de diámetro. Señalizado con conos.'),
-  ElementoMapa(id: 'fa-1', tipo: 'fuga_agua', nombre: 'Filtración desde matriz', direccion: 'Vista Hermosa 1240', sector: 'S-3',
+  ElementoMapa(id: '770e8400-e29b-41d4-a716-446655440033', tipo: 'fuga_agua', nombre: 'Filtración desde matriz', direccion: 'Vista Hermosa 1240', sector: 'S-3',
     lat: -37.0812, lng: -73.1618, estado: 'en_revision', fecha: '2026-04-17', by: 'P. Castro', notas: 'Agua aflorando desde la calzada. Derivado a ESSBIO.'),
 ];
 

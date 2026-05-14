@@ -104,6 +104,22 @@ final capaGeoJsonProvider =
   return jsonDecode(resp.body) as Map<String, dynamic>;
 });
 
+/// GeoJSON FeatureCollection unificado para una capa base del sistema (tsunami, incendio)
+final sistemaTipoGeojsonProvider =
+    FutureProvider.family<Map<String, dynamic>?, String>((ref, tipo) async {
+  final storage = ref.read(secureStorageProvider);
+  final token = await storage.read(key: 'access_token');
+  const apiBase = AppConstants.apiBaseUrl;
+
+  final resp = await http.get(
+    Uri.parse('$apiBase/api/capas/sistema/$tipo'),
+    headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+  ).timeout(const Duration(seconds: 20));
+
+  if (resp.statusCode != 200) return null;
+  return jsonDecode(resp.body) as Map<String, dynamic>;
+});
+
 /// Export/Download a layer
 Future<String?> exportCapa(String id) async {
   const apiBase = AppConstants.apiBaseUrl;

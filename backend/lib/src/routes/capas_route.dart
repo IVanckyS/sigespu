@@ -20,7 +20,7 @@ Router buildCapasRouter(DatabaseService db) {
     try {
       final rows = await db.db.execute(r'''
         SELECT id, nombre, descripcion, color, opacidad, visible, formato,
-               subido_por, created_at, categoria
+               subido_por, created_at, categoria, tipo_sistema
         FROM capas_personalizadas
         ORDER BY created_at DESC
       ''');
@@ -36,6 +36,7 @@ Router buildCapasRouter(DatabaseService db) {
         'subidoPor': r[7]?.toString(),
         'createdAt': (r[8] as DateTime).toIso8601String(),
         'categoria': r[9],
+        'tipoSistema': r[10],
       }).toList();
 
       return Response.ok(
@@ -54,6 +55,52 @@ Router buildCapasRouter(DatabaseService db) {
   // GET /<id>/geometrias â€” GeoJSON FeatureCollection for a capa
   // Optional query param: bbox=xmin,ymin,xmax,ymax
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── GET /sistema/<tipo> ── GeoJSON unificado de capas base del sistema ────────
+  router.get('/sistema/<tipo>', (Request req, String tipo) async {
+    const validTipos = ['zona_tsunami', 'zona_incendio_forestal'];
+    if (!validTipos.contains(tipo)) {
+      return Response(
+        400,
+        body: jsonEncode({'error': 'tipo_sistema inválido'}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+    try {
+      final rows = await db.db.execute(
+        Sql.named(r'''
+          SELECT gc.id, gc.nombre, gc.propiedades,
+                 ST_AsGeoJSON(gc.geom)::text AS geom_json
+          FROM geometrias_capa gc
+          JOIN capas_personalizadas cp ON cp.id = gc.capa_id
+          WHERE cp.tipo_sistema = @tipo
+        '''),
+        parameters: {'tipo': tipo},
+      );
+
+      final features = rows.map((r) {
+        final props = (r[2] as Map<String, dynamic>? ?? {});
+        props['nombre'] = r[1];
+        props['geometria_id'] = r[0].toString();
+        return {
+          'type': 'Feature',
+          'id': r[0].toString(),
+          'geometry': jsonDecode(r[3] as String),
+          'properties': props,
+        };
+      }).toList();
+
+      return Response.ok(
+        jsonEncode({'type': 'FeatureCollection', 'features': features}),
+        headers: {'content-type': 'application/json'},
+      );
+    } catch (e) {
+      return Response.internalServerError(
+        body: jsonEncode({'error': 'Error al obtener capa sistema: $e'}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+  });
+
   router.get('/<id>/geometrias', (Request req, String id) async {
     try {
       final bbox = req.url.queryParameters['bbox'];
@@ -216,6 +263,18 @@ Router buildCapasRouter(DatabaseService db) {
         final descripcion = parsed['descripcion'] ?? '';
         final color = parsed['color'] ?? '#FF5722';
         final categoria = parsed['categoria'] ?? 'Personalizadas';
+        final tipoSistemaRaw = parsed['tipo_sistema']?.toString();
+        final tipoSistema = (tipoSistemaRaw == null || tipoSistemaRaw.isEmpty)
+            ? null
+            : tipoSistemaRaw;
+        const validTipos = ['zona_tsunami', 'zona_incendio_forestal'];
+        if (tipoSistema != null && !validTipos.contains(tipoSistema)) {
+          return Response(
+            400,
+            body: jsonEncode({'error': 'tipo_sistema inválido'}),
+            headers: {'content-type': 'application/json'},
+          );
+        }
         final archivoBytes = parsed['archivo_bytes'] as Uint8List?;
         final archivoNombre = parsed['archivo_nombre'] as String? ?? '';
 
@@ -253,9 +312,11 @@ Router buildCapasRouter(DatabaseService db) {
         await db.db.execute(
           Sql.named(r'''
             INSERT INTO capas_personalizadas
-              (id, nombre, descripcion, color, opacidad, visible, formato, subido_por, categoria)
+              (id, nombre, descripcion, color, opacidad, visible, formato,
+               subido_por, categoria, tipo_sistema)
             VALUES
-              (@id, @nombre, @descripcion, @color, 0.7, true, @formato, @subidoPor::uuid, @categoria)
+              (@id, @nombre, @descripcion, @color, 0.7, true, @formato,
+               @subidoPor::uuid, @categoria, @tipoSistema)
           '''),
           parameters: {
             'id': capaId,
@@ -265,6 +326,7 @@ Router buildCapasRouter(DatabaseService db) {
             'formato': formato,
             'subidoPor': userId,
             'categoria': categoria,
+            'tipoSistema': tipoSistema,
           },
         );
 

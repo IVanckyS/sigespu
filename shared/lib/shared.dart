@@ -7,3 +7,4 @@ export 'src/models/patente_comercial.dart';
 export 'src/models/sector_plan_regulador.dart';
 export 'src/models/sismo_dto.dart';
 export 'src/models/capa_personalizada_dto.dart';
+export 'src/models/actividad_municipal.dart';

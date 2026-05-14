@@ -1,6 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
+  static TextStyle displayFont({
+    double fontSize = 22,
+    FontWeight fontWeight = FontWeight.w700,
+    Color? color,
+    double letterSpacing = -0.02,
+  }) =>
+      GoogleFonts.spaceGrotesk(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+        letterSpacing: letterSpacing * fontSize,
+      );
+
+  static TextStyle monoFont({
+    double fontSize = 12,
+    FontWeight fontWeight = FontWeight.w400,
+    Color? color,
+  }) =>
+      GoogleFonts.jetBrainsMono(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+      );
+
   // Paleta oficial SIGESPU Lota (definida en CLAUDE.md y Design System)
   static const orange600 = Color(0xFFEA580C);
   static const orange700 = Color(0xFFC2410C);

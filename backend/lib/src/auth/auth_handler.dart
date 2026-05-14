@@ -50,13 +50,15 @@ class AuthHandler {
   Future<Response> _register(Request req) async {
     final body = await req.readAsString();
     final data = jsonDecode(body);
-    final email = data['email'] as String?;
+    final emailRaw = data['email'] as String?;
     final nombre = data['nombre'] as String?;
     final password = data['password'] as String?;
 
-    if (email == null || nombre == null || password == null) {
+    if (emailRaw == null || nombre == null || password == null) {
       return Response.badRequest(body: jsonEncode({'error': 'Faltan campos requeridos'}));
     }
+
+    final email = emailRaw.trim().toLowerCase();
 
     final domainParts = email.split('@');
     if (domainParts.length != 2 || !allowedDomains.contains(domainParts.last)) {
@@ -106,12 +108,14 @@ class AuthHandler {
   Future<Response> _login(Request req) async {
     final body = await req.readAsString();
     final data = jsonDecode(body);
-    final email = data['email'] as String?;
+    final emailRaw = data['email'] as String?;
     final password = data['password'] as String?;
 
-    if (email == null || password == null) {
+    if (emailRaw == null || password == null) {
       return Response.badRequest(body: jsonEncode({'error': 'Faltan campos requeridos'}));
     }
+
+    final email = emailRaw.trim().toLowerCase();
 
     final result = await _dbService.db.execute(
       Sql.named('SELECT id, password_hash, nivel_acceso, activo, nombre, solicitud_operativo FROM usuarios WHERE email = @email'),

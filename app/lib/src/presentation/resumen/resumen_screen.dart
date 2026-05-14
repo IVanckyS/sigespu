@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../config/theme.dart';
 import '../../data/seed_data.dart';
 
@@ -16,16 +17,24 @@ class ResumenScreen extends StatelessWidget {
     // KPIs calculados desde seed
     final reportes = kElementosSeed.where((e) => e.tipo.startsWith('reporte_')).length;
     final zonas = kElementosSeed.where((e) => e.tipo == 'zona_peligro').length;
-    final patentes = kElementosSeed.where((e) => e.tipo == 'patente').length;
+    final patentes = kPatentes.length; // total en BD de scraping
     final acopios = kElementosSeed.where((e) => e.tipo == 'centro_acopio').length;
     final sedes = kElementosSeed.where((e) => e.tipo == 'sede_comunitaria').length;
 
-    // Reportes por tipo para barchart
+    // Reportes por tipo para gráfico (últimos 30 días)
+    final limite30 = now.subtract(const Duration(days: 30));
+    bool enUltimos30(ElementoMapa e) {
+      final d = DateTime.tryParse(e.fecha);
+      return d != null && d.isAfter(limite30);
+    }
     final reportesPorTipo = <String, int>{
-      'Robo': kElementosSeed.where((e) => e.tipo == 'reporte_robo').length,
-      'Vandalismo': kElementosSeed.where((e) => e.tipo == 'reporte_vandalismo').length,
-      'Accidente': kElementosSeed.where((e) => e.tipo == 'reporte_accidente').length,
+      'Robo':       kElementosSeed.where((e) => e.tipo == 'reporte_robo'       && enUltimos30(e)).length,
+      'Vandalismo': kElementosSeed.where((e) => e.tipo == 'reporte_vandalismo' && enUltimos30(e)).length,
+      'Accidente':  kElementosSeed.where((e) => e.tipo == 'reporte_accidente'  && enUltimos30(e)).length,
     };
+
+    // Tendencia semanal (últimas 8 semanas)
+    final weeklyData = _weeklyReportCounts(now);
 
     // Últimos reportes (ordenados por fecha desc)
     final ultimos = kElementosSeed
@@ -38,11 +47,14 @@ class ResumenScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Resumen operativo',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.stone900, letterSpacing: -0.02)),
-          const SizedBox(height: 4),
-          Text('Dirección de Seguridad Pública · Actualizado: $fechaStr',
-              style: const TextStyle(fontSize: 13, color: AppTheme.stone500)),
+          // ── View banner ──────────────────────────────────────────────────
+          _ResumenBanner(
+            reportes: reportes,
+            zonas: zonas,
+            patentes: patentes,
+            acopios: acopios,
+            fechaStr: fechaStr,
+          ),
           const SizedBox(height: 20),
 
           // ── KPI grid ─────────────────────────────────────────────────────
@@ -69,8 +81,8 @@ class ResumenScreen extends StatelessWidget {
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(child: _DashCard(
               title: 'Tendencia semanal',
-              subtitle: 'reportes registrados',
-              child: SizedBox(height: 220, child: const _LineChartTendencia()),
+              subtitle: 'reportes por semana',
+              child: SizedBox(height: 220, child: _LineChartTendencia(data: weeklyData)),
             )),
             const SizedBox(width: 12),
             Expanded(child: _DashCard(
@@ -89,6 +101,173 @@ class ResumenScreen extends StatelessWidget {
     '', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
   ][m];
+
+  /// Conteo de reportes por semana para las últimas 8 semanas (más reciente al final).
+  static List<int> _weeklyReportCounts(DateTime ref) {
+    return List.generate(8, (i) {
+      // i=0 es la semana más antigua (7 semanas atrás), i=7 la más reciente
+      final daysAgo = (7 - i) * 7;
+      final weekStart = DateTime(
+        ref.subtract(Duration(days: daysAgo + 6)).year,
+        ref.subtract(Duration(days: daysAgo + 6)).month,
+        ref.subtract(Duration(days: daysAgo + 6)).day,
+      );
+      final weekEnd = DateTime(
+        ref.subtract(Duration(days: daysAgo)).year,
+        ref.subtract(Duration(days: daysAgo)).month,
+        ref.subtract(Duration(days: daysAgo)).day,
+        23, 59, 59,
+      );
+      return kElementosSeed.where((e) {
+        if (!e.tipo.startsWith('reporte_')) return false;
+        final d = DateTime.tryParse(e.fecha);
+        if (d == null) return false;
+        return !d.isBefore(weekStart) && !d.isAfter(weekEnd);
+      }).length;
+    });
+  }
+}
+
+// ── View banner ───────────────────────────────────────────────────────────────
+
+class _ResumenBanner extends StatelessWidget {
+  final int reportes, zonas, patentes, acopios;
+  final String fechaStr;
+  const _ResumenBanner({
+    required this.reportes,
+    required this.zonas,
+    required this.patentes,
+    required this.acopios,
+    required this.fechaStr,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFC2410C), Color(0xFFEA580C), Color(0xFFFB923C)],
+            stops: [0.0, 0.6, 1.0],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Decorative dashboard SVG (low opacity)
+            Positioned(
+              right: 24,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Opacity(
+                  opacity: 0.12,
+                  child: CustomPaint(
+                    size: const Size(100, 100),
+                    painter: _DashboardDecoPainter(),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(28, 24, 140, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    const Icon(Icons.dashboard_outlined, size: 12, color: Colors.white70),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Vista · Resumen operativo',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white70,
+                        letterSpacing: 0.09 * 10,
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Dirección de Seguridad Pública',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFEAEAEA),
+                      letterSpacing: -0.44,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'Indicadores clave y últimos registros · Actualizado: $fechaStr',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(children: [
+                    _VStat(value: '$reportes', label: 'Reportes'),
+                    const SizedBox(width: 16),
+                    _VStat(value: '$zonas', label: 'Zonas activas'),
+                    const SizedBox(width: 16),
+                    _VStat(value: '$patentes', label: 'Patentes (mes)'),
+                    const SizedBox(width: 16),
+                    _VStat(value: '$acopios', label: 'Centros acopio'),
+                  ]),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VStat extends StatelessWidget {
+  final String value;
+  final String label;
+  const _VStat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.spaceGrotesk(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFFEAEAEA),
+            height: 1,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+      ],
+    );
+  }
+}
+
+class _DashboardDecoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = Colors.white;
+    final s = size.width / 120;
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(10*s,10*s,45*s,55*s), Radius.circular(4*s)), p);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(65*s,10*s,45*s,35*s), Radius.circular(4*s)), p);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(65*s,55*s,45*s,55*s), Radius.circular(4*s)), p);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(10*s,75*s,45*s,35*s), Radius.circular(4*s)), p);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ── KPI grid ──────────────────────────────────────────────────────────────────
@@ -277,19 +456,19 @@ class _DoughnutChartTipos extends StatelessWidget {
 // ── Line chart: tendencia semanal ─────────────────────────────────────────────
 
 class _LineChartTendencia extends StatelessWidget {
-  const _LineChartTendencia();
+  final List<int> data;
+  const _LineChartTendencia({required this.data});
 
   @override
   Widget build(BuildContext context) {
-    // Datos demo: reportes por día en la última semana
-    const spots = [
-      FlSpot(0, 1), FlSpot(1, 3), FlSpot(2, 2),
-      FlSpot(3, 5), FlSpot(4, 4), FlSpot(5, 6), FlSpot(6, 8),
-    ];
-    const days = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+    final maxVal = data.fold(0, (a, b) => a > b ? a : b);
+    final maxY = (maxVal + 1).toDouble().clamp(4.0, double.infinity);
+    final spots = List.generate(data.length, (i) => FlSpot(i.toDouble(), data[i].toDouble()));
+    // Etiquetas: S1…S8 (S8 = semana más reciente)
+    final days = List.generate(data.length, (i) => 'S${i + 1}');
 
     return LineChart(LineChartData(
-      minY: 0, maxY: 10,
+      minY: 0, maxY: maxY,
       lineTouchData: LineTouchData(
         touchTooltipData: LineTouchTooltipData(
           getTooltipItems: (spots) => spots.map((s) => LineTooltipItem(

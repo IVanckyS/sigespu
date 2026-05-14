@@ -1,9 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:printing/printing.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../config/theme.dart';
+import '../actividades/actividades_provider.dart';
 import '../auth/auth_provider.dart';
 import '../map/providers/map_providers.dart';
 import 'pdf_export_service.dart';
@@ -123,26 +127,27 @@ class _BrandLogo extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Logo municipalidad (círculo azul con escudo naranja)
-        Container(
-          width: 36, height: 36,
-          decoration: const BoxDecoration(color: AppTheme.blue800, shape: BoxShape.circle),
-          child: const Icon(Icons.account_balance, color: Colors.white, size: 18),
-        ),
+        SizedBox(width: 36, height: 36, child: CustomPaint(painter: _MunicipalLogoPainter())),
+        const SizedBox(width: 8),
+        SizedBox(width: 36, height: 36, child: CustomPaint(painter: _SigespuLogoPainter())),
         const SizedBox(width: 10),
-        // Logo SIGESPU (cuadrado naranja con pin)
-        Container(
-          width: 36, height: 36,
-          decoration: BoxDecoration(color: AppTheme.orange600, borderRadius: BorderRadius.circular(8)),
-          child: const Icon(Icons.location_on, color: Colors.white, size: 18),
-        ),
-        const SizedBox(width: 10),
-        const Column(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('SIGESPU Lota', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.stone900, letterSpacing: -0.01)),
-            Text('I. Municipalidad de Lota', style: TextStyle(fontSize: 10, color: AppTheme.stone500, letterSpacing: 0.08)),
+            Text(
+              'SIGESPU Lota',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.stone900,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const Text(
+              'I. Municipalidad de Lota',
+              style: TextStyle(fontSize: 10, color: AppTheme.stone500, letterSpacing: 0.08),
+            ),
           ],
         ),
       ],
@@ -150,14 +155,80 @@ class _BrandLogo extends StatelessWidget {
   }
 }
 
+class _MunicipalLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 48;
+
+    canvas.drawCircle(
+      Offset(24 * s, 24 * s),
+      22 * s,
+      Paint()..color = const Color(0xFF44403C),
+    );
+
+    final archPath = Path()
+      ..moveTo(12 * s, 30 * s)
+      ..lineTo(12 * s, 20 * s)
+      ..quadraticBezierTo(12 * s, 14 * s, 18 * s, 14 * s)
+      ..lineTo(30 * s, 14 * s)
+      ..quadraticBezierTo(36 * s, 14 * s, 36 * s, 20 * s)
+      ..lineTo(36 * s, 30 * s)
+      ..close();
+    canvas.drawPath(archPath, Paint()..color = const Color(0xFFEA580C));
+
+    final winPaint = Paint()..color = Colors.white.withValues(alpha: 0.9);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(18 * s, 22 * s, 4 * s, 8 * s), Radius.circular(s)), winPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(26 * s, 22 * s, 4 * s, 8 * s), Radius.circular(s)), winPaint);
+
+    final roofPath = Path()
+      ..moveTo(20 * s, 14 * s)
+      ..lineTo(24 * s, 10 * s)
+      ..lineTo(28 * s, 14 * s)
+      ..close();
+    canvas.drawPath(roofPath, Paint()..color = const Color(0xFFFED7AA));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SigespuLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 48;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, 48 * s, 48 * s), Radius.circular(12 * s)),
+      Paint()..color = const Color(0xFFEA580C),
+    );
+
+    final pinPath = Path()
+      ..moveTo(24 * s, 8 * s)
+      ..cubicTo(17 * s, 8 * s, 11 * s, 14 * s, 11 * s, 21 * s)
+      ..cubicTo(11 * s, 32 * s, 24 * s, 42 * s, 24 * s, 42 * s)
+      ..cubicTo(24 * s, 42 * s, 37 * s, 32 * s, 37 * s, 21 * s)
+      ..cubicTo(37 * s, 14 * s, 31 * s, 8 * s, 24 * s, 8 * s)
+      ..close();
+    canvas.drawPath(pinPath, Paint()..color = Colors.white);
+
+    canvas.drawCircle(Offset(24 * s, 21 * s), 5 * s, Paint()..color = const Color(0xFFEA580C));
+    canvas.drawCircle(Offset(24 * s, 21 * s), 2.5 * s, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 // ── Mode switcher ─────────────────────────────────────────────────────────────
 
-class _ModeSwitcher extends StatelessWidget {
+class _ModeSwitcher extends ConsumerWidget {
   final String location;
   const _ModeSwitcher({required this.location});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final actividadesCount = ref.watch(actividadesProvider).length;
+
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
@@ -172,6 +243,13 @@ class _ModeSwitcher extends StatelessWidget {
           _ModeBtn(label: 'Tabla', icon: Icons.grid_on_outlined, route: '/tabla', active: location == '/tabla'),
           _ModeBtn(label: 'Scraping', icon: Icons.download_for_offline_outlined, route: '/scraping', active: location == '/scraping'),
           _ModeBtn(label: 'Usuarios', icon: Icons.people_outline, route: '/users', active: location == '/users'),
+          _ModeBtnBadged(
+            label: 'Actividades',
+            icon: Icons.view_kanban_outlined,
+            route: '/actividades',
+            active: location == '/actividades',
+            badge: '$actividadesCount',
+          ),
         ],
       ),
     );
@@ -203,6 +281,71 @@ class _ModeBtn extends StatelessWidget {
             Icon(icon, size: 15, color: active ? AppTheme.orange700 : AppTheme.stone600),
             const SizedBox(width: 6),
             Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: active ? AppTheme.orange700 : AppTheme.stone600)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ModeBtnBadged extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final String route;
+  final bool active;
+  final String badge;
+
+  const _ModeBtnBadged({
+    required this.label,
+    required this.icon,
+    required this.route,
+    required this.active,
+    required this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.go(route),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: active ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(7),
+          boxShadow: active
+              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 2, offset: const Offset(0, 1))]
+              : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: active ? AppTheme.orange700 : AppTheme.stone600),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: active ? AppTheme.orange700 : AppTheme.stone600,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: active ? AppTheme.orange100 : AppTheme.stone200,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                badge,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: active ? AppTheme.orange700 : AppTheme.stone500,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -264,27 +407,52 @@ class _ExportBtn extends ConsumerWidget {
   }
 
   Future<void> _exportPdf(BuildContext context, WidgetRef ref) async {
-    final activeLayers = ref.read(activeLayersProvider);
-    final dangerFilter = ref.read(dangerFilterProvider);
-    final dateRange = ref.read(dateRangeProvider);
-    final elementos = ref.read(filteredElementsProvider);
-
+    final location = GoRouterState.of(context).uri.path;
     final auth = ref.read(authProvider);
     final userName = auth.user?['nombre'] as String? ?? 'Funcionario';
 
-    final filterInfo = {
-      'Capas': activeLayers.join(', '),
-      'Peligro': dangerFilter,
-      'Rango': '$dateRange días',
-    };
-
     try {
-      final bytes = await PdfExportService.generateReport(
-        elementos,
-        userName,
-        filterInfo: filterInfo,
-      );
-      await Printing.layoutPdf(onLayout: (_) async => bytes);
+      late final List<int> bytes;
+
+      if (location == '/resumen') {
+        final allElements = ref.read(allElementsProvider);
+        bytes = await PdfExportService.generateResumenReport(allElements, userName);
+      } else if (location == '/tabla') {
+        final elementos = ref.read(tablaFilteredProvider);
+        bytes = await PdfExportService.generateReport(
+          elementos,
+          userName,
+          title: 'LISTADO DE ELEMENTOS',
+          filterInfo: {'Elementos mostrados': '${elementos.length}'},
+        );
+      } else if (location == '/scraping') {
+        bytes = await PdfExportService.generateScrapingReport(
+          userName,
+          patentes: ref.read(scrapingFilteredPatenteProvider),
+          permisos: ref.read(scrapingFilteredPermisoProvider),
+          transito: ref.read(scrapingFilteredTransitoProvider),
+          orgs: ref.read(scrapingFilteredOrgProvider),
+        );
+      } else if (location == '/users') {
+        bytes = await PdfExportService.generateUsuariosReport(userName);
+      } else {
+        // /map (default)
+        final activeLayers = ref.read(activeLayersProvider);
+        final dangerFilter = ref.read(dangerFilterProvider);
+        final dateRange = ref.read(dateRangeProvider);
+        final elementos = ref.read(filteredElementsProvider);
+        bytes = await PdfExportService.generateReport(
+          elementos,
+          userName,
+          filterInfo: {
+            'Capas activas': activeLayers.isEmpty ? 'Ninguna' : activeLayers.join(', '),
+            'Peligro': dangerFilter,
+            'Rango': dateRange == 'all' ? 'Todos' : '$dateRange dias',
+          },
+        );
+      }
+
+      await Printing.layoutPdf(onLayout: (_) async => Uint8List.fromList(bytes));
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

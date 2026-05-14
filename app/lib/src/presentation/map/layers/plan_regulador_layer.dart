@@ -54,6 +54,7 @@ class PlanReguladorLayer {
         color: color.withValues(alpha: 0.18),
         borderColor: AppTheme.amberWarning,
         borderStrokeWidth: 2,
+        isFilled: true,
       );
     }).toList();
   }

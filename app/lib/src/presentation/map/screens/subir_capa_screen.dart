@@ -20,6 +20,7 @@ class _SubirCapaScreenState extends ConsumerState<SubirCapaScreen> {
   final _nombreCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   String _categoria = 'Personalizadas';
+  String? _tipoSistema;
   Color _color = const Color(0xFFFF5722);
   PlatformFile? _file;
   bool _uploading = false;
@@ -80,6 +81,22 @@ class _SubirCapaScreenState extends ConsumerState<SubirCapaScreen> {
                       ))
                   .toList(),
               onChanged: (val) => setState(() => _categoria = val!),
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String?>(
+              initialValue: _tipoSistema,
+              dropdownColor: const Color(0xFF1E2327),
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              decoration: _inputDecoration('Capa base del sistema (opcional)'),
+              items: const [
+                DropdownMenuItem(value: null, child: Text('Ninguna (personalizada)')),
+                DropdownMenuItem(value: 'zona_tsunami', child: Text('Zona de Tsunami')),
+                DropdownMenuItem(
+                  value: 'zona_incendio_forestal',
+                  child: Text('Riesgo de Incendio Forestal'),
+                ),
+              ],
+              onChanged: (val) => setState(() => _tipoSistema = val),
             ),
             const SizedBox(height: 12),
             Row(children: [
@@ -254,6 +271,9 @@ class _SubirCapaScreenState extends ConsumerState<SubirCapaScreen> {
       }
       request.fields['color'] = colorHex;
       request.fields['categoria'] = _categoria;
+      if (_tipoSistema != null) {
+        request.fields['tipo_sistema'] = _tipoSistema!;
+      }
 
       if (kIsWeb || _file!.bytes != null) {
         request.files.add(

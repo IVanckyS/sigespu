@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../config/theme.dart';
 import '../../data/seed_data.dart';
+import '../map/providers/map_providers.dart';
 
-class ScrapingScreen extends StatefulWidget {
+class ScrapingScreen extends ConsumerStatefulWidget {
   const ScrapingScreen({super.key});
 
   @override
-  State<ScrapingScreen> createState() => _ScrapingScreenState();
+  ConsumerState<ScrapingScreen> createState() => _ScrapingScreenState();
 }
 
-class _ScrapingScreenState extends State<ScrapingScreen> {
+class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
   int _tab = 0; // 0=patentes, 1=permisos, 2=transito, 3=orgs
   String _year = 'all';
   String _month = 'all';
@@ -80,31 +83,41 @@ class _ScrapingScreenState extends State<ScrapingScreen> {
     _ => kOrganizaciones.length,
   };
 
+  void _syncProviders() {
+    ref.read(scrapingTabIndexProvider.notifier).state = _tab;
+    ref.read(scrapingFilteredPatenteProvider.notifier).state = _patentes;
+    ref.read(scrapingFilteredPermisoProvider.notifier).state = _permisos;
+    ref.read(scrapingFilteredTransitoProvider.notifier).state = _transito;
+    ref.read(scrapingFilteredOrgProvider.notifier).state = _orgs;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // ── Header ──────────────────────────────────────────────────────────
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // ── View banner ──────────────────────────────────────────────────────
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Datos scrapeados desde Transparencia',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.stone900, letterSpacing: -0.02)),
-            SizedBox(height: 2),
-            Text('Información pública extraída automáticamente desde lotatransparente.cl · Ley 20.285',
-                style: TextStyle(fontSize: 12.5, color: AppTheme.stone500)),
-          ]),
-          const Spacer(),
-          _ScraperStatus(),
+          Expanded(
+            child: _ScrapingBanner(
+              nPatentes: kPatentes.length,
+              nPermisos: kPermisos.length,
+              nTransito: kTransito.length,
+              nOrgs: kOrganizaciones.length,
+            ),
+          ),
         ]),
         const SizedBox(height: 14),
+        // ── Scraper status ───────────────────────────────────────────────────
+        Align(alignment: Alignment.centerRight, child: _ScraperStatus()),
+        const SizedBox(height: 4),
 
         // ── Tabs ─────────────────────────────────────────────────────────────
         Row(children: List.generate(_tabLabels.length, (i) {
           final isActive = _tab == i;
           final count = [kPatentes.length, kPermisos.length, kTransito.length, kOrganizaciones.length][i];
           return GestureDetector(
-            onTap: () => setState(() { _tab = i; _search = ''; }),
+            onTap: () { setState(() { _tab = i; _search = ''; }); _syncProviders(); },
             child: Container(
               margin: const EdgeInsets.only(right: 4),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
@@ -153,18 +166,18 @@ class _ScrapingScreenState extends State<ScrapingScreen> {
           child: Wrap(spacing: 10, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
             if (_tab == 0) ...[
               const _FLabel('Año'),
-              _FSelect(value: _year, items: const [('all','Todos'),('2026','2026'),('2025','2025'),('2024','2024')], onChanged: (v) => setState(() => _year = v)),
+              _FSelect(value: _year, items: const [('all','Todos'),('2026','2026'),('2025','2025'),('2024','2024')], onChanged: (v) { setState(() => _year = v); _syncProviders(); }),
               const _FLabel('Mes'),
               _FSelect(value: _month, items: const [
                 ('all','Todos'),('1','Enero'),('2','Febrero'),('3','Marzo'),('4','Abril'),
                 ('5','Mayo'),('6','Junio'),('7','Julio'),('8','Agosto'),
                 ('9','Septiembre'),('10','Octubre'),('11','Noviembre'),('12','Diciembre'),
-              ], onChanged: (v) => setState(() => _month = v)),
+              ], onChanged: (v) { setState(() => _month = v); _syncProviders(); }),
               const _FLabel('Geocoding'),
               _FSelect(value: _geo, items: const [
                 ('all','Todos'),('high','Confianza alta'),('med','Confianza media'),
                 ('low','Confianza baja'),('failed','Fallo'),
-              ], onChanged: (v) => setState(() => _geo = v)),
+              ], onChanged: (v) { setState(() => _geo = v); _syncProviders(); }),
             ],
             SizedBox(
               width: 260,
@@ -181,7 +194,7 @@ class _ScrapingScreenState extends State<ScrapingScreen> {
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
                 ),
                 style: const TextStyle(fontSize: 12.5),
-                onChanged: (v) => setState(() => _search = v),
+                onChanged: (v) { setState(() => _search = v); _syncProviders(); },
               ),
             ),
             Text.rich(TextSpan(children: [
@@ -205,12 +218,16 @@ class _ScrapingScreenState extends State<ScrapingScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: SingleChildScrollView(
-                child: switch (_tab) {
-                  0 => _TablaPatentes(items: _patentes),
-                  1 => _TablaPermisos(items: _permisos),
-                  2 => _TablaTransito(items: _transito),
-                  _ => _TablaOrganizaciones(items: _orgs),
-                },
+                scrollDirection: Axis.vertical,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: switch (_tab) {
+                    0 => _TablaPatentes(items: _patentes),
+                    1 => _TablaPermisos(items: _permisos),
+                    2 => _TablaTransito(items: _transito),
+                    _ => _TablaOrganizaciones(items: _orgs),
+                  },
+                ),
               ),
             ),
           ),
@@ -506,6 +523,118 @@ class _FSelect extends StatelessWidget {
         }).toList(),
         onChanged: (v) { if (v != null) onChanged(v); },
       ),
+    );
+  }
+}
+
+// ── View banner ───────────────────────────────────────────────────────────────
+
+class _ScrapingBanner extends StatelessWidget {
+  final int nPatentes, nPermisos, nTransito, nOrgs;
+  const _ScrapingBanner({
+    required this.nPatentes,
+    required this.nPermisos,
+    required this.nTransito,
+    required this.nOrgs,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF4C1D95), Color(0xFF6D28D9), Color(0xFF7C3AED)],
+            stops: [0.0, 0.6, 1.0],
+          ),
+        ),
+        child: Stack(
+          children: [
+            const Positioned(
+              right: 24,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Opacity(
+                  opacity: 0.12,
+                  child: Icon(Icons.work_outline, size: 100, color: Colors.white),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(28, 24, 140, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    const Icon(Icons.download_for_offline_outlined, size: 12, color: Color(0x99FFFFFF)),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Datos · lotatransparente.cl · Ley 20.285',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0x99FFFFFF), letterSpacing: 0.9),
+                    ),
+                  ]),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Datos de Transparencia Pública',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: -0.44,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Patentes, permisos DOM, decretos de tránsito y organizaciones sociales extraídos automáticamente.',
+                    style: TextStyle(fontSize: 12, color: Color(0xBFFFFFFF), height: 1.5),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(children: [
+                    _ScrapingStat(value: '$nPatentes', label: 'Patentes'),
+                    const SizedBox(width: 16),
+                    _ScrapingStat(value: '$nPermisos', label: 'Permisos DOM'),
+                    const SizedBox(width: 16),
+                    _ScrapingStat(value: '$nTransito', label: 'Decretos tránsito'),
+                    const SizedBox(width: 16),
+                    _ScrapingStat(value: '$nOrgs', label: 'Organizaciones'),
+                  ]),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScrapingStat extends StatelessWidget {
+  final String value;
+  final String label;
+  const _ScrapingStat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.spaceGrotesk(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            height: 1,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xBFFFFFFF))),
+      ],
     );
   }
 }

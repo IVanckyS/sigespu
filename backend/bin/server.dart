@@ -10,6 +10,9 @@ import '../lib/src/middleware/cors_middleware.dart';
 import '../lib/src/middleware/auth_middleware.dart';
 import '../lib/src/routes/sismos_route.dart';
 import '../lib/src/routes/capas_route.dart';
+import '../lib/src/routes/elementos_route.dart';
+import '../lib/src/routes/actividades_route.dart';
+import '../lib/src/routes/zonas_route.dart';
 
 void main(List<String> args) async {
   final ip = InternetAddress.anyIPv4;
@@ -38,6 +41,18 @@ void main(List<String> args) async {
   router.mount('/api/capas', Pipeline()
     .addMiddleware(authMiddleware(jwtService))
     .addHandler(buildCapasRouter(dbService).call));
+
+  router.mount('/api/elementos', Pipeline()
+    .addMiddleware(authMiddleware(jwtService))
+    .addHandler(buildElementosRouter(dbService).call));
+
+  router.mount('/api/actividades', Pipeline()
+    .addMiddleware(authMiddleware(jwtService))
+    .addHandler(buildActividadesRouter(dbService).call));
+
+  router.mount('/api/zonas', Pipeline()
+    .addMiddleware(authMiddleware(jwtService))
+    .addHandler(buildZonasRouter(dbService).call));
 
   final handler = Pipeline()
       .addMiddleware(corsMiddleware())

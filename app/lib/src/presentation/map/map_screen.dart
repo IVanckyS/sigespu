@@ -598,6 +598,30 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 },
               ),
 
+              // Mobile drawer trigger
+              Builder(
+                builder: (ctx) {
+                  final w = MediaQuery.of(ctx).size.width;
+                  if (w >= 768) return const SizedBox.shrink();
+                  return Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Material(
+                      color: const Color(0xFF1E2327),
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => Scaffold.of(ctx).openDrawer(),
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(Icons.layers_outlined, size: 20, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
               // FABs bottom-right
               Positioned(
                 bottom: 24, right: 16,

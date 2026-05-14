@@ -62,35 +62,63 @@ class ResumenScreen extends StatelessWidget {
           const SizedBox(height: 12),
 
           // ── Row 1: Doughnut chart + Sector list ───────────────────────────────
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(flex: 2, child: _DashCard(
-              title: 'Reportes por tipo',
-              subtitle: 'últimos 30 días',
-              child: SizedBox(height: 220, child: _DoughnutChartTipos(data: reportesPorTipo)),
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: _DashCard(
-              title: 'Zonas por sector',
-              subtitle: 'Plan Regulador',
-              child: _SectorList(),
-            )),
-          ]),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 768;
+              final card1 = _DashCard(
+                title: 'Reportes por tipo',
+                subtitle: 'últimos 30 días',
+                child: SizedBox(height: 220, child: _DoughnutChartTipos(data: reportesPorTipo)),
+              );
+              final card2 = _DashCard(
+                title: 'Zonas por sector',
+                subtitle: 'Plan Regulador',
+                child: _SectorList(),
+              );
+              if (isMobile) {
+                return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  card1,
+                  const SizedBox(height: 12),
+                  card2,
+                ]);
+              }
+              return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(flex: 2, child: card1),
+                const SizedBox(width: 12),
+                Expanded(child: card2),
+              ]);
+            },
+          ),
           const SizedBox(height: 12),
 
           // ── Row 2: Line chart + Recent list ─────────────────────────────
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: _DashCard(
-              title: 'Tendencia semanal',
-              subtitle: 'reportes por semana',
-              child: SizedBox(height: 220, child: _LineChartTendencia(data: weeklyData)),
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: _DashCard(
-              title: 'Últimos reportes',
-              subtitle: 'orden cronológico',
-              child: _RecentList(items: ultimos.take(5).toList()),
-            )),
-          ]),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 768;
+              final card1 = _DashCard(
+                title: 'Tendencia semanal',
+                subtitle: 'reportes por semana',
+                child: SizedBox(height: 220, child: _LineChartTendencia(data: weeklyData)),
+              );
+              final card2 = _DashCard(
+                title: 'Últimos reportes',
+                subtitle: 'orden cronológico',
+                child: _RecentList(items: ultimos.take(5).toList()),
+              );
+              if (isMobile) {
+                return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  card1,
+                  const SizedBox(height: 12),
+                  card2,
+                ]);
+              }
+              return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(child: card1),
+                const SizedBox(width: 12),
+                Expanded(child: card2),
+              ]);
+            },
+          ),
           const SizedBox(height: 24),
         ],
       ),

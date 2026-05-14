@@ -19,6 +19,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
   String _search = '';
   String _sortCol = 'fecha';
   bool _sortAsc = false;
+  bool _filtersExpanded = true;
 
   List<ElementoMapa> get _filtered {
     final list = kElementosSeed.where((e) {
@@ -68,6 +69,73 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
     ref.read(tablaFilteredProvider.notifier).state = _filtered;
   }
 
+  Widget _buildFilterControls() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.stone200),
+      ),
+      child: Wrap(spacing: 10, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        _FilterLabel('Tipo'),
+        _FilterSelect(
+          value: _filterTipo,
+          items: const [
+            ('all', 'Todos los tipos'),
+            ('zona_peligro', 'Zonas de peligro'),
+            ('reporte', 'Reportes'),
+            ('patente', 'Patentes'),
+            ('centro_acopio', 'Centros de acopio'),
+            ('sede_comunitaria', 'Sedes comunitarias'),
+            ('infraestructura', 'Infraestructura'),
+          ],
+          onChanged: (v) { setState(() => _filterTipo = v); _syncProvider(); },
+        ),
+        _FilterLabel('Sector'),
+        _FilterSelect(
+          value: _filterSector,
+          items: const [
+            ('all', 'Todos'),
+            ('S-2', 'S-2 · Residencial Los Aromos'),
+            ('S-3', 'S-3 · Mixto Los Aromos'),
+            ('S-4', 'S-4 · Equipamiento'),
+            ('S-5', 'S-5 · Vivienda Periférica'),
+            ('Centro', 'Centro Histórico'),
+          ],
+          onChanged: (v) { setState(() => _filterSector = v); _syncProvider(); },
+        ),
+        _FilterLabel('Estado'),
+        _FilterSelect(
+          value: _filterEstado,
+          items: const [
+            ('all', 'Todos'),
+            ('activo', 'Activo'),
+            ('en_revision', 'En revisión'),
+            ('cerrado', 'Cerrado'),
+          ],
+          onChanged: (v) { setState(() => _filterEstado = v); _syncProvider(); },
+        ),
+        SizedBox(
+          width: 220,
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Buscar por nombre, dirección, RUT…',
+              hintStyle: const TextStyle(fontSize: 12.5, color: AppTheme.stone400),
+              prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.stone400),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
+            ),
+            style: const TextStyle(fontSize: 12.5),
+            onChanged: (v) { setState(() => _search = v); _syncProvider(); },
+          ),
+        ),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
@@ -80,71 +148,51 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
         const SizedBox(height: 16),
 
         // ── Filtros ──────────────────────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppTheme.stone200),
-          ),
-          child: Wrap(spacing: 10, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            _FilterLabel('Tipo'),
-            _FilterSelect(
-              value: _filterTipo,
-              items: const [
-                ('all', 'Todos los tipos'),
-                ('zona_peligro', 'Zonas de peligro'),
-                ('reporte', 'Reportes'),
-                ('patente', 'Patentes'),
-                ('centro_acopio', 'Centros de acopio'),
-                ('sede_comunitaria', 'Sedes comunitarias'),
-                ('infraestructura', 'Infraestructura'),
-              ],
-              onChanged: (v) { setState(() => _filterTipo = v); _syncProvider(); },
-            ),
-            _FilterLabel('Sector'),
-            _FilterSelect(
-              value: _filterSector,
-              items: const [
-                ('all', 'Todos'),
-                ('S-2', 'S-2 · Residencial Los Aromos'),
-                ('S-3', 'S-3 · Mixto Los Aromos'),
-                ('S-4', 'S-4 · Equipamiento'),
-                ('S-5', 'S-5 · Vivienda Periférica'),
-                ('Centro', 'Centro Histórico'),
-              ],
-              onChanged: (v) { setState(() => _filterSector = v); _syncProvider(); },
-            ),
-            _FilterLabel('Estado'),
-            _FilterSelect(
-              value: _filterEstado,
-              items: const [
-                ('all', 'Todos'),
-                ('activo', 'Activo'),
-                ('en_revision', 'En revisión'),
-                ('cerrado', 'Cerrado'),
-              ],
-              onChanged: (v) { setState(() => _filterEstado = v); _syncProvider(); },
-            ),
-            SizedBox(
-              width: 220,
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Buscar por nombre, dirección, RUT…',
-                  hintStyle: const TextStyle(fontSize: 12.5, color: AppTheme.stone400),
-                  prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.stone400),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 768;
+            if (!isMobile) {
+              return Column(children: [
+                _buildFilterControls(),
+                const SizedBox(height: 10),
+              ]);
+            }
+            return Column(children: [
+              GestureDetector(
+                onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.stone200),
+                  ),
+                  child: Row(children: [
+                    const Text('FILTROS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF78716C))),
+                    const Spacer(),
+                    Icon(
+                      _filtersExpanded ? Icons.expand_less : Icons.expand_more,
+                      size: 16,
+                      color: const Color(0xFF78716C),
+                    ),
+                  ]),
                 ),
-                style: const TextStyle(fontSize: 12.5),
-                onChanged: (v) { setState(() => _search = v); _syncProvider(); },
               ),
-            ),
-          ]),
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 200),
+                crossFadeState: _filtersExpanded
+                    ? CrossFadeState.showFirst
+                    : CrossFadeState.showSecond,
+                firstChild: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: _buildFilterControls(),
+                ),
+                secondChild: const SizedBox.shrink(),
+              ),
+              const SizedBox(height: 10),
+            ]);
+          },
         ),
-        const SizedBox(height: 10),
 
         // ── Tabla ────────────────────────────────────────────────────────────
         Expanded(

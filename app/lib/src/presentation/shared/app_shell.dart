@@ -469,6 +469,9 @@ class _ExportBtn extends ConsumerWidget {
           transito: ref.read(scrapingFilteredTransitoProvider),
           orgs: ref.read(scrapingFilteredOrgProvider),
         );
+      } else if (location == '/actividades') {
+        final actividades = ref.read(filteredActividadesProvider);
+        bytes = await PdfExportService.generateActividadesReport(actividades, userName);
       } else if (location == '/users') {
         bytes = await PdfExportService.generateUsuariosReport(userName);
       } else {

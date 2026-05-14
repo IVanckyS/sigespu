@@ -11,6 +11,7 @@ import 'actividades_provider.dart';
 import 'widgets/actividad_bottom_sheet.dart';
 import 'widgets/kanban_board.dart';
 import 'widgets/nueva_actividad_sheet.dart';
+import '../shared/date_range_popup.dart';
 
 class ActividadesScreen extends ConsumerStatefulWidget {
   const ActividadesScreen({super.key});
@@ -74,9 +75,11 @@ class _ActividadesToolbar extends ConsumerStatefulWidget {
 
 class _ActividadesToolbarState extends ConsumerState<_ActividadesToolbar> {
   final _searchCtrl = TextEditingController();
+  final _datePopupCtrl = DateRangePopupController(LayerLink());
 
   @override
   void dispose() {
+    _datePopupCtrl.dismiss();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -235,12 +238,23 @@ class _ActividadesToolbarState extends ConsumerState<_ActividadesToolbar> {
           const SizedBox(width: 6),
 
           // Date range filter
-          _DateFilterBtn(
+          _DateChip(
             dateFrom: dateFrom,
             dateTo: dateTo,
-            onChanged: (from, to) {
-              ref.read(actividadesDateFromProvider.notifier).state = from;
-              ref.read(actividadesDateToProvider.notifier).state = to;
+            layerLink: _datePopupCtrl.link,
+            onTap: () => _datePopupCtrl.show(
+              context,
+              initialFrom: dateFrom,
+              initialTo: dateTo,
+              onApply: (from, to) {
+                ref.read(actividadesDateFromProvider.notifier).state = from;
+                ref.read(actividadesDateToProvider.notifier).state = to;
+              },
+            ),
+            onClear: () {
+              _datePopupCtrl.dismiss();
+              ref.read(actividadesDateFromProvider.notifier).state = null;
+              ref.read(actividadesDateToProvider.notifier).state = null;
             },
           ),
           const SizedBox(width: 6),
@@ -525,95 +539,79 @@ class _DeptFilterBtn extends StatelessWidget {
   }
 }
 
-// -- Date range filter ---------------------------------------------------------
+// ── Date chip (anchored popup) ─────────────────────────────────────────────────
 
-class _DateFilterBtn extends StatelessWidget {
+class _DateChip extends StatelessWidget {
   final DateTime? dateFrom;
   final DateTime? dateTo;
-  final void Function(DateTime? from, DateTime? to) onChanged;
+  final LayerLink layerLink;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
 
-  const _DateFilterBtn({
+  const _DateChip({
     required this.dateFrom,
     required this.dateTo,
-    required this.onChanged,
+    required this.layerLink,
+    required this.onTap,
+    required this.onClear,
   });
 
   String _fmt(DateTime d) =>
-      '${d.day.toString().padLeft(2, "0")}/${d.month.toString().padLeft(2, "0")}';
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
     final active = dateFrom != null || dateTo != null;
     String label = 'Fecha';
     if (dateFrom != null && dateTo != null) {
-      label = '${_fmt(dateFrom!)}-${_fmt(dateTo!)}';
+      label = '${_fmt(dateFrom!)}–${_fmt(dateTo!)}';
     } else if (dateFrom != null) {
       label = 'Desde ${_fmt(dateFrom!)}';
     } else if (dateTo != null) {
       label = 'Hasta ${_fmt(dateTo!)}';
     }
 
-    return GestureDetector(
-      onTap: () async {
-        final range = await showDateRangePicker(
-          context: context,
-          firstDate: DateTime(2024),
-          lastDate: DateTime(2027),
-          initialDateRange: dateFrom != null && dateTo != null
-              ? DateTimeRange(start: dateFrom!, end: dateTo!)
-              : null,
-          builder: (ctx, child) => Theme(
-            data: Theme.of(ctx).copyWith(
-              colorScheme: const ColorScheme.light(
-                primary: Color(0xFFEA580C),
-                onPrimary: Colors.white,
-                surface: Colors.white,
-              ),
+    return CompositedTransformTarget(
+      link: layerLink,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFFFFF7ED) : Colors.transparent,
+            border: Border.all(
+              color: active ? const Color(0xFFEA580C) : const Color(0xFFE7E5E4),
+              width: 1.5,
             ),
-            child: child!,
+            borderRadius: BorderRadius.circular(7),
           ),
-        );
-        if (range != null) {
-          onChanged(range.start, range.end);
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? const Color(0xFFFFF7ED) : Colors.transparent,
-          border: Border.all(
-            color:
-                active ? const Color(0xFFEA580C) : const Color(0xFFE7E5E4),
-            width: 1.5,
-          ),
-          borderRadius: BorderRadius.circular(7),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.calendar_today_outlined,
-                size: 12,
-                color: active
-                    ? const Color(0xFFC2410C)
-                    : const Color(0xFF78716C)),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: active
-                    ? const Color(0xFFC2410C)
-                    : const Color(0xFF44403C),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.calendar_today_outlined,
+                  size: 12,
+                  color: active ? const Color(0xFFC2410C) : const Color(0xFF78716C)),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: active ? const Color(0xFFC2410C) : const Color(0xFF44403C),
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(Icons.expand_more,
-                size: 14,
-                color: active
-                    ? const Color(0xFFC2410C)
-                    : const Color(0xFF78716C)),
-          ],
+              if (active) ...[
+                const SizedBox(width: 5),
+                GestureDetector(
+                  onTap: onClear,
+                  child: const Icon(Icons.close, size: 12, color: Color(0xFFC2410C)),
+                ),
+              ] else ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.expand_more, size: 14, color: Color(0xFF78716C)),
+              ],
+            ],
+          ),
         ),
       ),
     );

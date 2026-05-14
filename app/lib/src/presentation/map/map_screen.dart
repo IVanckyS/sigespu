@@ -125,7 +125,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       }
     }
 
-    return Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 768;
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          drawer: isMobile ? const Drawer(child: PanelFiltrosIzquierdo()) : null,
+          body: Row(
       children: [
         // ── Sidebar ──────────────────────────────────────────────────────────
         AnimatedContainer(
@@ -608,7 +614,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
         ),
       ],
-    );
+          ),  // end body Row
+        );    // end Scaffold
+      },      // end LayoutBuilder builder
+    );        // end LayoutBuilder
   }
 
   HeatMapDataSource _buildHeatMapDataSource(List<ElementoMapa> allElems) {

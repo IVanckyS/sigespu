@@ -306,7 +306,7 @@ class _KpiGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(spacing: 12, runSpacing: 12, children: [
+    final cards = [
       _KpiCard(label: 'Reportes este mes', value: '$reportes', accent: AppTheme.orange600,
           icon: Icons.location_on_outlined, trend: '+12% vs mes anterior', trendUp: false),
       _KpiCard(label: 'Zonas de peligro activas', value: '$zonas', accent: AppTheme.redDanger,
@@ -317,7 +317,15 @@ class _KpiGrid extends StatelessWidget {
           icon: Icons.home_outlined, trend: 'Listos para emergencias', trendUp: true),
       _KpiCard(label: 'Sedes comunitarias', value: '$sedes', accent: AppTheme.greenSuccess,
           icon: Icons.people_outline, trend: 'Activas e identificadas', trendUp: true),
-    ]);
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 768) {
+          return Column(children: cards);
+        }
+        return Row(children: cards.map((c) => Expanded(child: c)).toList());
+      },
+    );
   }
 }
 

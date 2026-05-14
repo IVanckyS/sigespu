@@ -9,6 +9,7 @@ import '../presentation/resumen/resumen_screen.dart';
 import '../presentation/tabla/tabla_screen.dart';
 import '../presentation/scraping/scraping_screen.dart';
 import '../presentation/users/users_screen.dart';
+import '../presentation/actividades/actividades_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -55,6 +56,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/users',
             builder: (context, state) => const UsersScreen(),
+          ),
+          GoRoute(
+            path: '/actividades',
+            builder: (context, state) => const ActividadesScreen(),
           ),
         ],
       ),

@@ -1,0 +1,90 @@
+<h2>Diseño — Secciones 2 a 7</h2>
+<p class="subtitle">Resumen de todos los cambios restantes. Confirma o corrígeme.</p>
+
+<div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
+
+  <!-- Sección 2: Mobile -->
+  <div style="background:#fff;border:1.5px solid #e7e5e4;border-radius:10px;padding:14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div style="background:#1e3a8a;color:white;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700">2</div>
+      <div style="font-size:13px;font-weight:700;color:#1c1917">Responsividad Mobile — AppShell adaptativo</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;color:#44403c">
+      <div>
+        <div style="font-weight:600;color:#78716c;margin-bottom:4px">Desktop (≥768px) — sin cambios</div>
+        <div style="line-height:1.6">Header con tabs horizontales, igual que ahora.</div>
+      </div>
+      <div>
+        <div style="font-weight:600;color:#ea580c;margin-bottom:4px">Móvil (&lt;768px) — nuevo</div>
+        <div style="line-height:1.6">
+          • Header simplificado: logo + avatar + logout<br>
+          • <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">BottomNavigationBar</code> fija con 5 ítems: Mapa, Resumen, Tabla, Usuarios, Más (Scraping + Actividades en submenu)<br>
+          • Cada pantalla usa <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">LayoutBuilder</code> para adaptar padding, tamaños de fuente y columnas<br>
+          • Panel izquierdo del mapa se convierte en drawer en móvil
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección 3: Usuarios CRUD -->
+  <div style="background:#fff;border:1.5px solid #e7e5e4;border-radius:10px;padding:14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div style="background:#1e3a8a;color:white;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700">3</div>
+      <div style="font-size:13px;font-weight:700;color:#1c1917">Gestión de Usuarios — CRUD + dos pestañas</div>
+    </div>
+    <div style="font-size:12px;color:#44403c;line-height:1.7">
+      <strong>Tab "Usuarios":</strong> tabla centrada con columnas Nombre · Email · Rol · Estado · Acciones. Botón "Crear usuario" (director only) abre un dialog con campos Email, Nombre, Rol. Acciones por fila: ✏ Editar rol/estado, 🗑 Eliminar (con confirmación). El usuario director no puede editarse ni eliminarse.<br>
+      <strong>Tab "Solicitudes":</strong> vista actual sin cambios. Badge con cantidad pendiente.<br>
+      <strong>Guards:</strong> toda la pantalla solo visible para <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">nivel_acceso == 'director'</code>.
+    </div>
+  </div>
+
+  <!-- Sección 4: Tabla cross-data -->
+  <div style="background:#fff;border:1.5px solid #e7e5e4;border-radius:10px;padding:14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div style="background:#1e3a8a;color:white;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700">4</div>
+      <div style="font-size:13px;font-weight:700;color:#1c1917">Vista Tabla — cruce de datos y porcentajes</div>
+    </div>
+    <div style="font-size:12px;color:#44403c;line-height:1.7">
+      Se agrega una <strong>barra de estadísticas</strong> entre los filtros y la tabla, con chips de porcentaje por tipo (ej. "Zonas peligro 34% · Patentes 28%…") y distribución por sector. Se calculan sobre los resultados filtrados, no el total. Se agregan filtros adicionales: <strong>Registrado por</strong> (usuario) y <strong>Rango de fechas</strong>.
+    </div>
+  </div>
+
+  <!-- Sección 5: Date filter Actividades -->
+  <div style="background:#fff;border:1.5px solid #e7e5e4;border-radius:10px;padding:14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div style="background:#1e3a8a;color:white;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700">5</div>
+      <div style="font-size:13px;font-weight:700;color:#1c1917">Actividades — filtro de fecha compacto</div>
+    </div>
+    <div style="font-size:12px;color:#44403c;line-height:1.7">
+      Reemplaza <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">showDateRangePicker</code> (pantalla completa) por un <strong>overlay popup personalizado</strong> anclado al botón "Fecha" con <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">CompositedTransformFollower</code>. Contiene: inputs Desde/Hasta + <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">TableCalendar</code> o un <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">CalendarDatePicker</code> mini. Máx. 340×300px. Botones Limpiar y Aplicar.
+    </div>
+  </div>
+
+  <!-- Sección 6: Animaciones -->
+  <div style="background:#fff;border:1.5px solid #e7e5e4;border-radius:10px;padding:14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div style="background:#1e3a8a;color:white;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700">6</div>
+      <div style="font-size:13px;font-weight:700;color:#1c1917">Animaciones en botones</div>
+    </div>
+    <div style="font-size:12px;color:#44403c;line-height:1.7">
+      Todos los botones tipo <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">GestureDetector + Container</code> que no tienen feedback visual se reemplazan o envuelven con <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">InkWell</code> (ripple) o <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">AnimatedScale</code> (press shrink: scale 0.95 en 80ms). Aplica a: toolbar de Actividades, filtros del Mapa, botones del panel izquierdo, tabs del header, botones de Tabla y Usuarios. Los <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">ElevatedButton</code> ya tienen ripple nativo — se mantienen.
+    </div>
+  </div>
+
+  <!-- Sección 7: PDF Actividades -->
+  <div style="background:#fff;border:1.5px solid #e7e5e4;border-radius:10px;padding:14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div style="background:#1e3a8a;color:white;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700">7</div>
+      <div style="font-size:13px;font-weight:700;color:#1c1917">Actividades — PDF export con datos reales</div>
+    </div>
+    <div style="font-size:12px;color:#44403c;line-height:1.7">
+      El botón "Exportar PDF" del AppShell en la ruta <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">/actividades</code> actualmente no tiene implementación específica. Se agrega <code style="background:#f5f5f4;padding:1px 3px;border-radius:3px;font-size:10px">PdfExportService.generateActividadesReport()</code> que incluye: resumen de estado (total, completadas %, en curso), tabla de actividades filtradas con columnas Título · Tipo · Sector · Fecha · Estado · Responsable, y estadísticas por sector.
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:16px;padding:12px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;font-size:13px;color:#15803d;font-weight:600">
+  ✅ ¿Todo correcto? Responde en el terminal para continuar con el spec.
+</div>

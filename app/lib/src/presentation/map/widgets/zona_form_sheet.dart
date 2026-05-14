@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:uuid/uuid.dart';
 import '../../../config/theme.dart';
 import '../../../data/seed_data.dart';
 import '../../../presentation/auth/auth_provider.dart';
 import '../layers/custom_markers.dart';
 import '../providers/map_providers.dart';
+import '../../../data/sync/sync_provider.dart';
 
 class ZonaFormSheet extends ConsumerStatefulWidget {
   final List<LatLng> points;
@@ -85,7 +87,7 @@ class _ZonaFormSheetState extends ConsumerState<ZonaFormSheet> {
     final centroid = _centroid;
 
     final zona = ElementoMapa(
-      id: 'user-${DateTime.now().millisecondsSinceEpoch}',
+      id: const Uuid().v4(),
       tipo: _mapCatToTipo(_categoria),
       nombre: _nombreCtrl.text.trim(),
       direccion: 'Coordenadas: ${centroid.latitude.toStringAsFixed(4)}, ${centroid.longitude.toStringAsFixed(4)}',
@@ -104,6 +106,23 @@ class _ZonaFormSheetState extends ConsumerState<ZonaFormSheet> {
 
     ref.read(userElementsProvider.notifier).update((s) => [...s, zona]);
     ref.read(userPolygonsProvider.notifier).update((s) => [...s, (points: widget.points, zona: zona)]);
+    ref.read(userElementsProvider.notifier).savePolygonData(widget.points, zona);
+
+    // Encolar para sync con el backend
+    ref.read(syncServiceProvider).queueForSync(
+      entidad: 'zona_peligro',
+      accion: 'create',
+      entidadId: zona.id,
+      payload: {
+        'id': zona.id,
+        'nombre': zona.nombre,
+        'descripcion': zona.notas,
+        'nivel': zona.nivel,
+        'tipoPeligro': zona.tipoPeligro,
+        'horario': zona.horario,
+        'puntos': widget.points.map((p) => {'lat': p.latitude, 'lng': p.longitude}).toList(),
+      },
+    );
 
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(

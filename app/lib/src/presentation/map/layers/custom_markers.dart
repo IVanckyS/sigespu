@@ -72,25 +72,36 @@ class CustomMarkers {
 
   static IconData getIconForTipo(String tipo) {
     switch (tipo) {
-      case 'centro_acopio': return LucideIcons.store;
-      case 'sede_comunitaria': return LucideIcons.home;
-      case 'infraestructura': return LucideIcons.building;
-      case 'reporte_robo': return LucideIcons.alertTriangle;
-      case 'reporte_vandalismo': return LucideIcons.alertCircle;
-      case 'reporte_accidente': return LucideIcons.car;
-      case 'zona_peligro': return LucideIcons.shieldAlert;
-      case 'patente': return LucideIcons.briefcase;
-      case 'luminaria': return LucideIcons.lightbulb;
-      case 'camara_cctv': return LucideIcons.camera;
-      case 'arbol_caido': return LucideIcons.treePine;
-      case 'poste_caido': return LucideIcons.zap;
-      case 'sector_sin_luz': return LucideIcons.moon;
-      case 'cable_colgando': return LucideIcons.link;
-      case 'semaforo_dañado': return LucideIcons.alertOctagon;
-      case 'socavon': return LucideIcons.triangle;
-      case 'fuga_agua': return LucideIcons.droplet;
-      case 'microbasural': return LucideIcons.trash2;
-      default: return LucideIcons.mapPin;
+      // Infraestructura comunitaria
+      case 'centro_acopio':      return LucideIcons.home;
+      case 'sede_comunitaria':   return LucideIcons.users;
+      case 'infraestructura':    return LucideIcons.building;
+      // Seguridad pública
+      case 'zona_peligro':       return LucideIcons.shieldAlert;
+      case 'reporte_robo':       return LucideIcons.alertTriangle;
+      case 'reporte_vandalismo': return LucideIcons.flaskConical;
+      case 'reporte_accidente':  return LucideIcons.car;
+      // Incidentes urbanos
+      case 'arbol_caido':        return LucideIcons.treePine;
+      case 'poste_caido':        return LucideIcons.zap;
+      case 'sector_sin_luz':     return LucideIcons.moon;
+      case 'cable_colgando':     return LucideIcons.link;
+      case 'semaforo_dañado':    return LucideIcons.alertOctagon;
+      case 'socavon':            return LucideIcons.triangle;
+      case 'fuga_agua':          return LucideIcons.droplet;
+      case 'microbasural':       return LucideIcons.trash2;
+      // Cobertura y fiscalización
+      case 'patente':            return LucideIcons.bookmark;
+      case 'luminaria':          return LucideIcons.lightbulb;
+      case 'camara_cctv':        return LucideIcons.video;
+      // Capas del sistema (sin marcador propio)
+      case 'reporte':            return LucideIcons.alertTriangle;
+      case 'plan_regulador':     return LucideIcons.map;
+      case 'zona_tsunami':       return LucideIcons.waves;
+      case 'zona_incendio':      return LucideIcons.flame;
+      default:
+        if (tipo.startsWith('reporte_')) return LucideIcons.alertTriangle;
+        return LucideIcons.mapPin;
     }
   }
 

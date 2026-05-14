@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:uuid/uuid.dart';
 import '../../../config/constants.dart';
 import '../../../config/map_config.dart';
 import '../../../config/theme.dart';
@@ -581,13 +585,13 @@ class _AddElementModalState extends ConsumerState<AddElementModal> {
 
   // ── Guardar elemento ───────────────────────────────────────────────────────
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = ref.read(authProvider);
     final tipo = _selectedType!;
 
     final nuevo = ElementoMapa(
-      id: 'user-${DateTime.now().millisecondsSinceEpoch}',
+      id: const Uuid().v4(),
       tipo: tipo,
       nombre: _nombreCtrl.text.trim(),
       direccion: _direccionCtrl.text.trim(),
@@ -613,11 +617,51 @@ class _AddElementModalState extends ConsumerState<AddElementModal> {
     );
 
     ref.read(userElementsProvider.notifier).update((s) => [...s, nuevo]);
+
+    // POST directo al backend (sin pasar por la cola Drift)
+    bool sincronizado = false;
+    try {
+      final storage = ref.read(secureStorageProvider);
+      final token = await storage.read(key: 'access_token');
+      final resp = await http.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/api/elementos'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'id': nuevo.id,
+          'tipo': nuevo.tipo,
+          'nombre': nuevo.nombre,
+          'direccion': nuevo.direccion,
+          'lat': nuevo.lat,
+          'lng': nuevo.lng,
+          'estado': nuevo.estado,
+          'descripcion': nuevo.notas,
+          'metadata': {
+            'capacidad': nuevo.capacidad,
+            'rut': nuevo.rut,
+            'giro': nuevo.giro,
+            'tipoPeligro': nuevo.tipoPeligro,
+            'nivel': nuevo.nivel,
+            'horario': nuevo.horario,
+            'sector': nuevo.sector,
+          },
+        }),
+      ).timeout(const Duration(seconds: 8));
+      sincronizado = resp.statusCode == 200 || resp.statusCode == 201;
+    } catch (_) {
+      sincronizado = false;
+    }
+
+    if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${_nombreParaTipoExtended(nuevo.tipo)} registrado'),
-        backgroundColor: AppTheme.greenSuccess,
+        content: Text(sincronizado
+            ? '${_nombreParaTipoExtended(nuevo.tipo)} guardado en base de datos'
+            : '${_nombreParaTipoExtended(nuevo.tipo)} guardado localmente'),
+        backgroundColor: sincronizado ? AppTheme.greenSuccess : AppTheme.amberWarning,
       ),
     );
   }

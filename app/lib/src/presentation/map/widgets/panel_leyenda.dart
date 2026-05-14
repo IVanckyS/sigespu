@@ -43,7 +43,7 @@ class PanelLeyenda extends ConsumerWidget {
 
     capasAsync.whenData((capas) {
       for (final c in capas) {
-        if (customVisible[c.id] ?? c.visible) {
+        if (customVisible[c.id] ?? false) {
           final colorVal =
               int.tryParse(c.color.replaceFirst('#', '0xFF')) ?? 0xFFFF5722;
           items.add(_LegendDot(

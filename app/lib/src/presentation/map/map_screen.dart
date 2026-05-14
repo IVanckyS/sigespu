@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map_heatmap/flutter_map_heatmap.dart';
@@ -24,6 +25,8 @@ import 'widgets/panel_imprimir.dart';
 import 'screens/subir_capa_screen.dart';
 import 'providers/map_providers.dart';
 import 'providers/visor_provider.dart';
+import '../actividades/widgets/cobertura_panel.dart';
+import 'providers/amenazas_provider.dart';
 import '../auth/auth_provider.dart';
 
 // planReguladorMarkersProvider queda aquí: crea UI (PlanReguladorSheet) → evita dep circular
@@ -66,6 +69,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final mapCtrl = ref.watch(mapControllerProvider);
 
     final userElements = ref.watch(userElementsProvider);
+    final actividadesElems = activeLayers.contains('actividad_municipal')
+        ? ref.watch(actividadesLayerElementsProvider)
+        : <ElementoMapa>[];
+
     final List<Marker> markers = elementos.map((e) {
       final isPending = userElements.any((u) => u.id == e.id);
       return CustomMarkers.buildMarker(
@@ -82,14 +89,26 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       );
     }).toList();
 
-    // Reportes guardados localmente
-    if (activeLayers.contains('reporte')) {
+    // Actividades municipales
+    for (final e in actividadesElems) {
+      markers.add(CustomMarkers.buildMarker(
+        point: e.latLng,
+        icon: CustomMarkers.getIconForTipo('actividad_municipal'),
+        color: const Color(0xFF7C3AED),
+        isPending: false,
+      ));
+    }
+
+    // Reportes guardados localmente (filtrar por tipo específico activo)
+    if (activeLayers.any((k) => k.startsWith('reporte_'))) {
       reportesAsync.whenData((reportes) {
         for (final r in reportes) {
+          final key = 'reporte_${r.tipo}';
+          if (!activeLayers.contains(key)) continue;
           markers.add(CustomMarkers.buildMarker(
             point: LatLng(r.lat, r.lng),
-            icon: CustomMarkers.getIconForTipo('reporte_${r.tipo}'),
-            color: CustomMarkers.getColorForTipo('reporte_${r.tipo}'),
+            icon: CustomMarkers.getIconForTipo(key),
+            color: CustomMarkers.getColorForTipo(key),
             isPending: true,
           ));
         }
@@ -114,6 +133,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           child: collapsed
               ? const SizedBox.shrink()
               : _MapSidebar(activeLayers: activeLayers, ref: ref),
+        ),
+
+        // ── Botón toggle siempre visible en el borde ──────────────────────
+        _SidebarToggleBtn(
+          collapsed: collapsed,
+          onTap: () => ref.read(sidebarCollapsedProvider.notifier).state = !collapsed,
         ),
 
         // ── Mapa ─────────────────────────────────────────────────────────────
@@ -178,6 +203,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           urlTemplate: url,
                           subdomains: subs,
                           userAgentPackageName: 'cl.lota.sigespu',
+                          tileProvider: CancellableNetworkTileProvider(),
                         );
                       },
                     ),
@@ -202,6 +228,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         markers: ref.watch(planReguladorMarkersProvider),
                       ),
                     ],
+                    if (activeLayers.contains('zona_tsunami')) ...[
+                      PolygonLayer(polygons: ref.watch(tsunamiZonaPolygonsProvider)),
+                      PolylineLayer(polylines: ref.watch(tsunamiLimitePolylinesProvider)),
+                      PolylineLayer(polylines: ref.watch(tsunamiViasPolylinesProvider)),
+                      MarkerLayer(markers: ref.watch(tsunamiPuntosMarkersProvider)),
+                    ],
+                    if (activeLayers.contains('zona_incendio'))
+                      PolygonLayer(polygons: ref.watch(incendioPolygonsProvider)),
                     if (isDrawing && drawingPoints.length >= 3)
                       PolygonLayer(polygons: [
                         Polygon(
@@ -209,6 +243,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           color: AppTheme.redDanger.withValues(alpha: 0.25),
                           borderColor: AppTheme.redDanger,
                           borderStrokeWidth: 2,
+                          isFilled: true,
                         ),
                       ]),
                     if (filteredUserPolygons.isNotEmpty)
@@ -220,6 +255,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             color: color.withValues(alpha: 0.2),
                             borderColor: color,
                             borderStrokeWidth: 2,
+                            isFilled: true,
                           );
                         }).toList(),
                       ),
@@ -280,7 +316,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         return capasAsync.when(
                           data: (capas) {
                             final visibleCapas =
-                                capas.where((c) => customVisible[c.id] ?? c.visible).toList();
+                                capas.where((c) => customVisible[c.id] ?? false).toList();
                             if (visibleCapas.isEmpty) return const SizedBox.shrink();
                             return Stack(
                               children: visibleCapas.map((capa) {
@@ -424,16 +460,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
               ),
 
-              // Toggle sidebar btn
-              Positioned(
-                top: 16,
-                left: collapsed ? 16 : 244,
-                child: _SidebarToggleBtn(
-                  collapsed: collapsed,
-                  onTap: () => ref.read(sidebarCollapsedProvider.notifier).state = !collapsed,
-                ),
-              ),
-
               // Draw hint panel
               if (isDrawing)
                 Positioned(
@@ -455,7 +481,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               if (!isDrawing)
                 Positioned(
                   top: 16,
-                  left: collapsed ? 64 : 16,
+                  left: 16,
                   child: Consumer(
                     builder: (ctx, r, _) {
                       final coords = r.watch(mapCenterCoordsProvider);
@@ -705,33 +731,56 @@ class _MapSidebar extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Branding Header
+          // Branding Header — SIGESPU acronym breakdown
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             decoration: const BoxDecoration(
-              color: AppTheme.stone900,
-              border: Border(bottom: BorderSide(color: Colors.white10)),
+              color: Color(0xFFFFF7ED),
+              border: Border(
+                bottom: BorderSide(color: Color(0xFFFED7AA)),
+                left: BorderSide(color: AppTheme.orange600, width: 4),
+              ),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'SIGESPU LOTA',
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.orange600,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text('SIGESPU', style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    )),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Lota, Biobío', style: TextStyle(
+                    color: AppTheme.orange700,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  )),
+                ]),
+                const SizedBox(height: 5),
+                const Text(
+                  'Sistema de Información Geoespacial\nde Seguridad Pública',
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.2,
+                    color: AppTheme.stone700,
+                    fontSize: 10.5,
+                    height: 1.4,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                SizedBox(height: 3),
-                Text(
-                  'I. MUNICIPALIDAD DE LOTA',
+                const SizedBox(height: 3),
+                const Text(
+                  'Dirección de Seguridad Pública',
                   style: TextStyle(
-                    fontSize: 9,
                     color: AppTheme.stone500,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.8,
+                    fontSize: 9.5,
                   ),
                 ),
               ],
@@ -796,29 +845,6 @@ class _MapSidebar extends StatelessWidget {
 
                 const Divider(height: 1, color: AppTheme.stone100),
 
-                // Filtros de Zonas dibujadas
-                const _SectionHeader('Categorías de Zonas', null),
-                ...(() {
-                  final activeCats = ref.watch(activeZoneCategoriesProvider);
-                  const cats = MapLayerConfig.zoneCategories;
-                  return cats.map((c) {
-                    final (name, color) = c;
-                    final isActive = activeCats.contains(name);
-                    return _ZoneCatToggle(
-                      name: name,
-                      color: color,
-                      isActive: isActive,
-                      onTap: () {
-                        final next = Set<String>.from(activeCats);
-                        isActive ? next.remove(name) : next.add(name);
-                        ref.read(activeZoneCategoriesProvider.notifier).state = next;
-                      },
-                    );
-                  });
-                })(),
-
-                const Divider(height: 1, color: AppTheme.stone100),
-
                 // Mapa de calor
                 const _SectionHeader('Mapa de calor', null),
                 Padding(
@@ -876,6 +902,12 @@ class _MapSidebar extends StatelessWidget {
                     onChanged: (v) { if (v != null) ref.read(dateRangeProvider.notifier).state = v; },
                   ),
                 ),
+
+                // Cobertura de actividades (visible cuando la capa está activa)
+                if (activeLayers.contains('actividad_municipal')) ...[
+                  const Divider(height: 1, color: AppTheme.stone100),
+                  const CoberturaPanel(),
+                ],
               ],
             ),
           ),
@@ -924,24 +956,49 @@ class _LayerToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         color: isActive ? AppTheme.orange50 : Colors.transparent,
         child: Row(children: [
+          // Icon box — mismo estilo que el modal de agregar elemento
           Container(
             width: 28, height: 28,
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
-            child: Icon(Icons.circle, size: 10, color: color),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              CustomMarkers.getIconForTipo(layerKey),
+              size: 14,
+              color: color,
+            ),
           ),
           const SizedBox(width: 10),
-          Expanded(child: Text(name, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppTheme.stone800))),
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: isActive ? AppTheme.stone900 : AppTheme.stone700,
+              ),
+            ),
+          ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
             decoration: BoxDecoration(
               color: isActive ? const Color(0xFFFED7AA) : AppTheme.stone100,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text('$count', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: isActive ? AppTheme.orange700 : AppTheme.stone500)),
+            child: Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: isActive ? AppTheme.orange700 : AppTheme.stone500,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
           SizedBox(
@@ -970,17 +1027,33 @@ class _SidebarToggleBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 36, height: 36,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.stone200),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2)],
-        ),
-        child: Icon(
-          collapsed ? Icons.chevron_right : Icons.chevron_left,
-          size: 20, color: AppTheme.stone700,
+      child: Tooltip(
+        message: collapsed ? 'Abrir panel de capas' : 'Cerrar panel de capas',
+        child: Container(
+          width: 20,
+          height: double.infinity,
+          constraints: const BoxConstraints(minHeight: 60),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: const Border(
+              right: BorderSide(color: AppTheme.stone200),
+              left: BorderSide(color: AppTheme.stone200),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 4,
+                offset: const Offset(2, 0),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Icon(
+              collapsed ? Icons.chevron_right : Icons.chevron_left,
+              size: 16,
+              color: AppTheme.stone500,
+            ),
+          ),
         ),
       ),
     );
@@ -1082,45 +1155,6 @@ class _LegendPanel extends StatelessWidget {
             );
           }),
         ],
-      ),
-    );
-  }
-}
-
-class _ZoneCatToggle extends StatelessWidget {
-  final String name;
-  final Color color;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _ZoneCatToggle({
-    required this.name,
-    required this.color,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        child: Row(children: [
-          Checkbox(
-            value: isActive,
-            onChanged: (_) => onTap(),
-            activeColor: AppTheme.orange600,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            visualDensity: VisualDensity.compact,
-          ),
-          Container(
-            width: 8, height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 8),
-          Text(name, style: const TextStyle(fontSize: 12, color: AppTheme.stone700)),
-        ]),
       ),
     );
   }

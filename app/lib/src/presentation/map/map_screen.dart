@@ -22,6 +22,7 @@ import 'widgets/panel_capas.dart';
 import 'widgets/panel_mapa_base.dart';
 import 'widgets/panel_leyenda.dart';
 import 'widgets/panel_imprimir.dart';
+import 'widgets/panel_filtros_izquierdo.dart';
 import 'screens/subir_capa_screen.dart';
 import 'providers/map_providers.dart';
 import 'providers/visor_provider.dart';
@@ -145,6 +146,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         Expanded(
           child: Stack(
             children: [
+              // Left panel (desktop only)
+              Builder(
+                builder: (context) {
+                  final width = MediaQuery.of(context).size.width;
+                  if (width < 768) return const SizedBox.shrink();
+                  return const Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: PanelFiltrosIzquierdo(),
+                  );
+                },
+              ),
+
               RepaintBoundary(
                 key: _mapKey,
                 child: FlutterMap(
@@ -164,7 +179,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         ref.read(mapCenterCoordsProvider.notifier).state =
                             (c.latitude, c.longitude);
                       }
-                      
+
                       // Actualizar límites para filtrado espacial (lazy loading)
                       final bounds = camera.bounds;
                       if (bounds != null) {
@@ -174,7 +189,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           bounds.east,
                           bounds.north
                         ];
-                        
+
                         // Solo actualizamos si el cambio es significativo (ej. > 0.005 grados)
                         final current = ref.read(mapBoundsProvider);
                         bool significant = current == null;
@@ -186,7 +201,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             }
                           }
                         }
-                        
+
                         if (significant) {
                           ref.read(mapBoundsProvider.notifier).state = next;
                         }

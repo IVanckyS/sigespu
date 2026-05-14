@@ -29,13 +29,6 @@ class BarraVisor extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _VisorBtn(
-            icon: Icons.list_alt,
-            color: const Color(0xFF00897B),
-            label: 'Capas',
-            active: activePanel == VisorPanel.capas,
-            onTap: () => _toggle(ref, VisorPanel.capas),
-          ),
-          _VisorBtn(
             icon: Icons.map_outlined,
             color: AppTheme.orange600,
             label: 'Mapa base',

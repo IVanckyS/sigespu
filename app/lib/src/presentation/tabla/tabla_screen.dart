@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../config/theme.dart';
 import '../../data/seed_data.dart';
 import '../map/providers/map_providers.dart';
+import '../shared/date_range_popup.dart';
 
 class TablaScreen extends ConsumerStatefulWidget {
   const TablaScreen({super.key});
@@ -16,10 +17,20 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
   String _filterTipo = 'all';
   String _filterSector = 'all';
   String _filterEstado = 'all';
+  String _filterBy = 'all';
+  DateTime? _filterDateFrom;
+  DateTime? _filterDateTo;
   String _search = '';
   String _sortCol = 'fecha';
   bool _sortAsc = false;
   bool _filtersExpanded = true;
+  final _datePopupCtrl = DateRangePopupController(LayerLink());
+
+  @override
+  void dispose() {
+    _datePopupCtrl.dismiss();
+    super.dispose();
+  }
 
   List<ElementoMapa> get _filtered {
     final list = kElementosSeed.where((e) {
@@ -32,6 +43,27 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
             !e.direccion.toLowerCase().contains(q) &&
             !(e.rut?.toLowerCase().contains(q) ?? false)) {
           return false;
+        }
+      }
+      if (_filterBy != 'all') {
+        final byLower = e.by.toLowerCase();
+        bool match = false;
+        switch (_filterBy) {
+          case 'dir_seg': match = byLower.contains('seguridad pública'); break;
+          case 'dideco': match = byLower.contains('dideco'); break;
+          case 'scraping': match = byLower.contains('scraping'); break;
+          case 'sepulveda': match = byLower.contains('sepúlveda'); break;
+          case 'munoz': match = byLower.contains('muñoz'); break;
+          case 'castro': match = byLower.contains('castro'); break;
+          case 'historico': match = byLower.contains('histórico'); break;
+        }
+        if (!match) return false;
+      }
+      if (_filterDateFrom != null || _filterDateTo != null) {
+        final d = DateTime.tryParse(e.fecha);
+        if (d != null) {
+          if (_filterDateFrom != null && d.isBefore(_filterDateFrom!)) return false;
+          if (_filterDateTo != null && d.isAfter(_filterDateTo!.add(const Duration(days: 1)))) return false;
         }
       }
       return true;
@@ -69,7 +101,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
     ref.read(tablaFilteredProvider.notifier).state = _filtered;
   }
 
-  Widget _buildFilterControls() {
+  Widget _buildFilterControls(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -78,7 +110,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
         border: Border.all(color: AppTheme.stone200),
       ),
       child: Wrap(spacing: 10, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        _FilterLabel('Tipo'),
+        const _FilterLabel('Tipo'),
         _FilterSelect(
           value: _filterTipo,
           items: const [
@@ -92,7 +124,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
           ],
           onChanged: (v) { setState(() => _filterTipo = v); _syncProvider(); },
         ),
-        _FilterLabel('Sector'),
+        const _FilterLabel('Sector'),
         _FilterSelect(
           value: _filterSector,
           items: const [
@@ -105,7 +137,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
           ],
           onChanged: (v) { setState(() => _filterSector = v); _syncProvider(); },
         ),
-        _FilterLabel('Estado'),
+        const _FilterLabel('Estado'),
         _FilterSelect(
           value: _filterEstado,
           items: const [
@@ -115,6 +147,39 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
             ('cerrado', 'Cerrado'),
           ],
           onChanged: (v) { setState(() => _filterEstado = v); _syncProvider(); },
+        ),
+        const _FilterLabel('Por'),
+        _FilterSelect(
+          value: _filterBy,
+          items: const [
+            ('all', 'Todos'),
+            ('dir_seg', 'Dir. Seg. Pública'),
+            ('dideco', 'DIDECO'),
+            ('scraping', 'Scraping'),
+            ('sepulveda', 'R. Sepúlveda'),
+            ('munoz', 'C. Muñoz'),
+            ('castro', 'P. Castro'),
+            ('historico', 'Reg. histórico'),
+          ],
+          onChanged: (v) { setState(() => _filterBy = v); _syncProvider(); },
+        ),
+        _FilterDateChip(
+          from: _filterDateFrom,
+          to: _filterDateTo,
+          layerLink: _datePopupCtrl.link,
+          onTap: () => _datePopupCtrl.show(
+            context,
+            initialFrom: _filterDateFrom,
+            initialTo: _filterDateTo,
+            onApply: (f, t) {
+              setState(() { _filterDateFrom = f; _filterDateTo = t; });
+              _syncProvider();
+            },
+          ),
+          onClear: () {
+            setState(() { _filterDateFrom = null; _filterDateTo = null; });
+            _syncProvider();
+          },
         ),
         SizedBox(
           width: 220,
@@ -153,7 +218,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
             final isMobile = constraints.maxWidth < 768;
             if (!isMobile) {
               return Column(children: [
-                _buildFilterControls(),
+                _buildFilterControls(context),
                 const SizedBox(height: 10),
               ]);
             }
@@ -185,7 +250,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
                     : CrossFadeState.showSecond,
                 firstChild: Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: _buildFilterControls(),
+                  child: _buildFilterControls(context),
                 ),
                 secondChild: const SizedBox.shrink(),
               ),
@@ -193,6 +258,10 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
             ]);
           },
         ),
+
+        // ── Stats bar ────────────────────────────────────────────────────────
+        _StatsBar(elements: filtered),
+        const SizedBox(height: 8),
 
         // ── Tabla ────────────────────────────────────────────────────────────
         Expanded(
@@ -344,10 +413,10 @@ class _TablaBanner extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
-                    const Icon(Icons.grid_on_outlined, size: 12, color: Color(0x80FFFFFF)),
-                    const SizedBox(width: 6),
-                    const Text(
+                  const Row(children: [
+                    Icon(Icons.grid_on_outlined, size: 12, color: Color(0x80FFFFFF)),
+                    SizedBox(width: 6),
+                    Text(
                       'Vista · Registro de elementos',
                       style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0x80FFFFFF), letterSpacing: 0.9),
                     ),
@@ -464,6 +533,126 @@ class _FilterSelect extends StatelessWidget {
           return DropdownMenuItem(value: val, child: Text(label));
         }).toList(),
         onChanged: (v) { if (v != null) onChanged(v); },
+      ),
+    );
+  }
+}
+
+// ── StatsBar ──────────────────────────────────────────────────────────────────
+
+class _StatsBar extends StatelessWidget {
+  final List<ElementoMapa> elements;
+  const _StatsBar({required this.elements});
+
+  @override
+  Widget build(BuildContext context) {
+    if (elements.isEmpty) {
+      return const _StatPill(count: 0, label: 'Sin resultados', color: AppTheme.stone400);
+    }
+    final zonas = elements.where((e) => e.tipo == 'zona_peligro').length;
+    final reportes = elements.where((e) => e.tipo == 'reporte').length;
+    final patentes = elements.where((e) => e.tipo == 'patente').length;
+    final infra = elements.where((e) => const ['centro_acopio', 'sede_comunitaria', 'infraestructura'].contains(e.tipo)).length;
+    final otros = elements.length - zonas - reportes - patentes - infra;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(children: [
+        _StatPill(count: elements.length, label: 'Total', color: AppTheme.stone600),
+        if (zonas > 0) ...[const SizedBox(width: 6), _StatPill(count: zonas, label: 'Zonas peligro', color: AppTheme.redDanger)],
+        if (reportes > 0) ...[const SizedBox(width: 6), _StatPill(count: reportes, label: 'Reportes', color: const Color(0xFFEF4444))],
+        if (patentes > 0) ...[const SizedBox(width: 6), _StatPill(count: patentes, label: 'Patentes', color: AppTheme.amberWarning)],
+        if (infra > 0) ...[const SizedBox(width: 6), _StatPill(count: infra, label: 'Infraestructura', color: const Color(0xFF16A34A))],
+        if (otros > 0) ...[const SizedBox(width: 6), _StatPill(count: otros, label: 'Otros', color: AppTheme.stone400)],
+      ]),
+    );
+  }
+}
+
+class _StatPill extends StatelessWidget {
+  final int count;
+  final String label;
+  final Color color;
+  const _StatPill({required this.count, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 11, color: color.withValues(alpha: 0.8))),
+      ]),
+    );
+  }
+}
+
+// ── FilterDateChip ────────────────────────────────────────────────────────────
+
+class _FilterDateChip extends StatelessWidget {
+  final DateTime? from;
+  final DateTime? to;
+  final LayerLink layerLink;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  const _FilterDateChip({
+    required this.from,
+    required this.to,
+    required this.layerLink,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  String get _label {
+    if (from == null && to == null) return 'Fecha';
+    String fmt(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    final f = from != null ? fmt(from!) : '…';
+    final t = to != null ? fmt(to!) : '…';
+    return '$f – $t';
+  }
+
+  bool get _active => from != null || to != null;
+
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: layerLink,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: _active ? AppTheme.orange50 : Colors.white,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: _active ? AppTheme.orange600 : AppTheme.stone200),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.calendar_today_outlined, size: 13,
+                color: _active ? AppTheme.orange600 : AppTheme.stone500),
+            const SizedBox(width: 5),
+            Text(_label, style: TextStyle(
+                fontSize: 12.5,
+                color: _active ? AppTheme.orange700 : AppTheme.stone700)),
+            if (_active) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: onClear,
+                child: const Icon(Icons.close, size: 13, color: AppTheme.orange600),
+              ),
+            ],
+          ]),
+        ),
       ),
     );
   }

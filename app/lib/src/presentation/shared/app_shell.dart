@@ -42,77 +42,100 @@ class AppShell extends ConsumerWidget {
         ? userName.trim().split(' ').take(2).map((w) => w[0].toUpperCase()).join()
         : 'US';
 
-    return Scaffold(
-      backgroundColor: AppTheme.stone50,
-      body: Column(
-        children: [
-          // ── Header ──────────────────────────────────────────────────────────
-          Container(
-            height: 60,
-            color: Colors.white,
-            child: Column(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        // Brand
-                        _BrandLogo(),
-                        const SizedBox(width: 24),
-                        // Mode switcher
-                        _ModeSwitcher(location: location),
-                        const Spacer(),
-                        // Connectivity badge
-                        _ConnBadge(isOnline: isOnline),
-                        const SizedBox(width: 10),
-                        // Export PDF
-                        _ExportBtn(),
-                        const SizedBox(width: 10),
-                        // User chip
-                        _UserChip(name: userName, role: userRole, initials: initials),
-                        const SizedBox(width: 6),
-                        // Logout
-                        IconButton(
-                          onPressed: () => ref.read(authProvider.notifier).logout(),
-                          icon: const Icon(Icons.logout, size: 18, color: AppTheme.stone500),
-                          tooltip: 'Cerrar sesión',
-                          style: IconButton.styleFrom(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 768;
+
+        return Scaffold(
+          backgroundColor: AppTheme.stone50,
+          bottomNavigationBar: isMobile
+              ? _BottomNav(location: location, role: userRole)
+              : null,
+          body: Column(
+            children: [
+              _buildHeader(
+                isMobile, location, isOnline,
+                userName, userRole, initials, ref,
+              ),
+              // ── Offline banner ─────────────────────────────────────────────
+              if (!isOnline)
+                Container(
+                  color: const Color(0xFFFEF3C7),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.wifi_off, size: 14, color: Color(0xFFD97706)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Modo sin conexión activo — Los cambios se guardan localmente y se sincronizarán al recuperar conexión.',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFFD97706)),
                         ),
-                        const SizedBox(width: 4),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                Container(height: 1, color: AppTheme.stone200),
-              ],
-            ),
+              // ── Banner solicitar acceso (solo visitante) ───────────────────
+              if (userRole == 'visitante') const _SolicitarAccesoBanner(),
+              // ── Content ───────────────────────────────────────────────────
+              Expanded(child: child),
+            ],
           ),
-          // ── Offline banner ───────────────────────────────────────────────────
-          if (!isOnline)
-            Container(
-              color: const Color(0xFFFEF3C7),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader(
+    bool isMobile,
+    String location,
+    bool isOnline,
+    String userName,
+    String userRole,
+    String initials,
+    WidgetRef ref,
+  ) {
+    return Container(
+      height: 60,
+      color: Colors.white,
+      child: Column(
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  const Icon(Icons.wifi_off, size: 14, color: Color(0xFFD97706)),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Modo sin conexión activo — Los cambios se guardan localmente y se sincronizarán al recuperar conexión.',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFFD97706)),
+                  _BrandLogo(compact: isMobile),
+                  if (!isMobile) ...[
+                    const SizedBox(width: 24),
+                    Flexible(child: _ModeSwitcher(location: location)),
+                  ],
+                  const Spacer(),
+                  if (!isMobile) _ConnBadge(isOnline: isOnline),
+                  if (!isMobile) const SizedBox(width: 10),
+                  if (!isMobile) const _ExportBtn(),
+                  if (!isMobile) const SizedBox(width: 10),
+                  _UserChip(
+                    name: userName,
+                    role: userRole,
+                    initials: initials,
+                    compact: isMobile,
+                  ),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    onPressed: () => ref.read(authProvider.notifier).logout(),
+                    icon: const Icon(Icons.logout, size: 18, color: AppTheme.stone500),
+                    tooltip: 'Cerrar sesión',
+                    style: IconButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                     ),
                   ),
+                  const SizedBox(width: 4),
                 ],
               ),
             ),
-          // ── Banner solicitar acceso (solo visitante) ───────────────────────
-          if (userRole == 'visitante')
-            _SolicitarAccesoBanner(),
-          // ── Content ─────────────────────────────────────────────────────────
-          Expanded(child: child),
+          ),
+          Container(height: 1, color: AppTheme.stone200),
         ],
       ),
     );
@@ -122,8 +145,18 @@ class AppShell extends ConsumerWidget {
 // ── Brand logo ────────────────────────────────────────────────────────────────
 
 class _BrandLogo extends StatelessWidget {
+  final bool compact;
+  const _BrandLogo({this.compact = false});
+
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return SizedBox(
+        width: 32,
+        height: 32,
+        child: CustomPaint(painter: _SigespuLogoPainter()),
+      );
+    }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -235,22 +268,25 @@ class _ModeSwitcher extends ConsumerWidget {
         color: AppTheme.stone100,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _ModeBtn(label: 'Mapa', icon: Icons.map_outlined, route: '/map', active: location == '/map'),
-          _ModeBtn(label: 'Resumen', icon: Icons.dashboard_outlined, route: '/resumen', active: location == '/resumen'),
-          _ModeBtn(label: 'Tabla', icon: Icons.grid_on_outlined, route: '/tabla', active: location == '/tabla'),
-          _ModeBtn(label: 'Scraping', icon: Icons.download_for_offline_outlined, route: '/scraping', active: location == '/scraping'),
-          _ModeBtn(label: 'Usuarios', icon: Icons.people_outline, route: '/users', active: location == '/users'),
-          _ModeBtnBadged(
-            label: 'Actividades',
-            icon: Icons.view_kanban_outlined,
-            route: '/actividades',
-            active: location == '/actividades',
-            badge: '$actividadesCount',
-          ),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ModeBtn(label: 'Mapa', icon: Icons.map_outlined, route: '/map', active: location == '/map'),
+            _ModeBtn(label: 'Resumen', icon: Icons.dashboard_outlined, route: '/resumen', active: location == '/resumen'),
+            _ModeBtn(label: 'Tabla', icon: Icons.grid_on_outlined, route: '/tabla', active: location == '/tabla'),
+            _ModeBtn(label: 'Scraping', icon: Icons.download_for_offline_outlined, route: '/scraping', active: location == '/scraping'),
+            _ModeBtn(label: 'Usuarios', icon: Icons.people_outline, route: '/users', active: location == '/users'),
+            _ModeBtnBadged(
+              label: 'Actividades',
+              icon: Icons.view_kanban_outlined,
+              route: '/actividades',
+              active: location == '/actividades',
+              badge: '$actividadesCount',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -469,12 +505,29 @@ class _UserChip extends StatelessWidget {
   final String name;
   final String role;
   final String initials;
-  const _UserChip({required this.name, required this.role, required this.initials});
+  final bool compact;
+  const _UserChip({
+    required this.name,
+    required this.role,
+    required this.initials,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final avatarColor = role == 'director' ? AppTheme.blue800 : AppTheme.orange600;
     final roleLabel = role == 'director' ? 'Director' : role == 'operativo' ? 'Operativo' : 'Visitante';
+
+    if (compact) {
+      return CircleAvatar(
+        radius: 14,
+        backgroundColor: avatarColor,
+        child: Text(
+          initials,
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.fromLTRB(5, 5, 10, 5),
@@ -670,6 +723,88 @@ class _SolicitarAccesoBannerState
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Bottom navigation (mobile only) ──────────────────────────────────────────
+
+class _BottomNav extends ConsumerWidget {
+  final String location;
+  final String role;
+  const _BottomNav({required this.location, required this.role});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDirector = role == 'director';
+    final items = <BottomNavigationBarItem>[
+      const BottomNavigationBarItem(icon: Icon(Icons.map_outlined), label: 'Mapa'),
+      const BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), label: 'Resumen'),
+      const BottomNavigationBarItem(icon: Icon(Icons.grid_on_outlined), label: 'Tabla'),
+      if (isDirector)
+        const BottomNavigationBarItem(icon: Icon(Icons.people_outline), label: 'Usuarios'),
+      const BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'Más'),
+    ];
+    final routes = <String?>[
+      '/map',
+      '/resumen',
+      '/tabla',
+      if (isDirector) '/users',
+      null,
+    ];
+
+    int idx = routes.indexOf(location);
+    if (idx < 0) idx = 0;
+
+    return BottomNavigationBar(
+      currentIndex: idx,
+      onTap: (i) {
+        if (routes[i] == null) {
+          _showMas(context);
+        } else {
+          context.go(routes[i]!);
+        }
+      },
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: AppTheme.orange600,
+      unselectedItemColor: AppTheme.stone500,
+      backgroundColor: Colors.white,
+      selectedFontSize: 11,
+      unselectedFontSize: 11,
+      elevation: 8,
+      items: items,
+    );
+  }
+
+  void _showMas(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.download_for_offline_outlined, color: AppTheme.orange600),
+              title: const Text('Scraping'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/scraping');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.view_kanban_outlined, color: AppTheme.orange600),
+              title: const Text('Actividades'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/actividades');
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

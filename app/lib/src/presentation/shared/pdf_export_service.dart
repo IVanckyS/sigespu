@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:shared/shared.dart';
 import '../../data/seed_data.dart';
 
 class PdfExportService {
@@ -348,6 +349,50 @@ class PdfExportService {
     return pdf.save();
   }
 
+  // ── Exportar vista Actividades ────────────────────────────────────────────────
+
+  static Future<Uint8List> generateActividadesReport(
+    List<ActividadMunicipal> actividades,
+    String userName,
+  ) async {
+    final (fontR, fontB) = await _loadFonts();
+    final pdf = pw.Document(theme: pw.ThemeData.withFont(base: fontR, bold: fontB));
+    final now = DateTime.now();
+    final dateStr = _fmtDate(now);
+
+    final planificadas = actividades.where((a) => a.estado == EstadoActividad.planificado).length;
+    final enCurso      = actividades.where((a) => a.estado == EstadoActividad.enCurso).length;
+    final completadas  = actividades.where((a) => a.estado == EstadoActividad.completado).length;
+    final archivadas   = actividades.where((a) => a.estado == EstadoActividad.archivado).length;
+
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
+      header: (_) => _header(dateStr, 'Tablero de Actividades Municipales'),
+      footer: (ctx) => _footer(userName, dateStr, ctx.pageNumber, ctx.pagesCount),
+      build: (_) => [
+        pw.SizedBox(height: 16),
+        pw.Text('ACTIVIDADES MUNICIPALES',
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: _stone900)),
+        pw.SizedBox(height: 2),
+        pw.Text('Tablero kanban  |  Total: ${actividades.length} actividades',
+            style: const pw.TextStyle(fontSize: 9, color: _stone500)),
+        pw.SizedBox(height: 16),
+        pw.Row(children: [
+          pw.Expanded(child: _kpiBox('Planificadas', '$planificadas')),
+          pw.Expanded(child: _kpiBox('En curso', '$enCurso')),
+          pw.Expanded(child: _kpiBox('Completadas', '$completadas')),
+          pw.Expanded(child: _kpiBox('Archivadas', '$archivadas')),
+        ]),
+        pw.SizedBox(height: 20),
+        _sectionTitle('DETALLE DE ACTIVIDADES  |  Total: ${actividades.length}'),
+        _actividadesTable(actividades),
+      ],
+    ));
+
+    return pdf.save();
+  }
+
   // ── Tablas auxiliares ─────────────────────────────────────────────────────────
 
   static pw.Widget _elementosTable(List<ElementoMapa> elementos) {
@@ -443,6 +488,25 @@ class PdfExportService {
       o.vigencia,
     ]).toList();
     return _table(headers, rows, widths: [1.2, 1.4, 2.2, 2.0, 0.7, 1.8]);
+  }
+
+  static pw.Widget _actividadesTable(List<ActividadMunicipal> actividades) {
+    if (actividades.isEmpty) {
+      return pw.Text('Sin actividades en el rango seleccionado.',
+          style: const pw.TextStyle(fontSize: 8, color: _stone500));
+    }
+    final headers = ['TITULO', 'TIPO', 'ESTADO', 'DEPARTAMENTO', 'FECHA INICIO', 'FECHA FIN'];
+    String fmtD(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    final rows = actividades.map((a) => <String>[
+      a.titulo,
+      a.tipo.name.toUpperCase(),
+      a.estado.name.toUpperCase(),
+      a.direccionMunicipal ?? '-',
+      fmtD(a.fechaInicio),
+      a.fechaFin != null ? fmtD(a.fechaFin!) : '-',
+    ]).toList();
+    return _table(headers, rows, widths: [3.0, 1.0, 1.0, 1.0, 1.2, 1.2]);
   }
 
   static pw.Widget _table(

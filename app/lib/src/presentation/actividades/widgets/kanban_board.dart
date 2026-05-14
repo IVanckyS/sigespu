@@ -64,32 +64,60 @@ class KanbanBoard extends ConsumerWidget {
           colors: [Color(0xFFF5F5F4), Color(0xFFFAFAF9)],
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: _cols.map((col) {
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 768;
+          final columns = _cols.map((col) {
             final items = filtradas.where((a) => a.estado == col.estado).toList();
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  right: col.estado == EstadoActividad.archivado ? 0 : 12,
-                ),
-                child: _KanbanColumn(
-                  label: col.label,
-                  bg: col.bg,
-                  accent: col.accent,
-                  muted: col.muted,
-                  items: items,
-                  estado: col.estado,
-                  highlightedId: highlightedActividad?.id,
-                  onCardTap: onCardTap,
-                  onNuevaActividad: () => onNuevaActividad(estado: col.estado),
-                ),
+            final column = _KanbanColumn(
+              label: col.label,
+              bg: col.bg,
+              accent: col.accent,
+              muted: col.muted,
+              items: items,
+              estado: col.estado,
+              highlightedId: highlightedActividad?.id,
+              onCardTap: onCardTap,
+              onNuevaActividad: () => onNuevaActividad(estado: col.estado),
+            );
+            return (col: col, column: column);
+          }).toList();
+
+          if (isMobile) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: columns.map((entry) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      right: entry.col.estado == EstadoActividad.archivado ? 0 : 12,
+                    ),
+                    child: SizedBox(width: 280.0, child: entry.column),
+                  );
+                }).toList(),
               ),
             );
-          }).toList(),
-        ),
+          }
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: columns.map((entry) {
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: entry.col.estado == EstadoActividad.archivado ? 0 : 12,
+                    ),
+                    child: entry.column,
+                  ),
+                );
+              }).toList(),
+            ),
+          );
+        },
       ),
     );
   }

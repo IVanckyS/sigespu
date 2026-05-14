@@ -343,39 +343,35 @@ class _ToolbarBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return _PressableChip(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFE7E5E4), width: 1.5),
-          borderRadius: BorderRadius.circular(7),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: const Color(0xFF57534E)),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF44403C),
-              ),
-            ),
-          ],
-        ),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE7E5E4), width: 1.5),
+        borderRadius: BorderRadius.circular(7),
       ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 13, color: const Color(0xFF57534E)),
+        const SizedBox(width: 5),
+        Text(label, style: const TextStyle(
+          fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF44403C),
+        )),
+      ]),
     );
   }
 }
 
-class _TipoFilterBtn extends StatelessWidget {
+class _TipoFilterBtn extends StatefulWidget {
   final TipoActividad? selected;
   final ValueChanged<TipoActividad?> onChanged;
 
   const _TipoFilterBtn({required this.selected, required this.onChanged});
+
+  @override
+  State<_TipoFilterBtn> createState() => _TipoFilterBtnState();
+}
+
+class _TipoFilterBtnState extends State<_TipoFilterBtn> {
+  bool _pressed = false;
 
   static const _labels = {
     null: 'Tipo: Todos',
@@ -387,71 +383,58 @@ class _TipoFilterBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selected = widget.selected;
     return GestureDetector(
       onTapDown: (details) async {
-        final overlay =
-            Overlay.of(context).context.findRenderObject() as RenderBox;
+        setState(() => _pressed = true);
+        final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
         final box = context.findRenderObject() as RenderBox;
         final offset = box.localToGlobal(Offset.zero, ancestor: overlay);
 
         final result = await showMenu<TipoActividad?>(
           context: context,
           position: RelativeRect.fromLTRB(
-            offset.dx,
-            offset.dy + box.size.height + 4,
-            offset.dx + 160,
-            offset.dy + 200,
+            offset.dx, offset.dy + box.size.height + 4,
+            offset.dx + 160, offset.dy + 200,
           ),
           items: [
             const PopupMenuItem(value: null, child: Text('Todos')),
             ...TipoActividad.values.map(
-              (t) => PopupMenuItem(
-                value: t,
-                child: Text(_labels[t] ?? t.name),
-              ),
+              (t) => PopupMenuItem(value: t, child: Text(_labels[t] ?? t.name)),
             ),
           ],
           elevation: 4,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         );
-        if (result != selected) onChanged(result);
+        if (mounted) setState(() => _pressed = false);
+        if (result != selected) widget.onChanged(result);
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: selected != null
-                ? const Color(0xFFEA580C)
-                : const Color(0xFFE7E5E4),
-            width: 1.5,
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected != null ? const Color(0xFFEA580C) : const Color(0xFFE7E5E4),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(7),
+            color: selected != null ? const Color(0xFFFFF7ED) : Colors.transparent,
           ),
-          borderRadius: BorderRadius.circular(7),
-          color: selected != null
-              ? const Color(0xFFFFF7ED)
-              : Colors.transparent,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
             Text(
               _labels[selected] ?? 'Tipo: Todos',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: selected != null
-                    ? const Color(0xFFC2410C)
-                    : const Color(0xFF44403C),
+                color: selected != null ? const Color(0xFFC2410C) : const Color(0xFF44403C),
               ),
             ),
             const SizedBox(width: 4),
-            Icon(
-              Icons.expand_more,
-              size: 14,
-              color: selected != null
-                  ? const Color(0xFFC2410C)
-                  : const Color(0xFF78716C),
-            ),
-          ],
+            Icon(Icons.expand_more, size: 14,
+                color: selected != null ? const Color(0xFFC2410C) : const Color(0xFF78716C)),
+          ]),
         ),
       ),
     );
@@ -460,79 +443,108 @@ class _TipoFilterBtn extends StatelessWidget {
 
 // ── Dept filter ───────────────────────────────────────────────────────────────
 
-class _DeptFilterBtn extends StatelessWidget {
+class _DeptFilterBtn extends StatefulWidget {
   final String? selected;
   final ValueChanged<String?> onChanged;
 
   const _DeptFilterBtn({required this.selected, required this.onChanged});
 
-  static const _depts = [
-    'Seg. Publica',
-    'DIDECO',
-    'Transito',
-    'Obras',
-    'SECPLA',
-  ];
+  @override
+  State<_DeptFilterBtn> createState() => _DeptFilterBtnState();
+}
+
+class _DeptFilterBtnState extends State<_DeptFilterBtn> {
+  bool _pressed = false;
+
+  static const _depts = ['Seg. Publica', 'DIDECO', 'Transito', 'Obras', 'SECPLA'];
 
   @override
   Widget build(BuildContext context) {
-    final active = selected != null;
+    final active = widget.selected != null;
     return GestureDetector(
       onTapDown: (details) async {
-        final overlay =
-            Overlay.of(context).context.findRenderObject() as RenderBox;
+        setState(() => _pressed = true);
+        final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
         final box = context.findRenderObject() as RenderBox;
         final offset = box.localToGlobal(Offset.zero, ancestor: overlay);
 
         final result = await showMenu<String?>(
           context: context,
           position: RelativeRect.fromLTRB(
-            offset.dx,
-            offset.dy + box.size.height + 4,
-            offset.dx + 160,
-            offset.dy + 300,
+            offset.dx, offset.dy + box.size.height + 4,
+            offset.dx + 160, offset.dy + 300,
           ),
           items: [
             const PopupMenuItem(value: null, child: Text('Todos los deptos.')),
             ..._depts.map((d) => PopupMenuItem(value: d, child: Text(d))),
           ],
           elevation: 4,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         );
-        if (result != selected) onChanged(result);
+        if (mounted) setState(() => _pressed = false);
+        if (result != widget.selected) widget.onChanged(result);
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? const Color(0xFFFFF7ED) : Colors.transparent,
-          border: Border.all(
-            color:
-                active ? const Color(0xFFEA580C) : const Color(0xFFE7E5E4),
-            width: 1.5,
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFFFFF7ED) : Colors.transparent,
+            border: Border.all(
+              color: active ? const Color(0xFFEA580C) : const Color(0xFFE7E5E4),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(7),
           ),
-          borderRadius: BorderRadius.circular(7),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
             Text(
-              active ? selected! : 'Depto.',
+              active ? widget.selected! : 'Depto.',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: active
-                    ? const Color(0xFFC2410C)
-                    : const Color(0xFF44403C),
+                color: active ? const Color(0xFFC2410C) : const Color(0xFF44403C),
               ),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.expand_more,
-                size: 14,
-                color: active
-                    ? const Color(0xFFC2410C)
-                    : const Color(0xFF78716C)),
-          ],
+            Icon(Icons.expand_more, size: 14,
+                color: active ? const Color(0xFFC2410C) : const Color(0xFF78716C)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ── PressableChip ─────────────────────────────────────────────────────────────
+
+class _PressableChip extends StatefulWidget {
+  final VoidCallback? onTap;
+  final BoxDecoration decoration;
+  final Widget child;
+  const _PressableChip({required this.onTap, required this.decoration, required this.child});
+
+  @override
+  State<_PressableChip> createState() => _PressableChipState();
+}
+
+class _PressableChipState extends State<_PressableChip> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: widget.decoration,
+          child: widget.child,
         ),
       ),
     );

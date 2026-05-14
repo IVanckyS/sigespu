@@ -292,7 +292,7 @@ class _ModeSwitcher extends ConsumerWidget {
   }
 }
 
-class _ModeBtn extends StatelessWidget {
+class _ModeBtn extends StatefulWidget {
   final String label;
   final IconData icon;
   final String route;
@@ -300,31 +300,45 @@ class _ModeBtn extends StatelessWidget {
   const _ModeBtn({required this.label, required this.icon, required this.route, required this.active});
 
   @override
+  State<_ModeBtn> createState() => _ModeBtnState();
+}
+
+class _ModeBtnState extends State<_ModeBtn> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.go(route),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(7),
-          boxShadow: active ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 2, offset: const Offset(0, 1))] : [],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 15, color: active ? AppTheme.orange700 : AppTheme.stone600),
+      onTap: () => context.go(widget.route),
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: widget.active ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+            boxShadow: widget.active
+                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 2, offset: const Offset(0, 1))]
+                : [],
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(widget.icon, size: 15, color: widget.active ? AppTheme.orange700 : AppTheme.stone600),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: active ? AppTheme.orange700 : AppTheme.stone600)),
-          ],
+            Text(widget.label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
+                color: widget.active ? AppTheme.orange700 : AppTheme.stone600)),
+          ]),
         ),
       ),
     );
   }
 }
 
-class _ModeBtnBadged extends StatelessWidget {
+class _ModeBtnBadged extends StatefulWidget {
   final String label;
   final IconData icon;
   final String route;
@@ -340,49 +354,52 @@ class _ModeBtnBadged extends StatelessWidget {
   });
 
   @override
+  State<_ModeBtnBadged> createState() => _ModeBtnBadgedState();
+}
+
+class _ModeBtnBadgedState extends State<_ModeBtnBadged> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.go(route),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(7),
-          boxShadow: active
-              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 2, offset: const Offset(0, 1))]
-              : [],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 15, color: active ? AppTheme.orange700 : AppTheme.stone600),
+      onTap: () => context.go(widget.route),
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: widget.active ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+            boxShadow: widget.active
+                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 2, offset: const Offset(0, 1))]
+                : [],
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(widget.icon, size: 15, color: widget.active ? AppTheme.orange700 : AppTheme.stone600),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: active ? AppTheme.orange700 : AppTheme.stone600,
-              ),
-            ),
+            Text(widget.label, style: TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w500,
+              color: widget.active ? AppTheme.orange700 : AppTheme.stone600,
+            )),
             const SizedBox(width: 5),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                color: active ? AppTheme.orange100 : AppTheme.stone200,
+                color: widget.active ? AppTheme.orange100 : AppTheme.stone200,
                 borderRadius: BorderRadius.circular(999),
               ),
-              child: Text(
-                badge,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: active ? AppTheme.orange700 : AppTheme.stone500,
-                ),
-              ),
+              child: Text(widget.badge, style: TextStyle(
+                fontSize: 10, fontWeight: FontWeight.w700,
+                color: widget.active ? AppTheme.orange700 : AppTheme.stone500,
+              )),
             ),
-          ],
+          ]),
         ),
       ),
     );

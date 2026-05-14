@@ -22,11 +22,10 @@ import 'widgets/panel_capas.dart';
 import 'widgets/panel_mapa_base.dart';
 import 'widgets/panel_leyenda.dart';
 import 'widgets/panel_imprimir.dart';
-import 'widgets/panel_filtros_izquierdo.dart';
 import 'screens/subir_capa_screen.dart';
+import '../actividades/actividades_provider.dart';
 import 'providers/map_providers.dart';
 import 'providers/visor_provider.dart';
-import '../actividades/widgets/cobertura_panel.dart';
 import 'providers/amenazas_provider.dart';
 import '../auth/auth_provider.dart';
 
@@ -130,16 +129,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         final isMobile = constraints.maxWidth < 768;
         return Scaffold(
           backgroundColor: Colors.transparent,
-          drawer: isMobile ? const Drawer(child: PanelFiltrosIzquierdo()) : null,
+          drawer: isMobile ? const Drawer(child: _MapSidebar()) : null,
           body: Row(
       children: [
         // ── Sidebar ──────────────────────────────────────────────────────────
         AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           width: collapsed ? 0 : 280,
-          child: collapsed
-              ? const SizedBox.shrink()
-              : _MapSidebar(activeLayers: activeLayers, ref: ref),
+          child: collapsed ? const SizedBox.shrink() : const _MapSidebar(),
         ),
 
         // ── Botón toggle siempre visible en el borde ──────────────────────
@@ -152,20 +149,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         Expanded(
           child: Stack(
             children: [
-              // Left panel (desktop only)
-              Builder(
-                builder: (context) {
-                  final width = MediaQuery.of(context).size.width;
-                  if (width < 768) return const SizedBox.shrink();
-                  return const Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    child: PanelFiltrosIzquierdo(),
-                  );
-                },
-              ),
-
               RepaintBoundary(
                 key: _mapKey,
                 child: FlutterMap(
@@ -756,20 +739,89 @@ void _showGuardarZona(BuildContext context, WidgetRef ref, List<LatLng> points) 
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
-class _MapSidebar extends StatelessWidget {
-  final Set<String> activeLayers;
-  final WidgetRef ref;
-  const _MapSidebar({required this.activeLayers, required this.ref});
+class _MapSidebar extends ConsumerStatefulWidget {
+  const _MapSidebar();
 
-  static const _layers = MapLayerConfig.layers;
+  @override
+  ConsumerState<_MapSidebar> createState() => _MapSidebarState();
+}
+
+class _MapSidebarState extends ConsumerState<_MapSidebar> {
+  final _expanded = <String, bool>{
+    'seguridad': true,
+    'infra': true,
+    'incidentes': false,
+    'cobertura': false,
+    'amenazas': false,
+    'actividades': true,
+  };
+  bool _zonasExpanded = false;
+
   static const _dangerFilters = MapLayerConfig.dangerFilters;
+
+  static const _groups = <(String, String, List<String>)>[
+    ('seguridad', 'Seguridad pública',
+        ['zona_peligro', 'reporte_robo', 'reporte_vandalismo', 'reporte_accidente']),
+    ('infra', 'Infraestructura',
+        ['centro_acopio', 'sede_comunitaria', 'infraestructura']),
+    ('incidentes', 'Incidentes urbanos',
+        ['arbol_caido', 'poste_caido', 'sector_sin_luz', 'cable_colgando',
+         'semaforo_dañado', 'socavon', 'fuga_agua', 'microbasural']),
+    ('cobertura', 'Cobertura y fiscalización',
+        ['patente', 'luminaria', 'camara_cctv']),
+    ('amenazas', 'Amenazas y datos base',
+        ['plan_regulador', 'zona_tsunami', 'zona_incendio']),
+  ];
+
+  void _toggleLayer(String tipo) {
+    final current = ref.read(activeLayersProvider);
+    final next = Set<String>.from(current);
+    current.contains(tipo) ? next.remove(tipo) : next.add(tipo);
+    ref.read(activeLayersProvider.notifier).state = next;
+  }
+
+  static Color _colorFor(String tipo) => MapLayerConfig.layers
+      .firstWhere((l) => l.$1 == tipo,
+          orElse: () => (tipo, tipo, AppTheme.stone400))
+      .$3;
+
+  static String _labelFor(String tipo) => MapLayerConfig.layers
+      .firstWhere((l) => l.$1 == tipo,
+          orElse: () => (tipo, tipo, AppTheme.stone400))
+      .$2;
 
   @override
   Widget build(BuildContext context) {
+    final activeLayers = ref.watch(activeLayersProvider);
+    final counts = ref.watch(layerCountsProvider);
+    final actividadesElems = ref.watch(actividadesLayerElementsProvider);
+    final allActividades = ref.watch(actividadesProvider);
     final dangerFilter = ref.watch(dangerFilterProvider);
     final heatmapOn = ref.watch(heatmapOnProvider);
     final dateRange = ref.watch(dateRangeProvider);
+    final polygons = ref.watch(userPolygonsProvider);
+    final categories = ref.watch(customZonaCategoriesProvider);
+    final activeCategories = ref.watch(activeZonaCategoriesProvider);
+    final sismosVisible = ref.watch(sismosVisibleProvider);
     final activeCount = activeLayers.length;
+    const totalLayers = 22;
+
+    final totalAct = allActividades.length;
+    final completadas = allActividades
+        .where((a) => a.estado == EstadoActividad.completado)
+        .length;
+    final pct = totalAct > 0 ? (completadas / totalAct * 100).round() : 0;
+    final sectorMap = <String, int>{};
+    for (final a in allActividades) {
+      if (a.sector != null) {
+        sectorMap[a.sector!] = (sectorMap[a.sector!] ?? 0) + 1;
+      }
+    }
+    final topSectores = (sectorMap.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value)))
+        .take(3)
+        .toList();
+    final maxS = topSectores.isEmpty ? 1 : topSectores.first.value;
 
     return Container(
       width: 280,
@@ -777,190 +829,326 @@ class _MapSidebar extends StatelessWidget {
         color: Colors.white,
         border: Border(right: BorderSide(color: AppTheme.stone200)),
       ),
-      child: Column(
-        children: [
-          // Branding Header — SIGESPU acronym breakdown
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFF7ED),
-              border: Border(
-                bottom: BorderSide(color: Color(0xFFFED7AA)),
-                left: BorderSide(color: AppTheme.orange600, width: 4),
+      child: Column(children: [
+        // ── Branding header ──────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFF7ED),
+            border: Border(
+              bottom: BorderSide(color: Color(0xFFFED7AA)),
+              left: BorderSide(color: AppTheme.orange600, width: 4),
+            ),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                    color: AppTheme.orange600,
+                    borderRadius: BorderRadius.circular(4)),
+                child: const Text('SIGESPU',
+                    style: TextStyle(
+                        color: Colors.white, fontSize: 9,
+                        fontWeight: FontWeight.w800, letterSpacing: 0.6)),
+              ),
+              const SizedBox(width: 8),
+              const Text('Lota, Biobío',
+                  style: TextStyle(
+                      color: AppTheme.orange700, fontSize: 11,
+                      fontWeight: FontWeight.w600)),
+            ]),
+            const SizedBox(height: 5),
+            const Text('Sistema de Información Geoespacial\nde Seguridad Pública',
+                style: TextStyle(
+                    color: AppTheme.stone700, fontSize: 10.5,
+                    height: 1.4, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 3),
+            const Text('Dirección de Seguridad Pública',
+                style: TextStyle(color: AppTheme.stone500, fontSize: 9.5)),
+          ]),
+        ),
+
+        Expanded(
+          child: ListView(padding: EdgeInsets.zero, children: [
+
+            // ── COBERTURA · ACTIVIDADES ────────────────────────────────────
+            if (totalAct > 0) ...[
+              const _SectionHeader('Cobertura · Actividades', null),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: Column(children: [
+                  Row(children: [
+                    _StatBadge(label: 'Total', value: '$totalAct',
+                        color: AppTheme.orange600),
+                    const SizedBox(width: 8),
+                    _StatBadge(label: 'Completadas', value: '$pct%',
+                        color: const Color(0xFF15803D)),
+                  ]),
+                  const SizedBox(height: 8),
+                  ...topSectores.map((e) {
+                    final pctBar = maxS > 0 ? e.value / maxS : 0.0;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(children: [
+                        SizedBox(
+                          width: 80,
+                          child: Text(e.key,
+                              style: const TextStyle(
+                                  fontSize: 10, color: AppTheme.stone600),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: pctBar.clamp(0.0, 1.0),
+                              backgroundColor: AppTheme.stone100,
+                              valueColor: const AlwaysStoppedAnimation(
+                                  AppTheme.orange600),
+                              minHeight: 4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text('${e.value}',
+                            style: const TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.w600,
+                                color: AppTheme.orange700)),
+                      ]),
+                    );
+                  }),
+                ]),
+              ),
+              const Divider(height: 1, color: AppTheme.stone100),
+            ],
+
+            // ── CAPAS DEL SISTEMA ──────────────────────────────────────────
+            _SectionHeader('Capas del sistema', '$activeCount/$totalLayers'),
+            for (final (key, label, tipos) in _groups) ...[
+              _AccordionHeader(
+                label: label,
+                expanded: _expanded[key] ?? false,
+                activeCount:
+                    tipos.where((t) => activeLayers.contains(t)).length +
+                    (key == 'amenazas' && sismosVisible ? 1 : 0),
+                total: tipos.length + (key == 'amenazas' ? 1 : 0),
+                onTap: () => setState(
+                    () => _expanded[key] = !(_expanded[key] ?? false)),
+              ),
+              if (_expanded[key] == true) ...[
+                if (key == 'amenazas')
+                  _LayerToggle(
+                    layerKey: 'sismos',
+                    name: 'Sismos recientes',
+                    color: const Color(0xFFE53935),
+                    isActive: sismosVisible,
+                    count: 0,
+                    onTap: () => ref
+                        .read(sismosVisibleProvider.notifier)
+                        .state = !sismosVisible,
+                  ),
+                for (final tipo in tipos)
+                  _LayerToggle(
+                    layerKey: tipo,
+                    name: _labelFor(tipo),
+                    color: _colorFor(tipo),
+                    isActive: activeLayers.contains(tipo),
+                    count: counts[tipo] ?? 0,
+                    onTap: () => _toggleLayer(tipo),
+                  ),
+              ],
+            ],
+            // Actividades como grupo propio
+            _AccordionHeader(
+              label: 'Actividades municipales',
+              expanded: _expanded['actividades'] ?? true,
+              activeCount: activeLayers.contains('actividad_municipal') ? 1 : 0,
+              total: 1,
+              onTap: () => setState(() =>
+                  _expanded['actividades'] =
+                      !(_expanded['actividades'] ?? true)),
+            ),
+            if (_expanded['actividades'] == true)
+              _LayerToggle(
+                layerKey: 'actividad_municipal',
+                name: 'Actividades',
+                color: const Color(0xFF7C3AED),
+                isActive: activeLayers.contains('actividad_municipal'),
+                count: actividadesElems.length,
+                onTap: () => _toggleLayer('actividad_municipal'),
+              ),
+
+            const Divider(height: 1, color: AppTheme.stone100),
+
+            // ── ZONAS DIBUJADAS ────────────────────────────────────────────
+            _SectionHeader('Zonas dibujadas', '${polygons.length}'),
+            _LayerToggle(
+              layerKey: 'zona_custom',
+              name: 'Todas las zonas ✏',
+              color: const Color(0xFF7C3AED),
+              isActive: activeLayers.contains('zona_custom'),
+              count: polygons.length,
+              onTap: () => _toggleLayer('zona_custom'),
+              trailing: polygons.isNotEmpty
+                  ? GestureDetector(
+                      onTap: () =>
+                          setState(() => _zonasExpanded = !_zonasExpanded),
+                      child: Icon(
+                          _zonasExpanded
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                          size: 16, color: AppTheme.stone400),
+                    )
+                  : null,
+            ),
+            if (_zonasExpanded && categories.isNotEmpty)
+              ...categories.map((cat) {
+                final catCount =
+                    polygons.where((p) => p.zona.tipo == cat).length;
+                return Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: _LayerToggle(
+                    layerKey: cat,
+                    name: cat,
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.7),
+                    isActive: activeCategories.contains(cat),
+                    count: catCount,
+                    onTap: () {
+                      final next = Set<String>.from(activeCategories);
+                      activeCategories.contains(cat)
+                          ? next.remove(cat)
+                          : next.add(cat);
+                      ref
+                          .read(activeZonaCategoriesProvider.notifier)
+                          .state = next;
+                    },
+                  ),
+                );
+              }),
+
+            const Divider(height: 1, color: AppTheme.stone100),
+
+            // ── TIPOS DE PELIGRO ───────────────────────────────────────────
+            const _SectionHeader('Tipos de peligro', null),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: Wrap(
+                spacing: 6, runSpacing: 6,
+                children: _dangerFilters.map((f) {
+                  final (key, label) = f;
+                  final isActive = dangerFilter == key;
+                  return GestureDetector(
+                    onTap: () =>
+                        ref.read(dangerFilterProvider.notifier).state = key,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 120),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? AppTheme.orange600
+                            : AppTheme.stone100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(label,
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w500,
+                              color: isActive
+                                  ? Colors.white
+                                  : AppTheme.stone600)),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppTheme.orange600,
-                      borderRadius: BorderRadius.circular(4),
+
+            const Divider(height: 1, color: AppTheme.stone100),
+
+            // ── MAPA DE CALOR ──────────────────────────────────────────────
+            const _SectionHeader('Mapa de calor', null),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: GestureDetector(
+                onTap: () =>
+                    ref.read(heatmapOnProvider.notifier).state = !heatmapOn,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.stone50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.stone200),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.blur_on, size: 16, color: AppTheme.orange600),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                        child: Text('Densidad de reportes',
+                            style: TextStyle(
+                                fontSize: 12.5, fontWeight: FontWeight.w500,
+                                color: AppTheme.stone800))),
+                    Switch(
+                      value: heatmapOn,
+                      onChanged: (v) =>
+                          ref.read(heatmapOnProvider.notifier).state = v,
+                      activeTrackColor: AppTheme.orange600,
+                      activeThumbColor: Colors.white,
+                      inactiveTrackColor: AppTheme.stone300,
+                      inactiveThumbColor: Colors.white,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text('SIGESPU', style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.6,
-                    )),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text('Lota, Biobío', style: TextStyle(
-                    color: AppTheme.orange700,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  )),
-                ]),
-                const SizedBox(height: 5),
-                const Text(
-                  'Sistema de Información Geoespacial\nde Seguridad Pública',
-                  style: TextStyle(
-                    color: AppTheme.stone700,
-                    fontSize: 10.5,
-                    height: 1.4,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  ]),
                 ),
-                const SizedBox(height: 3),
-                const Text(
-                  'Dirección de Seguridad Pública',
-                  style: TextStyle(
-                    color: AppTheme.stone500,
-                    fontSize: 9.5,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                // Sección capas
-                _SectionHeader('Capas del sistema', '$activeCount/${_layers.length}'),
-                ...(() {
-                  final counts = <String, int>{};
-                  for (final e in kElementosSeed) {
-                    counts[e.layerKey] = (counts[e.layerKey] ?? 0) + 1;
-                  }
-                  return _layers.map((l) {
-                    final (key, name, color) = l;
-                    final isActive = activeLayers.contains(key);
-                    final count = counts[key] ?? 0;
-                    return _LayerToggle(
-                      layerKey: key, name: name, color: color,
-                      isActive: isActive, count: count,
-                      onTap: () {
-                        final next = Set<String>.from(activeLayers);
-                        isActive ? next.remove(key) : next.add(key);
-                        ref.read(activeLayersProvider.notifier).state = next;
-                      },
-                    );
-                  });
-                })(),
 
-                const Divider(height: 1, color: AppTheme.stone100),
+            const Divider(height: 1, color: AppTheme.stone100),
 
-                // Tipos de peligro
-                const _SectionHeader('Tipos de peligro', null),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                  child: Wrap(
-                    spacing: 6, runSpacing: 6,
-                    children: _dangerFilters.map((f) {
-                      final (key, label) = f;
-                      final isActive = dangerFilter == key;
-                      return GestureDetector(
-                        onTap: () => ref.read(dangerFilterProvider.notifier).state = key,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 120),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isActive ? AppTheme.orange600 : AppTheme.stone100,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(label, style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w500,
-                            color: isActive ? Colors.white : AppTheme.stone600,
-                          )),
-                        ),
-                      );
-                    }).toList(),
-                  ),
+            // ── RANGO DE FECHAS ────────────────────────────────────────────
+            const _SectionHeader('Rango de fechas', null),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: DropdownButtonFormField<String>(
+                // ignore: deprecated_member_use
+                value: dateRange,
+                decoration: InputDecoration(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide:
+                          const BorderSide(color: AppTheme.stone200)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide:
+                          const BorderSide(color: AppTheme.stone200)),
+                  isDense: true,
                 ),
-
-                const Divider(height: 1, color: AppTheme.stone100),
-
-                // Mapa de calor
-                const _SectionHeader('Mapa de calor', null),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                  child: GestureDetector(
-                    onTap: () => ref.read(heatmapOnProvider.notifier).state = !heatmapOn,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.stone50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.stone200),
-                      ),
-                      child: Row(children: [
-                        const Icon(Icons.blur_on, size: 16, color: AppTheme.orange600),
-                        const SizedBox(width: 8),
-                        const Expanded(child: Text('Densidad de reportes', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppTheme.stone800))),
-                        Switch(
-                          value: heatmapOn,
-                          onChanged: (v) => ref.read(heatmapOnProvider.notifier).state = v,
-                          activeTrackColor: AppTheme.orange600,
-                          activeThumbColor: Colors.white,
-                          inactiveTrackColor: AppTheme.stone300,
-                          inactiveThumbColor: Colors.white,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ]),
-                    ),
-                  ),
-                ),
-
-                const Divider(height: 1, color: AppTheme.stone100),
-
-                // Rango de fechas
-                const _SectionHeader('Rango de fechas', null),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                  child: DropdownButtonFormField<String>(
-                    // ignore: deprecated_member_use
-                    value: dateRange,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
-                      isDense: true,
-                    ),
-                    style: const TextStyle(fontSize: 11.5, color: AppTheme.stone800),
-                    items: const [
-                      DropdownMenuItem(value: '7', child: Text('Últimos 7 días')),
-                      DropdownMenuItem(value: '30', child: Text('Últimos 30 días')),
-                      DropdownMenuItem(value: '90', child: Text('Últimos 90 días')),
-                      DropdownMenuItem(value: '365', child: Text('Último año')),
-                      DropdownMenuItem(value: 'all', child: Text('Histórico completo')),
-                    ],
-                    onChanged: (v) { if (v != null) ref.read(dateRangeProvider.notifier).state = v; },
-                  ),
-                ),
-
-                // Cobertura de actividades (visible cuando la capa está activa)
-                if (activeLayers.contains('actividad_municipal')) ...[
-                  const Divider(height: 1, color: AppTheme.stone100),
-                  const CoberturaPanel(),
+                style: const TextStyle(
+                    fontSize: 11.5, color: AppTheme.stone800),
+                items: const [
+                  DropdownMenuItem(value: '7', child: Text('Últimos 7 días')),
+                  DropdownMenuItem(
+                      value: '30', child: Text('Últimos 30 días')),
+                  DropdownMenuItem(
+                      value: '90', child: Text('Últimos 90 días')),
+                  DropdownMenuItem(
+                      value: '365', child: Text('Último año')),
+                  DropdownMenuItem(
+                      value: 'all', child: Text('Histórico completo')),
                 ],
-              ],
+                onChanged: (v) {
+                  if (v != null) {
+                    ref.read(dateRangeProvider.notifier).state = v;
+                  }
+                },
+              ),
             ),
-          ),
-        ],
-      ),
+          ]),
+        ),
+      ]),
     );
   }
 }
@@ -987,6 +1175,95 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+class _AccordionHeader extends StatelessWidget {
+  final String label;
+  final bool expanded;
+  final int activeCount;
+  final int total;
+  final VoidCallback onTap;
+
+  const _AccordionHeader({
+    required this.label, required this.expanded,
+    required this.activeCount, required this.total, required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasActive = activeCount > 0;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(children: [
+          Icon(
+            expanded
+                ? Icons.keyboard_arrow_down_rounded
+                : Icons.keyboard_arrow_right_rounded,
+            size: 15, color: AppTheme.stone400,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w600,
+                    color: hasActive ? AppTheme.stone800 : AppTheme.stone600)),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: hasActive
+                  ? const Color(0xFFFED7AA)
+                  : AppTheme.stone100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              hasActive ? '$activeCount/$total' : '0/$total',
+              style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight:
+                      hasActive ? FontWeight.w700 : FontWeight.w400,
+                  color: hasActive
+                      ? AppTheme.orange700
+                      : AppTheme.stone400),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _StatBadge extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _StatBadge(
+      {required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Column(children: [
+          Text(value,
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w700, color: color)),
+          const SizedBox(height: 2),
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 9.5, color: AppTheme.stone500)),
+        ]),
+      ),
+    );
+  }
+}
+
 class _LayerToggle extends StatelessWidget {
   final String layerKey;
   final String name;
@@ -994,10 +1271,12 @@ class _LayerToggle extends StatelessWidget {
   final bool isActive;
   final int count;
   final VoidCallback onTap;
+  final Widget? trailing;
 
   const _LayerToggle({
     required this.layerKey, required this.name, required this.color,
     required this.isActive, required this.count, required this.onTap,
+    this.trailing,
   });
 
   @override
@@ -1009,29 +1288,21 @@ class _LayerToggle extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         color: isActive ? AppTheme.orange50 : Colors.transparent,
         child: Row(children: [
-          // Icon box — mismo estilo que el modal de agregar elemento
           Container(
             width: 28, height: 28,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.13),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(
-              CustomMarkers.getIconForTipo(layerKey),
-              size: 14,
-              color: color,
-            ),
+            child: Icon(CustomMarkers.getIconForTipo(layerKey),
+                size: 14, color: color),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              name,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w500,
-                color: isActive ? AppTheme.stone900 : AppTheme.stone700,
-              ),
-            ),
+            child: Text(name,
+                style: TextStyle(
+                    fontSize: 12.5, fontWeight: FontWeight.w500,
+                    color: isActive ? AppTheme.stone900 : AppTheme.stone700)),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
@@ -1039,16 +1310,14 @@ class _LayerToggle extends StatelessWidget {
               color: isActive ? const Color(0xFFFED7AA) : AppTheme.stone100,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(
-              '$count',
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-                color: isActive ? AppTheme.orange700 : AppTheme.stone500,
-              ),
-            ),
+            child: Text('$count',
+                style: TextStyle(
+                    fontSize: 10.5, fontWeight: FontWeight.w600,
+                    color: isActive
+                        ? AppTheme.orange700
+                        : AppTheme.stone500)),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           SizedBox(
             width: 28, height: 16,
             child: Switch(
@@ -1060,6 +1329,7 @@ class _LayerToggle extends StatelessWidget {
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
+          if (trailing != null) ...[const SizedBox(width: 4), trailing!],
         ]),
       ),
     );

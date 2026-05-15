@@ -119,129 +119,41 @@ class _UsuariosTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final usersAsync = ref.watch(usersProvider);
+    final solicitudesAsync = ref.watch(solicitudesProvider);
 
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(children: [
-        Row(children: [
-          const Spacer(),
-          ElevatedButton.icon(
-            onPressed: () => _showCreateDialog(context, ref),
-            icon: const Icon(Icons.add, size: 14),
-            label: const Text('Crear usuario',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.orange600,
-              foregroundColor: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              elevation: 0,
-            ),
-          ),
-        ]),
+        // Toolbar
+        _UsersToolbar(onCreatePressed: () => _showCreateDialog(context, ref)),
         const SizedBox(height: 14),
         Expanded(
           child: usersAsync.when(
-            loading: () =>
-                const Center(child: CircularProgressIndicator()),
+            loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Error: $e')),
-            data: (users) => Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 900),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.stone200),
-                  ),
+            data: (users) => Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Main table
+                Expanded(child: _UsersTable(users: users, ref: ref)),
+                const SizedBox(width: 18),
+                // Sidebar
+                SizedBox(
+                  width: 280,
                   child: SingleChildScrollView(
-                    child: DataTable(
-                      headingRowColor:
-                          WidgetStateProperty.all(AppTheme.stone50),
-                      columnSpacing: 20,
-                      columns: const [
-                        DataColumn(label: Text('Nombre')),
-                        DataColumn(label: Text('Email')),
-                        DataColumn(label: Text('Rol')),
-                        DataColumn(label: Text('Estado')),
-                        DataColumn(label: Text('Acciones')),
-                      ],
-                      rows: users
-                          .map((u) => _buildRow(context, ref, u))
-                          .toList(),
+                    child: _UsersSidebar(
+                      users: users,
+                      solicitudes: solicitudesAsync.valueOrNull ?? [],
+                      ref: ref,
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
       ]),
     );
-  }
-
-  DataRow _buildRow(BuildContext context, WidgetRef ref, UsuarioItem u) {
-    final isDirector = u.nivelAcceso == 'director';
-    final rolColor = isDirector
-        ? AppTheme.blue800
-        : u.nivelAcceso == 'operativo'
-            ? AppTheme.orange600
-            : AppTheme.stone500;
-
-    return DataRow(cells: [
-      DataCell(Text(u.nombre,
-          style: const TextStyle(fontWeight: FontWeight.w500))),
-      DataCell(Text(u.email,
-          style: const TextStyle(fontSize: 12, color: AppTheme.stone600))),
-      DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: rolColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          u.nivelAcceso.toUpperCase(),
-          style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w700,
-              color: rolColor),
-        ),
-      )),
-      DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: u.activo
-              ? AppTheme.greenSuccess.withValues(alpha: 0.1)
-              : AppTheme.stone200,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          u.activo ? 'Activo' : 'Inactivo',
-          style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w700,
-              color: u.activo ? AppTheme.greenSuccess : AppTheme.stone500),
-        ),
-      )),
-      DataCell(isDirector
-          ? const Text('—', style: TextStyle(color: AppTheme.stone400))
-          : Row(mainAxisSize: MainAxisSize.min, children: [
-              IconButton(
-                icon: const Icon(Icons.edit_outlined,
-                    size: 18, color: AppTheme.stone500),
-                tooltip: 'Editar',
-                onPressed: () => _showEditDialog(context, ref, u),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    size: 18, color: AppTheme.redDanger),
-                tooltip: 'Eliminar',
-                onPressed: () => _showDeleteDialog(context, ref, u),
-              ),
-            ])),
-    ]);
   }
 
   void _showCreateDialog(BuildContext context, WidgetRef ref) {
@@ -254,8 +166,178 @@ class _UsuariosTab extends ConsumerWidget {
       ),
     );
   }
+}
 
-  void _showEditDialog(BuildContext context, WidgetRef ref, UsuarioItem u) {
+// ── Toolbar ───────────────────────────────────────────────────────────────────
+
+class _UsersToolbar extends StatelessWidget {
+  final VoidCallback onCreatePressed;
+  const _UsersToolbar({required this.onCreatePressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      SizedBox(
+        width: 280,
+        child: TextField(
+          decoration: InputDecoration(
+            hintText: 'Buscar por nombre, email o RUT…',
+            hintStyle: const TextStyle(fontSize: 12.5, color: AppTheme.stone400),
+            prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.stone400),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.stone200)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.stone200)),
+            filled: true, fillColor: Colors.white,
+          ),
+          style: const TextStyle(fontSize: 12.5),
+        ),
+      ),
+      const SizedBox(width: 10),
+      const _ToolbarDropdown(label: 'Rol', value: 'Todos'),
+      const SizedBox(width: 8),
+      const _ToolbarDropdown(label: 'Unidad', value: 'Todas'),
+      const SizedBox(width: 8),
+      const _ToolbarDropdown(label: 'Estado', value: 'Activos'),
+      const Spacer(),
+      OutlinedButton.icon(
+        onPressed: () {},
+        icon: const Icon(Icons.download_outlined, size: 14),
+        label: const Text('Exportar CSV', style: TextStyle(fontSize: 12.5)),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppTheme.stone700,
+          side: const BorderSide(color: AppTheme.stone200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      const SizedBox(width: 10),
+      ElevatedButton.icon(
+        onPressed: onCreatePressed,
+        icon: const Icon(Icons.person_add_outlined, size: 14),
+        label: const Text('Crear usuario', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.orange600,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          elevation: 0,
+        ),
+      ),
+    ]);
+  }
+}
+
+class _ToolbarDropdown extends StatelessWidget {
+  final String label;
+  final String value;
+  const _ToolbarDropdown({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppTheme.stone200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Text('$label: ', style: const TextStyle(fontSize: 10.5, color: AppTheme.stone400, fontWeight: FontWeight.w600)),
+        Text(value, style: const TextStyle(fontSize: 12.5, color: AppTheme.stone800, fontWeight: FontWeight.w600)),
+        const SizedBox(width: 4),
+        const Icon(Icons.keyboard_arrow_down, size: 14, color: AppTheme.stone500),
+      ]),
+    );
+  }
+}
+
+// ── Users Table ───────────────────────────────────────────────────────────────
+
+class _UsersTable extends StatelessWidget {
+  final List<UsuarioItem> users;
+  final WidgetRef ref;
+  const _UsersTable({required this.users, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.stone200),
+      ),
+      child: SingleChildScrollView(
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(AppTheme.stone50),
+          headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.stone600, letterSpacing: 0.04),
+          dataTextStyle: const TextStyle(fontSize: 12.5, color: AppTheme.stone800),
+          columnSpacing: 16,
+          horizontalMargin: 14,
+          columns: const [
+            DataColumn(label: Text('Nombre')),
+            DataColumn(label: Text('Email')),
+            DataColumn(label: Text('Unidad')),
+            DataColumn(label: Text('Rol')),
+            DataColumn(label: Text('Estado')),
+            DataColumn(label: Text('Última sesión')),
+            DataColumn(label: Text('Acciones')),
+          ],
+          rows: users.map((u) => _buildRow(context, u)).toList(),
+        ),
+      ),
+    );
+  }
+
+  DataRow _buildRow(BuildContext context, UsuarioItem u) {
+    final isDirector = u.nivelAcceso == 'director';
+    final initials = u.nombre.split(' ').take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
+    final avatarColor = isDirector
+        ? AppTheme.orange700
+        : u.nivelAcceso == 'operativo'
+            ? AppTheme.greenSuccess
+            : AppTheme.stone500;
+
+    return DataRow(cells: [
+      DataCell(Row(children: [
+        Container(
+          width: 30, height: 30,
+          decoration: BoxDecoration(color: avatarColor.withValues(alpha: 0.15), shape: BoxShape.circle),
+          alignment: Alignment.center,
+          child: Text(initials, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: avatarColor)),
+        ),
+        const SizedBox(width: 10),
+        Text(u.nombre, style: const TextStyle(fontWeight: FontWeight.w500)),
+      ])),
+      DataCell(Text(u.email, style: const TextStyle(fontSize: 12, color: AppTheme.stone600))),
+      DataCell(Text(
+        isDirector ? 'Dir. Seguridad Pública' : u.nivelAcceso == 'operativo' ? 'Inspección' : 'Municipal',
+        style: const TextStyle(fontSize: 12, color: AppTheme.stone500),
+      )),
+      DataCell(_RolPill(rol: u.nivelAcceso)),
+      DataCell(_EstadoPill(activo: u.activo)),
+      DataCell(Text(
+        isDirector ? 'hace 1h' : u.activo ? 'hace 3h' : 'hace 2 semanas',
+        style: const TextStyle(fontSize: 12, color: AppTheme.stone400),
+      )),
+      DataCell(isDirector
+          ? const Text('—', style: TextStyle(color: AppTheme.stone300))
+          : Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.stone500),
+                tooltip: 'Editar',
+                onPressed: () => _showEditDialog(context, u),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 16, color: AppTheme.redDanger),
+                tooltip: 'Eliminar',
+                onPressed: () => _showDeleteDialog(context, u),
+              ),
+            ])),
+    ]);
+  }
+
+  void _showEditDialog(BuildContext context, UsuarioItem u) {
     showDialog(
       context: context,
       builder: (_) => _UserFormDialog(
@@ -264,27 +346,21 @@ class _UsuariosTab extends ConsumerWidget {
         initialRol: u.nivelAcceso,
         emailReadOnly: true,
         initialEmail: u.email,
-        onSave: (_, nombre, rol) =>
-            ref.read(usersProvider.notifier).editar(u.id, nombre, rol),
+        onSave: (_, nombre, rol) => ref.read(usersProvider.notifier).editar(u.id, nombre, rol),
       ),
     );
   }
 
-  void _showDeleteDialog(BuildContext context, WidgetRef ref, UsuarioItem u) {
+  void _showDeleteDialog(BuildContext context, UsuarioItem u) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar usuario'),
-        content: Text(
-            '¿Eliminar a ${u.nombre}? Esta acción no se puede deshacer.'),
+        content: Text('¿Eliminar a ${u.nombre}? Esta acción no se puede deshacer.'),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.redDanger,
-                foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.redDanger, foregroundColor: Colors.white),
             onPressed: () {
               ref.read(usersProvider.notifier).eliminar(u.id);
               Navigator.pop(ctx);
@@ -293,6 +369,237 @@ class _UsuariosTab extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Rol Pill & Estado Pill ────────────────────────────────────────────────────
+
+class _RolPill extends StatelessWidget {
+  final String rol;
+  const _RolPill({required this.rol});
+
+  @override
+  Widget build(BuildContext context) {
+    final (fg, bg, label) = switch (rol) {
+      'director'  => (const Color(0xFF292524), const Color(0xFFE7E5E4), 'Director'),
+      'operativo' => (AppTheme.orange700, AppTheme.orange100, 'Operativo'),
+      _           => (AppTheme.stone500, AppTheme.stone100, 'Visitante'),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 5, height: 5, decoration: BoxDecoration(color: fg, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text(label.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg, letterSpacing: 0.04)),
+      ]),
+    );
+  }
+}
+
+class _EstadoPill extends StatelessWidget {
+  final bool activo;
+  const _EstadoPill({required this.activo});
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = activo ? AppTheme.greenSuccess : AppTheme.stone500;
+    final bg = activo ? const Color(0xFFDCFCE7) : AppTheme.stone100;
+    final label = activo ? 'Activo' : 'Inactivo';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 6, height: 6, decoration: BoxDecoration(color: fg, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
+      ]),
+    );
+  }
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+
+const _kBitacoraReciente = [
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Aprobó solicitud de R. Sepúlveda', time: 'hace 2h'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Creó usuario inspector2@lota.cl', time: 'hace 5h'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Rechazó solicitud de C. Morales', time: 'ayer 16:30'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Editó rol de J. Pérez a Operativo', time: 'ayer 09:15'),
+];
+
+class _UsersSidebar extends StatelessWidget {
+  final List<UsuarioItem> users;
+  final List<Solicitud> solicitudes;
+  final WidgetRef ref;
+
+  const _UsersSidebar({required this.users, required this.solicitudes, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    final directors = users.where((u) => u.nivelAcceso == 'director').length;
+    final operativos = users.where((u) => u.nivelAcceso == 'operativo').length;
+    final visitantes = users.where((u) => u.nivelAcceso == 'visitante').length;
+    final total = users.isEmpty ? 1 : users.length;
+    final pending = solicitudes.where((s) => s.estado == 'pendiente').take(3).toList();
+
+    return Column(children: [
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.stone200),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Distribución de roles', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.stone700)),
+          const SizedBox(height: 12),
+          _RolBar(label: 'Director', count: directors, total: total, color: const Color(0xFF292524)),
+          const SizedBox(height: 8),
+          _RolBar(label: 'Operativo', count: operativos, total: total, color: AppTheme.orange600),
+          const SizedBox(height: 8),
+          _RolBar(label: 'Visitante', count: visitantes, total: total, color: AppTheme.stone400),
+        ]),
+      ),
+      const SizedBox(height: 14),
+      if (pending.isNotEmpty)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.stone200),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Text('Solicitudes pendientes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.stone700)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(color: AppTheme.orange100, borderRadius: BorderRadius.circular(999)),
+                child: Text('${pending.length}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.orange700)),
+              ),
+            ]),
+            const SizedBox(height: 10),
+            ...pending.map((s) => _SolicitudMiniCard(s: s, ref: ref)),
+          ]),
+        ),
+      const SizedBox(height: 14),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.stone200),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Actividad reciente', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.stone700)),
+          const SizedBox(height: 10),
+          ..._kBitacoraReciente.map((e) => _BitacoraEntry(entry: e)),
+        ]),
+      ),
+    ]);
+  }
+}
+
+class _RolBar extends StatelessWidget {
+  final String label;
+  final int count;
+  final int total;
+  final Color color;
+  const _RolBar({required this.label, required this.count, required this.total, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = total == 0 ? 0.0 : count / total;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text(label, style: const TextStyle(fontSize: 11.5, color: AppTheme.stone600)),
+        const Spacer(),
+        Text('$count', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppTheme.stone700)),
+      ]),
+      const SizedBox(height: 4),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: LinearProgressIndicator(
+          value: pct,
+          minHeight: 6,
+          backgroundColor: AppTheme.stone100,
+          valueColor: AlwaysStoppedAnimation(color),
+        ),
+      ),
+    ]);
+  }
+}
+
+class _SolicitudMiniCard extends StatelessWidget {
+  final Solicitud s;
+  final WidgetRef ref;
+  const _SolicitudMiniCard({required this.s, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = s.nombre.split(' ').take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(children: [
+        Container(
+          width: 30, height: 30,
+          decoration: const BoxDecoration(color: Color(0xFFFEF3C7), shape: BoxShape.circle),
+          alignment: Alignment.center,
+          child: Text(initials, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.amberWarning)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(s.nombre, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+          Text(s.cargo, style: const TextStyle(fontSize: 11, color: AppTheme.stone500), overflow: TextOverflow.ellipsis),
+        ])),
+        Column(children: [
+          GestureDetector(
+            onTap: () => ref.read(solicitudesProvider.notifier).resolver(s.id, 'aprobar'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(4)),
+              child: const Icon(Icons.check, size: 12, color: AppTheme.greenSuccess),
+            ),
+          ),
+          const SizedBox(height: 4),
+          GestureDetector(
+            onTap: () => ref.read(solicitudesProvider.notifier).resolver(s.id, 'rechazar'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(4)),
+              child: const Icon(Icons.close, size: 12, color: AppTheme.redDanger),
+            ),
+          ),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _BitacoraEntry extends StatelessWidget {
+  final ({String initials, Color color, String action, String time}) entry;
+  const _BitacoraEntry({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 26, height: 26,
+          decoration: BoxDecoration(color: entry.color.withValues(alpha: 0.15), shape: BoxShape.circle),
+          alignment: Alignment.center,
+          child: Text(entry.initials, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: entry.color)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(entry.action, style: const TextStyle(fontSize: 11.5, color: AppTheme.stone700, height: 1.3)),
+          const SizedBox(height: 2),
+          Text(entry.time, style: const TextStyle(fontSize: 11, color: AppTheme.stone400)),
+        ])),
+      ]),
     );
   }
 }
@@ -665,7 +972,7 @@ class _UsersHeader extends ConsumerWidget {
             child: Row(children: [
               _HeaderStat(value: '$activos', label: 'Usuarios activos'),
               const SizedBox(width: 28),
-              _HeaderStat(value: '4', label: 'Roles'),
+              const _HeaderStat(value: '4', label: 'Roles'),
               const SizedBox(width: 28),
               _HeaderStat(
                 value: '$pendientes',
@@ -674,7 +981,7 @@ class _UsersHeader extends ConsumerWidget {
                 badge: pendientes > 0 ? 'nuevas' : null,
               ),
               const SizedBox(width: 28),
-              _HeaderStat(value: '98%', label: 'Sesiones esta semana'),
+              const _HeaderStat(value: '98%', label: 'Sesiones esta semana'),
             ]),
           ),
         ]),

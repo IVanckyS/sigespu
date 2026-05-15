@@ -996,9 +996,91 @@ class _HeaderStat extends StatelessWidget {
 
 class _RolesTab extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => const Center(
-    child: Text('Roles y permisos — próximamente', style: TextStyle(color: AppTheme.stone400)),
-  );
+  Widget build(BuildContext context) {
+    return const SingleChildScrollView(
+      padding: EdgeInsets.all(24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Capacidades por rol en el sistema SIGESPU.',
+          style: TextStyle(fontSize: 13, color: AppTheme.stone500)),
+        SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _RolCard(rol: 'Visitante', color: AppTheme.stone500, bg: AppTheme.stone100),
+            SizedBox(width: 14),
+            _RolCard(rol: 'Operativo', color: AppTheme.orange700, bg: AppTheme.orange100),
+            SizedBox(width: 14),
+            _RolCard(rol: 'Director', color: Color(0xFF292524), bg: Color(0xFFE7E5E4)),
+          ],
+        ),
+      ]),
+    );
+  }
+}
+
+const _kPermisos = [
+  (label: 'Ver mapa y capas',          visitante: true,  operativo: true,  director: true),
+  (label: 'Exportar PDF',              visitante: true,  operativo: true,  director: true),
+  (label: 'Crear reportes',            visitante: false, operativo: true,  director: true),
+  (label: 'Agregar elementos al mapa', visitante: false, operativo: true,  director: true),
+  (label: 'Dibujar zonas de peligro',  visitante: false, operativo: true,  director: true),
+  (label: 'Verificar en terreno',      visitante: false, operativo: true,  director: true),
+  (label: 'Aprobar solicitudes',       visitante: false, operativo: false, director: true),
+  (label: 'Gestionar usuarios',        visitante: false, operativo: false, director: true),
+  (label: 'Ver bitácora completa',     visitante: false, operativo: false, director: true),
+];
+
+class _RolCard extends StatelessWidget {
+  final String rol;
+  final Color color;
+  final Color bg;
+  const _RolCard({required this.rol, required this.color, required this.bg});
+
+  @override
+  Widget build(BuildContext context) {
+    final perms = _kPermisos.map((p) => switch (rol) {
+      'Operativo' => p.operativo,
+      'Director'  => p.director,
+      _           => p.visitante,
+    }).toList();
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.stone200),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              const SizedBox(width: 5),
+              Text(rol.toUpperCase(), style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color, letterSpacing: 0.04)),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          ..._kPermisos.asMap().entries.map((e) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(children: [
+              Icon(
+                perms[e.key] ? Icons.check_circle : Icons.cancel_outlined,
+                size: 16,
+                color: perms[e.key] ? AppTheme.greenSuccess : AppTheme.stone300,
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: Text(e.value.label,
+                style: TextStyle(fontSize: 12.5, color: perms[e.key] ? AppTheme.stone700 : AppTheme.stone400),
+              )),
+            ]),
+          )),
+        ]),
+      ),
+    );
+  }
 }
 
 class _BitacoraTab extends StatelessWidget {

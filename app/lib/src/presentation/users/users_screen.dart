@@ -135,7 +135,7 @@ class _UsuariosTab extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Main table
-                Expanded(child: _UsersTable(users: users, ref: ref)),
+                Expanded(child: _UsersTable(users: users)),
                 const SizedBox(width: 18),
                 // Sidebar
                 SizedBox(
@@ -144,7 +144,6 @@ class _UsuariosTab extends ConsumerWidget {
                     child: _UsersSidebar(
                       users: users,
                       solicitudes: solicitudesAsync.valueOrNull ?? [],
-                      ref: ref,
                     ),
                   ),
                 ),
@@ -254,13 +253,12 @@ class _ToolbarDropdown extends StatelessWidget {
 
 // ── Users Table ───────────────────────────────────────────────────────────────
 
-class _UsersTable extends StatelessWidget {
+class _UsersTable extends ConsumerWidget {
   final List<UsuarioItem> users;
-  final WidgetRef ref;
-  const _UsersTable({required this.users, required this.ref});
+  const _UsersTable({required this.users});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -283,13 +281,13 @@ class _UsersTable extends StatelessWidget {
             DataColumn(label: Text('Última sesión')),
             DataColumn(label: Text('Acciones')),
           ],
-          rows: users.map((u) => _buildRow(context, u)).toList(),
+          rows: users.map((u) => _buildRow(context, ref, u)).toList(),
         ),
       ),
     );
   }
 
-  DataRow _buildRow(BuildContext context, UsuarioItem u) {
+  DataRow _buildRow(BuildContext context, WidgetRef ref, UsuarioItem u) {
     final isDirector = u.nivelAcceso == 'director';
     final initials = u.nombre.split(' ').take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
     final avatarColor = isDirector
@@ -326,18 +324,18 @@ class _UsersTable extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.stone500),
                 tooltip: 'Editar',
-                onPressed: () => _showEditDialog(context, u),
+                onPressed: () => _showEditDialog(context, ref, u),
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, size: 16, color: AppTheme.redDanger),
                 tooltip: 'Eliminar',
-                onPressed: () => _showDeleteDialog(context, u),
+                onPressed: () => _showDeleteDialog(context, ref, u),
               ),
             ])),
     ]);
   }
 
-  void _showEditDialog(BuildContext context, UsuarioItem u) {
+  void _showEditDialog(BuildContext context, WidgetRef ref, UsuarioItem u) {
     showDialog(
       context: context,
       builder: (_) => _UserFormDialog(
@@ -351,7 +349,7 @@ class _UsersTable extends StatelessWidget {
     );
   }
 
-  void _showDeleteDialog(BuildContext context, UsuarioItem u) {
+  void _showDeleteDialog(BuildContext context, WidgetRef ref, UsuarioItem u) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -428,15 +426,14 @@ const _kBitacoraReciente = [
   (initials: 'DS', color: Color(0xFF9A3412), action: 'Editó rol de J. Pérez a Operativo', time: 'ayer 09:15'),
 ];
 
-class _UsersSidebar extends StatelessWidget {
+class _UsersSidebar extends ConsumerWidget {
   final List<UsuarioItem> users;
   final List<Solicitud> solicitudes;
-  final WidgetRef ref;
 
-  const _UsersSidebar({required this.users, required this.solicitudes, required this.ref});
+  const _UsersSidebar({required this.users, required this.solicitudes});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final directors = users.where((u) => u.nivelAcceso == 'director').length;
     final operativos = users.where((u) => u.nivelAcceso == 'operativo').length;
     final visitantes = users.where((u) => u.nivelAcceso == 'visitante').length;
@@ -481,7 +478,7 @@ class _UsersSidebar extends StatelessWidget {
               ),
             ]),
             const SizedBox(height: 10),
-            ...pending.map((s) => _SolicitudMiniCard(s: s, ref: ref)),
+            ...pending.map((s) => _SolicitudMiniCard(s: s)),
           ]),
         ),
       const SizedBox(height: 14),
@@ -532,13 +529,12 @@ class _RolBar extends StatelessWidget {
   }
 }
 
-class _SolicitudMiniCard extends StatelessWidget {
+class _SolicitudMiniCard extends ConsumerWidget {
   final Solicitud s;
-  final WidgetRef ref;
-  const _SolicitudMiniCard({required this.s, required this.ref});
+  const _SolicitudMiniCard({required this.s});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final initials = s.nombre.split(' ').take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

@@ -378,11 +378,12 @@ class _TablaBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sectors = kElementosSeed.map((e) => e.sector).toSet().length;
-    final activos = kElementosSeed.where((e) => e.estado == 'activo').length;
+    const seed = kElementosSeed;
+    final sectors = seed.map((e) => e.sector).toSet().length;
+    final activos = seed.where((e) => e.estado == 'activo').length;
     final now = DateTime.now();
     final sevenDaysAgo = now.subtract(const Duration(days: 7));
-    final estaSemana = kElementosSeed.where((e) {
+    final estaSemana = seed.where((e) {
       final d = DateTime.tryParse(e.fecha);
       return d != null && d.isAfter(sevenDaysAgo);
     }).length;

@@ -370,7 +370,22 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
         child: Text(estadoLabel, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: estadoColor)),
       )),
       // Por
-      DataCell(Text(e.by, style: const TextStyle(color: AppTheme.stone500, fontSize: 11.5))),
+      DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 26, height: 26,
+          decoration: BoxDecoration(
+            color: _byColor(e.by),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            _byInitials(e.by),
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(e.by, style: const TextStyle(color: AppTheme.stone600, fontSize: 11.5)),
+      ])),
     ]);
   }
 
@@ -636,6 +651,24 @@ class _CategoryChips extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Avatar helpers ────────────────────────────────────────────────────────
+
+Color _byColor(String by) {
+  const colors = [
+    Color(0xFF9A3412), Color(0xFF15803D), Color(0xFF7C3AED),
+    Color(0xFFCA8A04), Color(0xFF57534E), Color(0xFFB91C1C),
+    Color(0xFF0284C7), Color(0xFF92400E),
+  ];
+  return colors[by.codeUnits.fold(0, (a, b) => a + b) % colors.length];
+}
+
+String _byInitials(String by) {
+  final parts = by.trim().split(RegExp(r'[\s.]+'));
+  if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  if (parts[0].length >= 2) return parts[0].substring(0, 2).toUpperCase();
+  return parts[0][0].toUpperCase();
 }
 
 // ── FilterDateChip ────────────────────────────────────────────────────────────

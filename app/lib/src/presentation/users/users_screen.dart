@@ -426,6 +426,19 @@ const _kBitacoraReciente = [
   (initials: 'DS', color: Color(0xFF9A3412), action: 'Editó rol de J. Pérez a Operativo', time: 'ayer 09:15'),
 ];
 
+const _kBitacoraFull = [
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Aprobó solicitud de R. Sepúlveda → Operativo', time: '2026-05-14 · 10:22'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Creó usuario inspector2@lota.cl (Visitante)', time: '2026-05-14 · 09:18'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Rechazó solicitud de C. Morales', time: '2026-05-13 · 16:30'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Editó rol de J. Pérez: Visitante → Operativo', time: '2026-05-13 · 09:15'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Eliminó usuario temporal@lota.cl', time: '2026-05-12 · 14:44'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Creó usuario msilva@lota.cl (Visitante)', time: '2026-05-12 · 11:02'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Aprobó solicitud de A. Fuentes → Operativo', time: '2026-05-11 · 17:33'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Suspendió usuario ex-inspector@lota.cl', time: '2026-05-10 · 08:50'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Creó usuario director@lota.cl (Director)', time: '2026-04-30 · 12:00'),
+  (initials: 'DS', color: Color(0xFF9A3412), action: 'Sistema inicializado — migración 002_seed', time: '2026-04-30 · 11:55'),
+];
+
 class _UsersSidebar extends ConsumerWidget {
   final List<UsuarioItem> users;
   final List<Solicitud> solicitudes;
@@ -1084,8 +1097,73 @@ class _RolCard extends StatelessWidget {
 }
 
 class _BitacoraTab extends StatelessWidget {
+  // TODO(sprint-5): conectar a GET /audit-log
   @override
-  Widget build(BuildContext context) => const Center(
-    child: Text('Bitácora — próximamente', style: TextStyle(color: AppTheme.stone400)),
-  );
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('Registro de acciones administrativas.',
+            style: TextStyle(fontSize: 13, color: AppTheme.stone500)),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppTheme.stone100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.info_outline, size: 13, color: AppTheme.stone400),
+              SizedBox(width: 6),
+              Text('Datos de demo · Ley 19.628',
+                style: TextStyle(fontSize: 11.5, color: AppTheme.stone500)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 16),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.stone200),
+            ),
+            child: ListView.separated(
+              itemCount: _kBitacoraFull.length,
+              separatorBuilder: (_, __) => Container(
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                height: 1,
+                color: AppTheme.stone100,
+              ),
+              itemBuilder: (_, i) {
+                final e = _kBitacoraFull[i];
+                return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(
+                    width: 34, height: 34,
+                    decoration: BoxDecoration(
+                      color: e.color.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(e.initials,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: e.color)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(e.action,
+                      style: const TextStyle(fontSize: 13, color: AppTheme.stone800, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 3),
+                    Text(e.time,
+                      style: const TextStyle(fontSize: 11.5, color: AppTheme.stone400)),
+                  ])),
+                ]);
+              },
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
 }

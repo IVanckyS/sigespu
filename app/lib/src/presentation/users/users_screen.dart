@@ -600,7 +600,7 @@ class _BitacoraEntry extends StatelessWidget {
   }
 }
 
-// ── Tab: Solicitudes (existing logic) ────────────────────────────────────────
+// ── Tab: Solicitudes (card layout) ───────────────────────────────────────────
 
 class _SolicitudesTab extends ConsumerWidget {
   @override
@@ -609,186 +609,150 @@ class _SolicitudesTab extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Solicitudes de acceso operativo pendientes y procesadas.',
-            style: TextStyle(fontSize: 13, color: AppTheme.stone500),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text(
+          'Solicitudes de acceso operativo — pendientes y procesadas.',
+          style: TextStyle(fontSize: 13, color: AppTheme.stone500),
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: solicitudesAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+            data: (solicitudes) => solicitudes.isEmpty
+                ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.inbox_outlined, size: 48, color: AppTheme.stone300),
+                    SizedBox(height: 12),
+                    Text('No hay solicitudes.', style: TextStyle(fontSize: 14, color: AppTheme.stone400)),
+                  ]))
+                : ListView.separated(
+                    itemCount: solicitudes.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, i) => _SolicitudCard(
+                      s: solicitudes[i],
+                      onAprobar: () => _resolver(context, ref, solicitudes[i].id, 'aprobar'),
+                      onRechazar: () => _resolver(context, ref, solicitudes[i].id, 'rechazar'),
+                    ),
+                  ),
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: solicitudesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        size: 40, color: AppTheme.stone400),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Error al cargar solicitudes\n$e',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          color: AppTheme.stone500, fontSize: 13),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: () => ref.invalidate(solicitudesProvider),
-                      child: const Text('Reintentar'),
-                    ),
-                  ],
-                ),
-              ),
-              data: (solicitudes) => solicitudes.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.inbox_outlined,
-                              size: 48, color: AppTheme.stone300),
-                          SizedBox(height: 12),
-                          Text(
-                            'No hay solicitudes registradas.',
-                            style: TextStyle(
-                                fontSize: 14, color: AppTheme.stone400),
-                          ),
-                        ],
-                      ),
-                    )
-                  : Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.stone200),
-                      ),
-                      child: SingleChildScrollView(
-                        child: DataTable(
-                          headingRowColor: WidgetStateProperty.resolveWith(
-                              (_) => AppTheme.stone50),
-                          columnSpacing: 20,
-                          columns: const [
-                            DataColumn(label: Text('Nombre')),
-                            DataColumn(label: Text('Email')),
-                            DataColumn(label: Text('Cargo')),
-                            DataColumn(label: Text('Dependencia')),
-                            DataColumn(label: Text('Fecha')),
-                            DataColumn(label: Text('Estado')),
-                            DataColumn(label: Text('Acciones')),
-                          ],
-                          rows: solicitudes
-                              .map((s) => _buildRow(context, ref, s))
-                              .toList(),
-                        ),
-                      ),
-                    ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 
-  DataRow _buildRow(BuildContext context, WidgetRef ref, Solicitud s) {
-    final isPending = s.estado == 'pendiente';
-
-    Color estadoBg;
-    Color estadoFg;
-    switch (s.estado) {
-      case 'pendiente':
-        estadoBg = AppTheme.amberWarning.withValues(alpha: 0.12);
-        estadoFg = AppTheme.amberWarning;
-      case 'aprobada':
-        estadoBg = AppTheme.greenSuccess.withValues(alpha: 0.12);
-        estadoFg = AppTheme.greenSuccess;
-      default:
-        estadoBg = AppTheme.redDanger.withValues(alpha: 0.10);
-        estadoFg = AppTheme.redDanger;
-    }
-
-    return DataRow(
-      cells: [
-        DataCell(Text(s.nombre,
-            style: const TextStyle(fontWeight: FontWeight.w500))),
-        DataCell(Text(s.email,
-            style: const TextStyle(fontSize: 12, color: AppTheme.stone600))),
-        DataCell(Text(s.cargo, style: const TextStyle(fontSize: 12))),
-        DataCell(Text(s.direccion,
-            style: const TextStyle(fontSize: 12, color: AppTheme.stone600))),
-        DataCell(Text(
-          s.fecha.length >= 10 ? s.fecha.substring(0, 10) : s.fecha,
-          style: const TextStyle(fontSize: 12, color: AppTheme.stone500),
-        )),
-        DataCell(
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: estadoBg,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              s.estado.toUpperCase(),
-              style: TextStyle(
-                  color: estadoFg,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-        DataCell(
-          isPending
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.check_circle,
-                          color: AppTheme.greenSuccess, size: 22),
-                      tooltip: 'Aprobar',
-                      onPressed: () =>
-                          _resolver(context, ref, s.id, 'aprobar'),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.cancel,
-                          color: AppTheme.redDanger, size: 22),
-                      tooltip: 'Rechazar',
-                      onPressed: () =>
-                          _resolver(context, ref, s.id, 'rechazar'),
-                    ),
-                  ],
-                )
-              : const SizedBox.shrink(),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _resolver(
-      BuildContext context, WidgetRef ref, String id, String accion) async {
+  Future<void> _resolver(BuildContext context, WidgetRef ref, String id, String accion) async {
     try {
       await ref.read(solicitudesProvider.notifier).resolver(id, accion);
       if (context.mounted) {
-        final msg = accion == 'aprobar'
-            ? 'Solicitud aprobada — usuario promovido a Operativo'
-            : 'Solicitud rechazada';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor:
-                accion == 'aprobar' ? AppTheme.greenSuccess : AppTheme.stone700,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(accion == 'aprobar'
+              ? 'Solicitud aprobada — usuario promovido a Operativo'
+              : 'Solicitud rechazada'),
+          backgroundColor: accion == 'aprobar' ? AppTheme.greenSuccess : AppTheme.stone700,
+        ));
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: AppTheme.redDanger,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: AppTheme.redDanger,
+        ));
       }
     }
+  }
+}
+
+class _SolicitudCard extends StatelessWidget {
+  final Solicitud s;
+  final VoidCallback onAprobar;
+  final VoidCallback onRechazar;
+
+  const _SolicitudCard({required this.s, required this.onAprobar, required this.onRechazar});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPending = s.estado == 'pendiente';
+    final initials = s.nombre.split(' ').take(2).map((p) => p.isNotEmpty ? p[0] : '').join().toUpperCase();
+
+    final (stateFg, stateBg, stateLabel) = switch (s.estado) {
+      'aprobada'  => (AppTheme.greenSuccess, const Color(0xFFDCFCE7), 'Aprobada'),
+      'rechazada' => (AppTheme.redDanger, const Color(0xFFFEE2E2), 'Rechazada'),
+      _           => (AppTheme.amberWarning, const Color(0xFFFEF3C7), 'Pendiente'),
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isPending ? const Color(0xFFFFFBF5) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isPending ? AppTheme.orange100 : AppTheme.stone200),
+      ),
+      child: Row(children: [
+        Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(
+            color: isPending ? const Color(0xFFFEF3C7) : AppTheme.stone100,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(initials, style: TextStyle(
+            fontSize: 13, fontWeight: FontWeight.w700,
+            color: isPending ? AppTheme.amberWarning : AppTheme.stone500,
+          )),
+        ),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text(s.nombre, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(color: stateBg, borderRadius: BorderRadius.circular(4)),
+              child: Text(stateLabel, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: stateFg)),
+            ),
+          ]),
+          const SizedBox(height: 3),
+          Text('${s.cargo} · ${s.direccion}',
+            style: const TextStyle(fontSize: 12.5, color: AppTheme.stone500)),
+          const SizedBox(height: 2),
+          Text(s.email, style: const TextStyle(fontSize: 12, color: AppTheme.stone400)),
+          const SizedBox(height: 2),
+          Text(
+            s.fecha.length >= 10 ? s.fecha.substring(0, 10) : s.fecha,
+            style: const TextStyle(fontSize: 11.5, color: AppTheme.stone400),
+          ),
+        ])),
+        if (isPending) ...[
+          const SizedBox(width: 12),
+          Column(children: [
+            ElevatedButton.icon(
+              onPressed: onAprobar,
+              icon: const Icon(Icons.check, size: 13),
+              label: const Text('Aprobar', style: TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.greenSuccess,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+            ),
+            const SizedBox(height: 6),
+            OutlinedButton.icon(
+              onPressed: onRechazar,
+              icon: const Icon(Icons.close, size: 13),
+              label: const Text('Rechazar', style: TextStyle(fontSize: 12)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.redDanger,
+                side: const BorderSide(color: AppTheme.redDanger),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ]),
+        ],
+      ]),
+    );
   }
 }
 

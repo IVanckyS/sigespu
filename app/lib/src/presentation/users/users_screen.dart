@@ -18,7 +18,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 2, vsync: this);
+    _tab = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -29,92 +29,82 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
 
   @override
   Widget build(BuildContext context) {
-    final solicitudesAsync = ref.watch(solicitudesProvider);
-    final pendingCount = solicitudesAsync.valueOrNull
-            ?.where((s) => s.estado == 'pendiente')
-            .length ??
-        0;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Header ────────────────────────────────────────────────────────────
+        // ── Header card ────────────────────────────────────────────
+        _UsersHeader(),
+        // ── Tab bar ────────────────────────────────────────────────
         Container(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
           color: Colors.white,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                const Text(
-                  'Gestión de Usuarios',
-                  style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.stone900),
+          child: Column(children: [
+            TabBar(
+              controller: _tab,
+              labelColor: AppTheme.orange600,
+              unselectedLabelColor: AppTheme.stone500,
+              indicatorColor: AppTheme.orange600,
+              indicatorWeight: 2,
+              labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              tabs: [
+                const Tab(
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.people_outline, size: 14),
+                    SizedBox(width: 6),
+                    Text('Usuarios'),
+                  ]),
                 ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.refresh,
-                      size: 18, color: AppTheme.stone500),
-                  onPressed: () {
-                    ref.invalidate(usersProvider);
-                    ref.invalidate(solicitudesProvider);
-                  },
-                ),
-              ]),
-              const SizedBox(height: 4),
-              const Text(
-                'Gestión de accesos al sistema SIGESPU.',
-                style: TextStyle(fontSize: 13, color: AppTheme.stone500),
-              ),
-              const SizedBox(height: 12),
-              TabBar(
-                controller: _tab,
-                labelColor: AppTheme.orange600,
-                unselectedLabelColor: AppTheme.stone500,
-                indicatorColor: AppTheme.orange600,
-                indicatorWeight: 2,
-                labelStyle: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600),
-                tabs: [
-                  const Tab(text: 'Usuarios'),
-                  Tab(
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Tab(
+                  child: Consumer(builder: (_, ref, __) {
+                    final count = ref.watch(solicitudesProvider).valueOrNull
+                        ?.where((s) => s.estado == 'pendiente').length ?? 0;
+                    return Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.inbox_outlined, size: 14),
+                      const SizedBox(width: 6),
                       const Text('Solicitudes'),
-                      if (pendingCount > 0) ...[
+                      if (count > 0) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                           decoration: BoxDecoration(
                             color: AppTheme.orange100,
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          child: Text(
-                            '$pendingCount',
-                            style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.orange700),
-                          ),
+                          child: Text('$count', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.orange700)),
                         ),
                       ],
-                    ]),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                    ]);
+                  }),
+                ),
+                const Tab(
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.key_outlined, size: 14),
+                    SizedBox(width: 6),
+                    Text('Roles y permisos'),
+                  ]),
+                ),
+                const Tab(
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.history, size: 14),
+                    SizedBox(width: 6),
+                    Text('Bitácora'),
+                  ]),
+                ),
+              ],
+            ),
+            Container(height: 1, color: AppTheme.stone200),
+          ]),
         ),
-        Container(height: 1, color: AppTheme.stone200),
-        // ── Tab content ───────────────────────────────────────────────────────
+        // ── Tab content ────────────────────────────────────────────
         Expanded(
           child: TabBarView(
             controller: _tab,
             children: [
               _UsuariosTab(),
               _SolicitudesTab(),
+              _RolesTab(),
+              _BitacoraTab(),
             ],
           ),
         ),
@@ -608,4 +598,145 @@ class _UserFormDialogState extends State<_UserFormDialog> {
       ],
     );
   }
+}
+
+// ── Header card ───────────────────────────────────────────────────────────────
+
+class _UsersHeader extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final users = ref.watch(usersProvider).valueOrNull ?? [];
+    final solicitudes = ref.watch(solicitudesProvider).valueOrNull ?? [];
+    final activos = users.where((u) => u.activo).length;
+    final pendientes = solicitudes.where((s) => s.estado == 'pendiente').length;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: const EdgeInsets.fromLTRB(26, 22, 26, 22),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1C1917), Color(0xFF44403C), Color(0xFF9A3412)],
+          stops: [0.0, 0.55, 1.0],
+        ),
+      ),
+      child: Stack(children: [
+        const Positioned(
+          right: 0, top: 0, bottom: 0,
+          child: Center(
+            child: Opacity(
+              opacity: 0.13,
+              child: Icon(Icons.shield_outlined, size: 110, color: Colors.white),
+            ),
+          ),
+        ),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.shield_outlined, size: 11, color: Color(0xFFFED7AA)),
+              SizedBox(width: 6),
+              Text(
+                'ADMINISTRACIÓN · ACCESO AL SISTEMA',
+                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600,
+                  letterSpacing: 0.6, color: Color(0xCCFFFFFF)),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Gestión de usuarios',
+            style: AppTheme.displayFont(fontSize: 26, color: Colors.white),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'Roles, credenciales y permisos del personal SIGESPU. Toda alta queda registrada en bitácora · Ley 19.628.',
+            style: TextStyle(fontSize: 12.5, color: Color(0xBFFFFFFF), height: 1.5),
+          ),
+          const SizedBox(height: 18),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              _HeaderStat(value: '$activos', label: 'Usuarios activos'),
+              const SizedBox(width: 28),
+              _HeaderStat(value: '4', label: 'Roles'),
+              const SizedBox(width: 28),
+              _HeaderStat(
+                value: '$pendientes',
+                label: 'Solicitudes pendientes',
+                highlight: pendientes > 0,
+                badge: pendientes > 0 ? 'nuevas' : null,
+              ),
+              const SizedBox(width: 28),
+              _HeaderStat(value: '98%', label: 'Sesiones esta semana'),
+            ]),
+          ),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _HeaderStat extends StatelessWidget {
+  final String value;
+  final String label;
+  final bool highlight;
+  final String? badge;
+
+  const _HeaderStat({
+    required this.value,
+    required this.label,
+    this.highlight = false,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text(
+          value,
+          style: AppTheme.displayFont(
+            fontSize: 28,
+            color: highlight ? const Color(0xFFFED7AA) : Colors.white,
+          ),
+        ),
+        if (badge != null) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppTheme.orange600,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(badge!, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
+        ],
+      ]),
+      const SizedBox(height: 4),
+      Text(label, style: const TextStyle(fontSize: 11, color: Color(0xBFFFFFFF), letterSpacing: 0.03)),
+    ]);
+  }
+}
+
+// ── Tab stubs ─────────────────────────────────────────────────────────────────
+
+class _RolesTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: Text('Roles y permisos — próximamente', style: TextStyle(color: AppTheme.stone400)),
+  );
+}
+
+class _BitacoraTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: Text('Bitácora — próximamente', style: TextStyle(color: AppTheme.stone400)),
+  );
 }

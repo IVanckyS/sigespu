@@ -23,7 +23,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
   String _search = '';
   String _sortCol = 'fecha';
   bool _sortAsc = false;
-  bool _filtersExpanded = true;
+  bool _filtersExpanded = false;
   final _datePopupCtrl = DateRangePopupController(LayerLink());
 
   @override
@@ -209,7 +209,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         // ── View banner ──────────────────────────────────────────────────────
-        _TablaBanner(total: kElementosSeed.length, shown: filtered.length),
+        _TablaBanner(total: kElementosSeed.length),
         const SizedBox(height: 16),
 
         // ── Filtros ──────────────────────────────────────────────────────────
@@ -374,13 +374,18 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
 
 class _TablaBanner extends StatelessWidget {
   final int total;
-  final int shown;
-  const _TablaBanner({required this.total, required this.shown});
+  const _TablaBanner({required this.total});
 
   @override
   Widget build(BuildContext context) {
-    final types = kElementosSeed.map((e) => e.tipo).toSet().length;
     final sectors = kElementosSeed.map((e) => e.sector).toSet().length;
+    final activos = kElementosSeed.where((e) => e.estado == 'activo').length;
+    final now = DateTime.now();
+    final sevenDaysAgo = now.subtract(const Duration(days: 7));
+    final estaSemana = kElementosSeed.where((e) {
+      final d = DateTime.tryParse(e.fecha);
+      return d != null && d.isAfter(sevenDaysAgo);
+    }).length;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -409,17 +414,18 @@ class _TablaBanner extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 24, 140, 24),
+              padding: const EdgeInsets.fromLTRB(28, 24, 24, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Row(children: [
                     Icon(Icons.grid_on_outlined, size: 12, color: Color(0x80FFFFFF)),
                     SizedBox(width: 6),
-                    Text(
+                    Flexible(child: Text(
                       'Vista · Registro de elementos',
                       style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0x80FFFFFF), letterSpacing: 0.9),
-                    ),
+                      overflow: TextOverflow.ellipsis,
+                    )),
                   ]),
                   const SizedBox(height: 6),
                   Text(
@@ -438,15 +444,18 @@ class _TablaBanner extends StatelessWidget {
                     style: TextStyle(fontSize: 12, color: Color(0xBFFFFFFF), height: 1.5),
                   ),
                   const SizedBox(height: 14),
-                  Row(children: [
-                    _TablaStat(value: '$total', label: 'Total registros', valueColor: const Color(0xFFFB923C)),
-                    const SizedBox(width: 16),
-                    _TablaStat(value: '$types', label: 'Tipos distintos'),
-                    const SizedBox(width: 16),
-                    _TablaStat(value: '$sectors', label: 'Sectores'),
-                    const SizedBox(width: 16),
-                    _TablaStat(value: '$shown', label: 'Mostrando'),
-                  ]),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: [
+                      _TablaStat(value: '$total', label: 'Total registros', valueColor: const Color(0xFFFB923C)),
+                      const SizedBox(width: 16),
+                      _TablaStat(value: '$sectors', label: 'Sectores'),
+                      const SizedBox(width: 16),
+                      _TablaStat(value: '$activos', label: 'Activos'),
+                      const SizedBox(width: 16),
+                      _TablaStat(value: '$estaSemana', label: 'Esta semana'),
+                    ]),
+                  ),
                 ],
               ),
             ),

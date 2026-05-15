@@ -547,8 +547,8 @@ class _ScrapingBanner extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF4C1D95), Color(0xFF6D28D9), Color(0xFF7C3AED)],
-            stops: [0.0, 0.6, 1.0],
+            colors: [Color(0xFF7C2D12), Color(0xFF9A3412), Color(0xFFC2410C)],
+            stops: [0.0, 0.5, 1.0],
           ),
         ),
         child: Stack(

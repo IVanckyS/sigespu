@@ -14,6 +14,7 @@ class TablaScreen extends ConsumerStatefulWidget {
 }
 
 class _TablaScreenState extends ConsumerState<TablaScreen> {
+  String _filterCat = 'todos'; // 'todos' | 'zonas' | 'patente' | 'infra' | 'otros'
   String _filterTipo = 'all';
   String _filterSector = 'all';
   String _filterEstado = 'all';
@@ -34,6 +35,12 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
 
   List<ElementoMapa> get _filtered {
     final list = kElementosSeed.where((e) {
+      // ── filtro de categoría (chips) ──
+      if (_filterCat == 'zonas' && e.layerKey != 'zona_peligro') return false;
+      if (_filterCat == 'patente' && e.layerKey != 'patente') return false;
+      if (_filterCat == 'infra' && !const ['centro_acopio', 'sede_comunitaria', 'infraestructura'].contains(e.layerKey)) return false;
+      if (_filterCat == 'otros' && const ['zona_peligro', 'patente', 'centro_acopio', 'sede_comunitaria', 'infraestructura'].contains(e.layerKey)) return false;
+      // ── filtros existentes (no tocar) ──
       if (_filterTipo != 'all' && e.layerKey != _filterTipo) return false;
       if (_filterSector != 'all' && e.sector != _filterSector) return false;
       if (_filterEstado != 'all' && e.estado != _filterEstado) return false;
@@ -259,8 +266,14 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
           },
         ),
 
-        // ── Stats bar ────────────────────────────────────────────────────────
-        _StatsBar(elements: filtered),
+        // ── Category chips ────────────────────────────────────────────────────────
+        _CategoryChips(
+          active: _filterCat,
+          onChanged: (cat) {
+            setState(() => _filterCat = cat);
+            _syncProvider();
+          },
+        ),
         const SizedBox(height: 8),
 
         // ── Tabla ────────────────────────────────────────────────────────────
@@ -548,59 +561,79 @@ class _FilterSelect extends StatelessWidget {
   }
 }
 
-// ── StatsBar ──────────────────────────────────────────────────────────────────
+// ── CategoryChips ─────────────────────────────────────────────────────────────
 
-class _StatsBar extends StatelessWidget {
-  final List<ElementoMapa> elements;
-  const _StatsBar({required this.elements});
+class _CategoryChips extends StatelessWidget {
+  final String active;
+  final ValueChanged<String> onChanged;
+
+  const _CategoryChips({required this.active, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    if (elements.isEmpty) {
-      return const _StatPill(count: 0, label: 'Sin resultados', color: AppTheme.stone400);
-    }
-    final zonas = elements.where((e) => e.tipo == 'zona_peligro').length;
-    final reportes = elements.where((e) => e.tipo == 'reporte').length;
-    final patentes = elements.where((e) => e.tipo == 'patente').length;
-    final infra = elements.where((e) => const ['centro_acopio', 'sede_comunitaria', 'infraestructura'].contains(e.tipo)).length;
-    final otros = elements.length - zonas - reportes - patentes - infra;
+    const seed = kElementosSeed;
+    final chips = [
+      (id: 'todos',   label: 'Total',           count: seed.length,
+        fg: AppTheme.stone600, bg: AppTheme.stone100),
+      (id: 'zonas',   label: 'Zonas peligro',   count: seed.where((e) => e.layerKey == 'zona_peligro').length,
+        fg: AppTheme.redDanger, bg: const Color(0xFFFEE2E2)),
+      (id: 'patente', label: 'Patentes',         count: seed.where((e) => e.layerKey == 'patente').length,
+        fg: AppTheme.amberWarning, bg: const Color(0xFFFEF3C7)),
+      (id: 'infra',   label: 'Infraestructura',  count: seed.where((e) => const ['centro_acopio','sede_comunitaria','infraestructura'].contains(e.layerKey)).length,
+        fg: AppTheme.greenSuccess, bg: const Color(0xFFDCFCE7)),
+      (id: 'otros',   label: 'Otros',            count: seed.where((e) => !const ['zona_peligro','patente','centro_acopio','sede_comunitaria','infraestructura'].contains(e.layerKey)).length,
+        fg: AppTheme.stone500, bg: AppTheme.stone100),
+    ];
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Row(children: [
-        _StatPill(count: elements.length, label: 'Total', color: AppTheme.stone600),
-        if (zonas > 0) ...[const SizedBox(width: 6), _StatPill(count: zonas, label: 'Zonas peligro', color: AppTheme.redDanger)],
-        if (reportes > 0) ...[const SizedBox(width: 6), _StatPill(count: reportes, label: 'Reportes', color: const Color(0xFFEF4444))],
-        if (patentes > 0) ...[const SizedBox(width: 6), _StatPill(count: patentes, label: 'Patentes', color: AppTheme.amberWarning)],
-        if (infra > 0) ...[const SizedBox(width: 6), _StatPill(count: infra, label: 'Infraestructura', color: const Color(0xFF16A34A))],
-        if (otros > 0) ...[const SizedBox(width: 6), _StatPill(count: otros, label: 'Otros', color: AppTheme.stone400)],
-      ]),
-    );
-  }
-}
-
-class _StatPill extends StatelessWidget {
-  final int count;
-  final String label;
-  final Color color;
-  const _StatPill({required this.count, required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+      child: Row(
+        children: chips.map((c) {
+          final isActive = active == c.id;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => onChanged(c.id),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isActive ? c.bg : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isActive ? c.fg : AppTheme.stone200,
+                    width: isActive ? 1.5 : 1,
+                  ),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                    width: 7, height: 7,
+                    decoration: BoxDecoration(color: c.fg, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(c.label,
+                    style: TextStyle(
+                      fontSize: 12, fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                      color: isActive ? c.fg : AppTheme.stone600,
+                    )),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: isActive ? c.fg.withValues(alpha: 0.15) : AppTheme.stone100,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text('${c.count}',
+                      style: TextStyle(
+                        fontSize: 10.5, fontWeight: FontWeight.w700,
+                        color: isActive ? c.fg : AppTheme.stone500,
+                      )),
+                  ),
+                ]),
+              ),
+            ),
+          );
+        }).toList(),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 5),
-        Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: color.withValues(alpha: 0.8))),
-      ]),
     );
   }
 }

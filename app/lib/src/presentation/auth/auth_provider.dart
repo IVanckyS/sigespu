@@ -188,6 +188,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final token = await _storage.read(key: 'access_token');
+      if (token == null) {
+        state = state.copyWith(isLoading: false, error: 'Sesión expirada. Inicia sesión de nuevo.');
+        return false;
+      }
       final response = await http.post(
         Uri.parse('$baseUrl/solicitar-acceso'),
         headers: {

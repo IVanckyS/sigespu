@@ -13,6 +13,7 @@ import '../lib/src/routes/capas_route.dart';
 import '../lib/src/routes/elementos_route.dart';
 import '../lib/src/routes/actividades_route.dart';
 import '../lib/src/routes/zonas_route.dart';
+import '../lib/src/services/email_service.dart';
 
 void main(List<String> args) async {
   final ip = InternetAddress.anyIPv4;
@@ -23,7 +24,8 @@ void main(List<String> args) async {
   print('Connected to PostgreSQL and Redis');
 
   final jwtService = JwtService(dbService);
-  final authHandler = AuthHandler(dbService, jwtService);
+  final emailService = EmailService();
+  final authHandler = AuthHandler(dbService, jwtService, emailService);
 
   final router = Router()
     ..get('/api/health', (Request req) {

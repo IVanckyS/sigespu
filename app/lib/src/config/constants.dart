@@ -8,5 +8,10 @@ class AppConstants {
   static const String mapTileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
   static const List<String> mapSubdomains = ['a', 'b', 'c', 'd'];
 
-  static const String apiBaseUrl = 'http://localhost:8080';
+  // En dev: http://localhost:8080
+  // En producción: pasado via --dart-define=API_BASE_URL=https://...
+  static const String apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:8080',
+  );
 }

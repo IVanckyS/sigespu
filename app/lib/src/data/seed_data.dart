@@ -128,6 +128,21 @@ class DatoPatente {
     required this.url,
     required this.scrapedAt,
   });
+
+  factory DatoPatente.fromJson(Map<String, dynamic> j) => DatoPatente(
+        nDecreto: (j['n_decreto'] as num?)?.toInt() ?? 0,
+        fechaDecreto: _dateOnly(j['fecha_decreto']),
+        tipo: j['tipo'] as String? ?? '',
+        rut: j['rut'] as String? ?? '',
+        razonSocial: j['razon_social'] as String? ?? '',
+        giro: j['giro'] as String? ?? '',
+        direccion: j['direccion'] as String? ?? '',
+        lat: (j['lat'] as num?)?.toDouble() ?? 0,
+        lng: (j['lng'] as num?)?.toDouble() ?? 0,
+        confianza: _mapConfianza(j['confianza'] as String?),
+        url: j['url'] as String? ?? '',
+        scrapedAt: _isoToShort(j['scraped_at']),
+      );
 }
 
 class DatoPermiso {
@@ -156,6 +171,20 @@ class DatoPermiso {
     required this.confianza,
     required this.url,
   });
+
+  factory DatoPermiso.fromJson(Map<String, dynamic> j) => DatoPermiso(
+        nPermiso: j['n_permiso'] as String? ?? '',
+        tipo: j['tipo'] as String? ?? '',
+        direccion: j['direccion'] as String? ?? '',
+        sector: j['sector'] as String? ?? '',
+        lat: (j['lat'] as num?)?.toDouble() ?? 0,
+        lng: (j['lng'] as num?)?.toDouble() ?? 0,
+        descripcion: j['descripcion'] as String? ?? '',
+        fecha: _dateOnly(j['fecha']),
+        estado: j['estado'] as String? ?? 'activo',
+        confianza: _mapConfianza(j['confianza'] as String?),
+        url: j['url'] as String? ?? '',
+      );
 }
 
 class DatoTransito {
@@ -178,6 +207,17 @@ class DatoTransito {
     required this.estado,
     required this.url,
   });
+
+  factory DatoTransito.fromJson(Map<String, dynamic> j) => DatoTransito(
+        nDecreto: j['n_decreto'] as String? ?? '',
+        tipo: j['tipo'] as String? ?? '',
+        direccion: j['direccion'] as String? ?? '',
+        motivo: j['motivo'] as String? ?? '',
+        fechaInicio: _dateOnly(j['fecha_inicio']),
+        fechaFin: _dateOnly(j['fecha_fin']),
+        estado: j['estado'] as String? ?? 'activo',
+        url: j['url'] as String? ?? '',
+      );
 }
 
 class DatoOrganizacion {
@@ -202,6 +242,45 @@ class DatoOrganizacion {
     required this.sector,
     required this.url,
   });
+
+  factory DatoOrganizacion.fromJson(Map<String, dynamic> j) => DatoOrganizacion(
+        nPersonalidad: j['n_personalidad'] as String? ?? '',
+        tipo: j['tipo'] as String? ?? '',
+        nombre: j['nombre'] as String? ?? '',
+        direccion: j['direccion'] as String? ?? '',
+        representante: j['representante'] as String? ?? '',
+        rutRep: j['rut_rep'] as String? ?? '',
+        vigencia: _dateOnly(j['vigencia']),
+        sector: j['sector'] as String? ?? '',
+        url: j['url'] as String? ?? '',
+      );
+}
+
+// ── Helpers de parsing JSON del backend ───────────────────────────────────────
+
+/// Acepta ISO 8601 o `YYYY-MM-DD` y devuelve la parte de fecha.
+String _dateOnly(dynamic v) {
+  if (v is! String || v.isEmpty) return '';
+  final tIdx = v.indexOf('T');
+  return tIdx >= 0 ? v.substring(0, tIdx) : v;
+}
+
+/// Convierte ISO 8601 a `YYYY-MM-DD HH:mm`. La UI muestra esto en `scraped_at`.
+String _isoToShort(dynamic v) {
+  if (v is! String || v.isEmpty) return '';
+  if (v.length < 16) return v;
+  return '${v.substring(0, 10)} ${v.substring(11, 16)}';
+}
+
+/// El backend devuelve `alta|media|baja|fallo`; la UI espera `high|med|low|failed`.
+String _mapConfianza(String? c) {
+  switch (c) {
+    case 'alta': return 'high';
+    case 'media': return 'med';
+    case 'baja': return 'low';
+    case 'fallo': return 'failed';
+    default: return c ?? 'failed';
+  }
 }
 
 // ── Helpers de UI ──────────────────────────────────────────────────────────────

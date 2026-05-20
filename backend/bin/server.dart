@@ -13,6 +13,7 @@ import '../lib/src/routes/capas_route.dart';
 import '../lib/src/routes/elementos_route.dart';
 import '../lib/src/routes/actividades_route.dart';
 import '../lib/src/routes/zonas_route.dart';
+import '../lib/src/routes/scraping_route.dart';
 import '../lib/src/services/email_service.dart';
 
 void main(List<String> args) async {
@@ -56,12 +57,39 @@ void main(List<String> args) async {
     .addMiddleware(authMiddleware(jwtService))
     .addHandler(buildZonasRouter(dbService).call));
 
+  // Scraping: GET autenticado para todos; POST run/histórico solo director.
+  // El guard director-only se aplica dentro del router para no exponer un
+  // mismo prefix con distintos niveles de auth en pipelines paralelos.
+  router.mount('/api/scraping', Pipeline()
+    .addMiddleware(authMiddleware(jwtService))
+    .addMiddleware(_scrapingWriteGuard())
+    .addHandler(buildScrapingRouter(dbService).call));
+
   final handler = Pipeline()
       .addMiddleware(corsMiddleware())
       .addMiddleware(logRequests())
-      .addMiddleware(rateLimitMiddleware(dbService, limit: 100, windowSecs: 60))
+      .addMiddleware(rateLimitMiddleware(dbService, limit: 500, windowSecs: 60))
       .addHandler(router.call);
 
   final server = await serve(handler, ip, port);
   print('Server listening on port ${server.port}');
+}
+
+/// Permite GET a cualquier usuario autenticado, exige rol director en POST.
+/// Se aplica solo a /api/scraping/* — los GET de status/listados son lectura
+/// para todos, los POST run/historico son acciones administrativas.
+Middleware _scrapingWriteGuard() {
+  return (Handler inner) {
+    return (Request req) async {
+      if (req.method != 'POST') return inner(req);
+      final nivel = req.context['nivel_acceso'] as String?;
+      if (nivel != 'director') {
+        return Response.forbidden(
+          '{"error":"Solo el director puede ejecutar el scraper"}',
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      return inner(req);
+    };
+  };
 }

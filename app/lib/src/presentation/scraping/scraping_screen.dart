@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../config/theme.dart';
 import '../../data/seed_data.dart';
 import '../map/providers/map_providers.dart';
+import 'scraping_provider.dart';
 
 class ScrapingScreen extends ConsumerStatefulWidget {
   const ScrapingScreen({super.key});
@@ -18,11 +19,37 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
   String _month = 'all';
   String _geo = 'all';
   String _search = '';
+  bool _last30Days = false;
+  int _page = 0;
+  static const int _pageSize = 20;
+
+  List<T> _paginate<T>(List<T> items) {
+    if (items.isEmpty) return const [];
+    final start = _page * _pageSize;
+    if (start >= items.length) return const [];
+    final end = (start + _pageSize) > items.length ? items.length : (start + _pageSize);
+    return items.sublist(start, end);
+  }
+
+  void _resetPage() => _page = 0;
+
+  // Fuentes cacheadas en build() para no rebajar la respuesta de los providers
+  // entre helpers (filtros) que se llaman varias veces en el mismo frame.
+  List<DatoPatente> _srcPatentes = const [];
+  List<DatoPermiso> _srcPermisos = const [];
+  List<DatoTransito> _srcTransito = const [];
+  List<DatoOrganizacion> _srcOrgs = const [];
 
   static const _tabLabels = ['Patentes comerciales', 'Permisos DOM', 'Decretos de tránsito', 'Organizaciones sociales'];
 
-  List<DatoPatente> get _patentes {
-    return kPatentes.where((p) {
+  String get _cutoffDate {
+    final c = DateTime.now().subtract(const Duration(days: 30));
+    return '${c.year.toString().padLeft(4, '0')}-${c.month.toString().padLeft(2, '0')}-${c.day.toString().padLeft(2, '0')}';
+  }
+
+  List<DatoPatente> _filteredPatentes() {
+    return _srcPatentes.where((p) {
+      if (_last30Days && p.fechaDecreto.compareTo(_cutoffDate) < 0) return false;
       if (_year != 'all' && !p.fechaDecreto.startsWith(_year)) return false;
       if (_month != 'all') {
         final parts = p.fechaDecreto.split('-');
@@ -39,8 +66,9 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
     }).toList();
   }
 
-  List<DatoPermiso> get _permisos {
-    return kPermisos.where((p) {
+  List<DatoPermiso> _filteredPermisos() {
+    return _srcPermisos.where((p) {
+      if (_last30Days && p.fecha.compareTo(_cutoffDate) < 0) return false;
       if (_search.isNotEmpty) {
         final q = _search.toLowerCase();
         if (!p.nPermiso.toLowerCase().contains(q) && !p.direccion.toLowerCase().contains(q)) return false;
@@ -49,8 +77,9 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
     }).toList();
   }
 
-  List<DatoTransito> get _transito {
-    return kTransito.where((t) {
+  List<DatoTransito> _filteredTransito() {
+    return _srcTransito.where((t) {
+      if (_last30Days && t.fechaInicio.compareTo(_cutoffDate) < 0) return false;
       if (_search.isNotEmpty) {
         final q = _search.toLowerCase();
         if (!t.nDecreto.toLowerCase().contains(q) && !t.direccion.toLowerCase().contains(q)) return false;
@@ -59,8 +88,8 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
     }).toList();
   }
 
-  List<DatoOrganizacion> get _orgs {
-    return kOrganizaciones.where((o) {
+  List<DatoOrganizacion> _filteredOrgs() {
+    return _srcOrgs.where((o) {
       if (_search.isNotEmpty) {
         final q = _search.toLowerCase();
         if (!o.nombre.toLowerCase().contains(q) && !o.representante.toLowerCase().contains(q)) return false;
@@ -69,30 +98,75 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
     }).toList();
   }
 
-  int get _currentCount => switch (_tab) {
-    0 => _patentes.length,
-    1 => _permisos.length,
-    2 => _transito.length,
-    _ => _orgs.length,
-  };
-
-  int get _totalCount => switch (_tab) {
-    0 => kPatentes.length,
-    1 => kPermisos.length,
-    2 => kTransito.length,
-    _ => kOrganizaciones.length,
-  };
-
-  void _syncProviders() {
+  void _syncProviders(List<DatoPatente> p, List<DatoPermiso> pe,
+      List<DatoTransito> t, List<DatoOrganizacion> o) {
     ref.read(scrapingTabIndexProvider.notifier).state = _tab;
-    ref.read(scrapingFilteredPatenteProvider.notifier).state = _patentes;
-    ref.read(scrapingFilteredPermisoProvider.notifier).state = _permisos;
-    ref.read(scrapingFilteredTransitoProvider.notifier).state = _transito;
-    ref.read(scrapingFilteredOrgProvider.notifier).state = _orgs;
+    ref.read(scrapingFilteredPatenteProvider.notifier).state = p;
+    ref.read(scrapingFilteredPermisoProvider.notifier).state = pe;
+    ref.read(scrapingFilteredTransitoProvider.notifier).state = t;
+    ref.read(scrapingFilteredOrgProvider.notifier).state = o;
   }
 
   @override
   Widget build(BuildContext context) {
+    // Cargar datos reales desde el backend.
+    final patentesAsync = ref.watch(scrapingPatentesProvider);
+    final permisosAsync = ref.watch(scrapingPermisosProvider);
+    final transitoAsync = ref.watch(scrapingTransitoProvider);
+    final orgsAsync = ref.watch(scrapingOrganizacionesProvider);
+    final statusAsync = ref.watch(scrapingStatusProvider);
+
+    _srcPatentes = patentesAsync.value ?? const [];
+    _srcPermisos = permisosAsync.value ?? const [];
+    _srcTransito = transitoAsync.value ?? const [];
+    _srcOrgs = orgsAsync.value ?? const [];
+
+    final patentes = _filteredPatentes();
+    final permisos = _filteredPermisos();
+    final transito = _filteredTransito();
+    final orgs = _filteredOrgs();
+
+    // Mantener providers compartidos en sync (los usa el mapa para puntos).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncProviders(patentes, permisos, transito, orgs);
+    });
+
+    // Slice paginado solo para la vista de tabla (no afecta al mapa).
+    final patentesPage = _paginate(patentes);
+    final permisosPage = _paginate(permisos);
+    final transitoPage = _paginate(transito);
+    final orgsPage = _paginate(orgs);
+
+    // Cuando termina un scraping, refresca las listas para reflejar lo nuevo.
+    ref.listen<AsyncValue<ScrapingStatus>>(scrapingStatusProvider, (prev, next) {
+      final wasRunning = prev?.value?.running ?? false;
+      final isRunning = next.value?.running ?? false;
+      if (wasRunning && !isRunning) {
+        ref.read(scrapingControllerProvider).refreshAll();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Scraping completado.')),
+          );
+        }
+      }
+    });
+
+    final status = statusAsync.value ?? ScrapingStatus.idle();
+    final isScraping = status.running;
+
+    final currentCount = switch (_tab) {
+      0 => patentes.length,
+      1 => permisos.length,
+      2 => transito.length,
+      _ => orgs.length,
+    };
+    final totalCount = switch (_tab) {
+      0 => _srcPatentes.length,
+      1 => _srcPermisos.length,
+      2 => _srcTransito.length,
+      _ => _srcOrgs.length,
+    };
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -100,24 +174,74 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
             child: _ScrapingBanner(
-              nPatentes: kPatentes.length,
-              nPermisos: kPermisos.length,
-              nTransito: kTransito.length,
-              nOrgs: kOrganizaciones.length,
+              nPatentes: _srcPatentes.length,
+              nPermisos: _srcPermisos.length,
+              nTransito: _srcTransito.length,
+              nOrgs: _srcOrgs.length,
             ),
           ),
         ]),
         const SizedBox(height: 14),
-        // ── Scraper status ───────────────────────────────────────────────────
-        Align(alignment: Alignment.centerRight, child: _ScraperStatus()),
+        // ── Scraper status + acciones ────────────────────────────────────────
+        Row(children: [
+          _ScraperStatus(),
+          const Spacer(),
+          OutlinedButton.icon(
+            onPressed: isScraping ? null : _scrapeNow,
+            icon: const Icon(Icons.refresh_outlined, size: 14),
+            label: const Text('Scrappear ahora', style: TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.stone700,
+              side: const BorderSide(color: AppTheme.stone300),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: isScraping ? null : _scrapeHistorico,
+            icon: const Icon(Icons.history_outlined, size: 14),
+            label: const Text('Scrappear histórico', style: TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.stone700,
+              side: const BorderSide(color: AppTheme.stone300),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF3C7),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFFDE68A)),
+          ),
+          child: const Row(children: [
+            Icon(Icons.info_outline, size: 14, color: Color(0xFFD97706)),
+            SizedBox(width: 8),
+            Expanded(child: Text(
+              'Actualización automática diaria a las 03:00 AM desde lotatransparente.cl (Ley 20.285). "Scrappear histórico" puede demorar varios minutos.',
+              style: TextStyle(fontSize: 11.5, color: Color(0xFF92400E)),
+            )),
+          ]),
+        ),
+        if (isScraping) ...[
+          const SizedBox(height: 8),
+          _ScrapingProgress(
+            progress: status.progress,
+            label: status.fuenteLabel.isEmpty ? 'Iniciando…' : 'Extrayendo: ${status.fuenteLabel}',
+          ),
+        ],
         const SizedBox(height: 4),
 
         // ── Tabs ─────────────────────────────────────────────────────────────
         Row(children: List.generate(_tabLabels.length, (i) {
           final isActive = _tab == i;
-          final count = [kPatentes.length, kPermisos.length, kTransito.length, kOrganizaciones.length][i];
+          final count = [_srcPatentes.length, _srcPermisos.length, _srcTransito.length, _srcOrgs.length][i];
           return GestureDetector(
-            onTap: () { setState(() { _tab = i; _search = ''; }); _syncProviders(); },
+            onTap: () { setState(() { _tab = i; _search = ''; _resetPage(); }); _syncProviders(patentes, permisos, transito, orgs); },
             child: Container(
               margin: const EdgeInsets.only(right: 4),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
@@ -164,20 +288,32 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
             border: Border.all(color: AppTheme.stone200),
           ),
           child: Wrap(spacing: 10, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            FilterChip(
+              label: const Text('Últimos 30 días', style: TextStyle(fontSize: 12)),
+              selected: _last30Days,
+              onSelected: (v) { setState(() { _last30Days = v; _resetPage(); }); _syncProviders(patentes, permisos, transito, orgs); },
+              selectedColor: AppTheme.orange100,
+              checkmarkColor: AppTheme.orange700,
+              labelStyle: TextStyle(color: _last30Days ? AppTheme.orange700 : AppTheme.stone600, fontSize: 12),
+              side: BorderSide(color: _last30Days ? AppTheme.orange600 : AppTheme.stone200),
+              backgroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              visualDensity: VisualDensity.compact,
+            ),
             if (_tab == 0) ...[
               const _FLabel('Año'),
-              _FSelect(value: _year, items: const [('all','Todos'),('2026','2026'),('2025','2025'),('2024','2024')], onChanged: (v) { setState(() => _year = v); _syncProviders(); }),
+              _FSelect(value: _year, items: const [('all','Todos'),('2026','2026'),('2025','2025'),('2024','2024')], onChanged: (v) { setState(() { _year = v; _resetPage(); }); _syncProviders(patentes, permisos, transito, orgs); }),
               const _FLabel('Mes'),
               _FSelect(value: _month, items: const [
                 ('all','Todos'),('1','Enero'),('2','Febrero'),('3','Marzo'),('4','Abril'),
                 ('5','Mayo'),('6','Junio'),('7','Julio'),('8','Agosto'),
                 ('9','Septiembre'),('10','Octubre'),('11','Noviembre'),('12','Diciembre'),
-              ], onChanged: (v) { setState(() => _month = v); _syncProviders(); }),
+              ], onChanged: (v) { setState(() { _month = v; _resetPage(); }); _syncProviders(patentes, permisos, transito, orgs); }),
               const _FLabel('Geocoding'),
               _FSelect(value: _geo, items: const [
                 ('all','Todos'),('high','Confianza alta'),('med','Confianza media'),
                 ('low','Confianza baja'),('failed','Fallo'),
-              ], onChanged: (v) { setState(() => _geo = v); _syncProviders(); }),
+              ], onChanged: (v) { setState(() { _geo = v; _resetPage(); }); _syncProviders(patentes, permisos, transito, orgs); }),
             ],
             SizedBox(
               width: 260,
@@ -194,14 +330,14 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
                 ),
                 style: const TextStyle(fontSize: 12.5),
-                onChanged: (v) { setState(() => _search = v); _syncProviders(); },
+                onChanged: (v) { setState(() { _search = v; _resetPage(); }); _syncProviders(patentes, permisos, transito, orgs); },
               ),
             ),
             Text.rich(TextSpan(children: [
               const TextSpan(text: 'Mostrando ', style: TextStyle(fontSize: 11.5, color: AppTheme.stone600)),
-              TextSpan(text: '$_currentCount', style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.orange700)),
+              TextSpan(text: '$currentCount', style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.orange700)),
               const TextSpan(text: ' de ', style: TextStyle(fontSize: 11.5, color: AppTheme.stone600)),
-              TextSpan(text: '$_totalCount', style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.orange700)),
+              TextSpan(text: '$totalCount', style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.orange700)),
             ])),
           ]),
         ),
@@ -210,26 +346,172 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
         // ── Tabla ────────────────────────────────────────────────────────────
         Expanded(
           child: Container(
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppTheme.stone200),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
+            child: Column(children: [
+              Expanded(
                 child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: switch (_tab) {
-                    0 => _TablaPatentes(items: _patentes),
-                    1 => _TablaPermisos(items: _permisos),
-                    2 => _TablaTransito(items: _transito),
-                    _ => _TablaOrganizaciones(items: _orgs),
-                  },
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: _isLoading(patentesAsync, permisosAsync, transitoAsync, orgsAsync)
+                        ? const Padding(
+                            padding: EdgeInsets.all(40),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        : _hasError(patentesAsync, permisosAsync, transitoAsync, orgsAsync)
+                            ? const Padding(
+                                padding: EdgeInsets.all(40),
+                                child: Center(child: Text(
+                                  'Error al cargar datos del servidor',
+                                  style: TextStyle(color: AppTheme.stone500),
+                                )),
+                              )
+                            : switch (_tab) {
+                                0 => _TablaPatentes(items: patentesPage),
+                                1 => _TablaPermisos(items: permisosPage),
+                                2 => _TablaTransito(items: transitoPage),
+                                _ => _TablaOrganizaciones(items: orgsPage),
+                              },
+                  ),
                 ),
               ),
+              if (currentCount > _pageSize) ...[
+                const Divider(height: 1, color: AppTheme.stone200),
+                _Pager(
+                  currentPage: _page,
+                  totalItems: currentCount,
+                  pageSize: _pageSize,
+                  onPageChange: (p) => setState(() => _page = p),
+                ),
+              ],
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  bool _isLoading(AsyncValue a, AsyncValue b, AsyncValue c, AsyncValue d) =>
+      a.isLoading || b.isLoading || c.isLoading || d.isLoading;
+
+  bool _hasError(AsyncValue a, AsyncValue b, AsyncValue c, AsyncValue d) =>
+      a.hasError || b.hasError || c.hasError || d.hasError;
+
+  Future<void> _scrapeNow() async {
+    final confirm = await _confirmDialog(
+      title: 'Scrappear ahora',
+      message:
+          'Se iniciará la extracción de datos recientes desde lotatransparente.cl. '
+          'La operación puede demorar entre 1 y 3 minutos y consumirá ancho de banda.\n\n'
+          '¿Deseas continuar?',
+    );
+    if (confirm != true || !mounted) return;
+    final res = await ref.read(scrapingControllerProvider).runActual();
+    if (!mounted) return;
+    if (!res.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res.error ?? 'No se pudo iniciar el scraping')),
+      );
+    }
+  }
+
+  Future<void> _scrapeHistorico() async {
+    final confirm = await _confirmDialog(
+      title: 'Scrappear histórico',
+      message:
+          'Esta operación descargará datos de múltiples años desde lotatransparente.cl '
+          'y puede demorar varios minutos. Se aplicará un rate-limit de 2 req/s para '
+          'respetar al servidor.\n\n¿Deseas continuar?',
+    );
+    if (confirm != true || !mounted) return;
+    final res = await ref.read(scrapingControllerProvider).runHistorico();
+    if (!mounted) return;
+    if (!res.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res.error ?? 'No se pudo iniciar el scraping')),
+      );
+    }
+  }
+
+  Future<bool?> _confirmDialog({required String title, required String message}) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 22),
+          const SizedBox(width: 8),
+          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        ]),
+        content: Text(message, style: const TextStyle(fontSize: 13.5, height: 1.45)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.orange600,
+              foregroundColor: Colors.white,
             ),
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
+
+class _ScrapingProgress extends StatelessWidget {
+  final double progress;
+  final String label;
+  const _ScrapingProgress({required this.progress, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = (progress * 100).clamp(0, 100).toStringAsFixed(0);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.orange50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.orange100),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const SizedBox(
+            width: 14, height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.orange600),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(label, style: const TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.orange700,
+            )),
+          ),
+          Text('$pct%', style: const TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.orange700,
+            fontFeatures: [FontFeature.tabularFigures()],
+          )),
+        ]),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 6,
+            backgroundColor: AppTheme.orange100,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.orange600),
           ),
         ),
       ]),
@@ -635,6 +917,130 @@ class _ScrapingStat extends StatelessWidget {
         const SizedBox(height: 2),
         Text(label, style: const TextStyle(fontSize: 11, color: Color(0xBFFFFFFF))),
       ],
+    );
+  }
+}
+
+// ── Pager ─────────────────────────────────────────────────────────────────────
+
+class _Pager extends StatelessWidget {
+  final int currentPage;
+  final int totalItems;
+  final int pageSize;
+  final ValueChanged<int> onPageChange;
+
+  const _Pager({
+    required this.currentPage,
+    required this.totalItems,
+    required this.pageSize,
+    required this.onPageChange,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (totalItems == 0) return const SizedBox.shrink();
+    final lastPage = ((totalItems - 1) ~/ pageSize);
+    final page = currentPage.clamp(0, lastPage);
+    final start = page * pageSize + 1;
+    final end = ((page + 1) * pageSize) > totalItems ? totalItems : ((page + 1) * pageSize);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      color: AppTheme.stone50,
+      child: Row(children: [
+        Text(
+          'Mostrando $start–$end de $totalItems',
+          style: const TextStyle(fontSize: 11.5, color: AppTheme.stone600),
+        ),
+        const Spacer(),
+        _PagerButton(
+          icon: Icons.chevron_left,
+          enabled: page > 0,
+          onTap: () => onPageChange(page - 1),
+        ),
+        const SizedBox(width: 6),
+        ..._buildPageNumbers(page, lastPage).map((p) {
+          if (p == -1) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Text('…', style: TextStyle(color: AppTheme.stone400, fontSize: 12)),
+            );
+          }
+          final active = p == page;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: InkWell(
+              onTap: () => onPageChange(p),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 28),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: active ? AppTheme.orange600 : Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: active ? AppTheme.orange600 : AppTheme.stone200),
+                ),
+                child: Text(
+                  '${p + 1}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: active ? Colors.white : AppTheme.stone700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+        const SizedBox(width: 6),
+        _PagerButton(
+          icon: Icons.chevron_right,
+          enabled: page < lastPage,
+          onTap: () => onPageChange(page + 1),
+        ),
+      ]),
+    );
+  }
+
+  List<int> _buildPageNumbers(int current, int lastPage) {
+    final pages = <int>{0, lastPage};
+    for (var i = current - 1; i <= current + 1; i++) {
+      if (i >= 0 && i <= lastPage) pages.add(i);
+    }
+    final sorted = pages.toList()..sort();
+    final result = <int>[];
+    for (var i = 0; i < sorted.length; i++) {
+      result.add(sorted[i]);
+      if (i < sorted.length - 1 && sorted[i + 1] - sorted[i] > 1) {
+        result.add(-1);
+      }
+    }
+    return result;
+  }
+}
+
+class _PagerButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _PagerButton({required this.icon, required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: enabled ? Colors.white : AppTheme.stone100,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppTheme.stone200),
+        ),
+        child: Icon(icon, size: 16, color: enabled ? AppTheme.stone700 : AppTheme.stone300),
+      ),
     );
   }
 }

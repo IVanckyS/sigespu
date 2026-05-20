@@ -2,10 +2,14 @@ FROM dart:stable AS build
 
 WORKDIR /app
 COPY shared/pubspec.* shared/
+COPY scraper/pubspec.* scraper/
 COPY backend/pubspec.* backend/
 
 # Get shared dependencies first
 WORKDIR /app/shared
+RUN dart pub get
+
+WORKDIR /app/scraper
 RUN dart pub get
 
 WORKDIR /app/backend
@@ -13,6 +17,7 @@ RUN dart pub get
 
 WORKDIR /app
 COPY shared/ shared/
+COPY scraper/ scraper/
 COPY backend/ backend/
 
 WORKDIR /app/backend

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../auth/auth_provider.dart';
+import 'users_provider.dart';
 
 class Solicitud {
   final String id;
@@ -70,6 +71,7 @@ class SolicitudesNotifier extends AsyncNotifier<List<Solicitud>> {
       throw Exception('Error al resolver solicitud: ${response.statusCode}');
     }
     ref.invalidateSelf();
+    ref.invalidate(usersProvider);
   }
 }
 

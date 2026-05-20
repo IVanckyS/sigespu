@@ -86,6 +86,21 @@ class SyncQueueTable extends Table {
   TextColumn get errorMsg => text().nullable()();
 }
 
+/// Caché genérico de respuestas del backend (GET).
+///
+/// Permite que la app cargue "lo último que viste" cuando el backend está
+/// caído o el dispositivo está offline. La key suele ser el path completo
+/// (ej. '/api/elementos') o un identificador semántico.
+@DataClassName('JsonCacheEntry')
+class JsonCacheTable extends Table {
+  TextColumn get key => text()();
+  TextColumn get payload => text()();
+  DateTimeColumn get cachedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
 @DriftDatabase(
   tables: [
     PuntosInteresTable,
@@ -93,6 +108,7 @@ class SyncQueueTable extends Table {
     ReportesSeguridadTable,
     PatentesComercialesTable,
     SyncQueueTable,
+    JsonCacheTable,
   ],
   daos: [ReportesDao, ZonasDao],
 )
@@ -100,7 +116,17 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connect());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(jsonCacheTable);
+          }
+        },
+      );
 
   @override
   ReportesDao get reportesDao => ReportesDao(this);

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'auth_provider.dart';
+import 'forgot_password_screen.dart';
 import 'verification_screen.dart';
 
 /// SIGESPU · Login — Cream Editorial
@@ -695,7 +696,13 @@ class _LoginCard extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerRight,
                     child: InkWell(
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ForgotPasswordScreen(),
+                          ),
+                        );
+                      },
                       borderRadius: BorderRadius.circular(4),
                       child: Padding(
                         padding: const EdgeInsets.all(4),

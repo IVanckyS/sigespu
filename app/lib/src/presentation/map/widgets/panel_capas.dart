@@ -31,7 +31,7 @@ class _PanelCapasState extends ConsumerState<PanelCapas> {
   static const _meta = <String, (IconData, Color, String)>{
     'centro_acopio':      (Icons.home_outlined,        Color(0xFFEA580C), 'Centro de acopio'),
     'sede_comunitaria':   (Icons.people_outline,       Color(0xFF16A34A), 'Sede comunitaria'),
-    'infraestructura':    (Icons.domain,               Color(0xFF1E3A8A), 'Infraestructura'),
+    'infraestructura':    (Icons.domain,               Color(0xFFC2410C), 'Infraestructura'),
     'zona_peligro':       (Icons.shield,               Color(0xFFB91C1C), 'Zona de peligro'),
     'reporte_robo':       (Icons.warning_amber,        Color(0xFFEF4444), 'Robo'),
     'reporte_vandalismo': (Icons.science,              Color(0xFF7C3AED), 'Vandalismo'),

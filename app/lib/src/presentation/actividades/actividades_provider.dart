@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
+import 'package:logging/logging.dart';
 import 'package:shared/shared.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../config/constants.dart';
+import '../../data/remote/cached_api.dart';
 import '../../data/sync/sync_provider.dart';
 import '../auth/auth_provider.dart';
+
+final _log = Logger('Actividades');
 
 const _uuid = Uuid();
 
@@ -314,7 +317,7 @@ class ActividadesNotifier extends Notifier<List<ActividadMunicipal>> {
           _buildSeedActividades().where((a) => !savedIds.contains(a.id));
       state = [...unmodifiedSeed, ...saved];
     } catch (e) {
-      print('Error cargando actividades locales: $e');
+      _log.warning('Error cargando locales', e);
     }
   }
 
@@ -324,7 +327,7 @@ class ActividadesNotifier extends Notifier<List<ActividadMunicipal>> {
       final jsonStr = jsonEncode(state.map((a) => a.toJson()).toList());
       await prefs.setString(_storageKey, jsonStr);
     } catch (e) {
-      print('Error guardando actividades locales: $e');
+      _log.warning('Error guardando locales', e);
     }
   }
 
@@ -335,22 +338,32 @@ class ActividadesNotifier extends Notifier<List<ActividadMunicipal>> {
       final storage = ref.read(secureStorageProvider);
       final token = await storage.read(key: 'access_token');
       const apiBase = AppConstants.apiBaseUrl;
+      final api = ref.read(cachedApiProvider);
 
-      final resp = await http.get(
+      final resp = await api.get(
         Uri.parse('$apiBase/api/actividades'),
         headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-      ).timeout(const Duration(seconds: 10));
+        cacheKey: 'api:/api/actividades',
+      );
 
-      if (resp.statusCode == 200) {
-        final List list = jsonDecode(resp.body);
-        final backendItems = list.map((j) => ActividadMunicipal.fromJson(j as Map<String, dynamic>)).toList();
+      if (!resp.hasData) return;
+
+      try {
+        final List list = jsonDecode(resp.body!);
+        final backendItems = list
+            .map((j) => ActividadMunicipal.fromJson(j as Map<String, dynamic>))
+            .toList();
         if (backendItems.isNotEmpty) {
           state = backendItems;
-          _saveLocal();
+          // Solo persistimos en SharedPreferences cuando viene fresco del backend.
+          // El caché de Drift ya tiene la copia desde CachedApi.
+          if (resp.isFresh) _saveLocal();
         }
+      } catch (e) {
+        _log.fine('Actividad mal formada del backend: $e');
       }
     } catch (e) {
-      print('Error cargando actividades del backend: $e');
+      _log.warning('_loadFromBackend falló', e);
     }
   }
 
@@ -569,4 +582,17 @@ final actividadesFiltadasProvider = Provider<List<ActividadMunicipal>>((ref) {
 /// Alias for actividadesFiltadasProvider — used by PDF export and map panel.
 final filteredActividadesProvider = Provider<List<ActividadMunicipal>>((ref) {
   return ref.watch(actividadesFiltadasProvider);
+});
+
+/// Filtered + grouped por estado.
+///
+/// Cada columna del kanban observa solo SU estado: cuando un drag mueve una
+/// tarjeta de "Planificado" a "En curso" solo se reconstruyen esas dos
+/// columnas, no las cuatro.
+final actividadesFiltradasPorEstadoProvider =
+    Provider.family<List<ActividadMunicipal>, EstadoActividad>((ref, estado) {
+  return ref
+      .watch(actividadesFiltadasProvider)
+      .where((a) => a.estado == estado)
+      .toList(growable: false);
 });

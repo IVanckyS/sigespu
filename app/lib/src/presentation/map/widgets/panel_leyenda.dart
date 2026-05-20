@@ -1,20 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../config/map_config.dart';
 import '../providers/visor_provider.dart';
 import '../providers/map_providers.dart';
 
 class PanelLeyenda extends ConsumerWidget {
   const PanelLeyenda({super.key});
 
-  static const _layerLegends = <String, (String, Color)>{
-    'centro_acopio': ('Centro de acopio', Color(0xFFEA580C)),
-    'sede_comunitaria': ('Sede comunitaria', Color(0xFF16A34A)),
-    'zona_peligro': ('Zona de peligro', Color(0xFFB91C1C)),
-    'reporte': ('Reporte seguridad', Color(0xFFEF4444)),
-    'patente': ('Patente comercial', Color(0xFFD97706)),
-    'infraestructura': ('Infraestructura', Color(0xFF1E3A8A)),
-    'plan_regulador': ('Plan Regulador', Color(0xFFCA8A04)),
-  };
+  // Sub-leyendas para capas compuestas (tsunami, incendio, sismos).
+  // Las capas atómicas se resuelven contra MapLayerConfig.layers.
+  static const _tsunamiSubItems = <(String, Color, bool)>[
+    ('Zona inundable',     Color.fromARGB(180, 230, 0, 0), false),
+    ('Línea segura',       Color(0xFF70A800),               false),
+    ('Vías de evacuación', Color(0xFF0070FF),               false),
+    ('Punto de encuentro', Color(0xFF0070FF),               false),
+  ];
+
+  static const _incendioSubItems = <(String, Color)>[
+    ('Bajo',     Color(0xFFA0C29B)),
+    ('Medio',    Color(0xFFFAFA64)),
+    ('Alto',     Color(0xFFFA8D34)),
+    ('Muy alto', Color(0xFFE81014)),
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,17 +40,41 @@ class PanelLeyenda extends ConsumerWidget {
       items.add(const _LegendDot(color: Color(0xFFE53935), label: 'Mayor a 6.0'));
     }
 
-    for (final key in activeLayers) {
-      final entry = _layerLegends[key];
-      if (entry != null) {
-        final (label, color) = entry;
-        items.add(_LegendDot(color: color, label: label));
+    // Tsunami: capa compuesta con 4 sub-leyendas
+    if (activeLayers.contains('zona_tsunami')) {
+      items.add(const _LegendSection('Zona de tsunami'));
+      for (final (label, color, isSquare) in _tsunamiSubItems) {
+        items.add(_LegendDot(color: color, label: label, isSquare: isSquare));
+      }
+    }
+
+    // Incendio forestal: 4 niveles SENAPRED
+    if (activeLayers.contains('zona_incendio')) {
+      items.add(const _LegendSection('Riesgo de incendio'));
+      for (final (label, color) in _incendioSubItems) {
+        items.add(_LegendDot(color: color, label: label, isSquare: true));
+      }
+    }
+
+    // Resto de capas atómicas: leemos directamente desde MapLayerConfig
+    final compositeLayers = {'zona_tsunami', 'zona_incendio'};
+    final atomicActive = activeLayers
+        .where((k) => !compositeLayers.contains(k))
+        .toList();
+    if (atomicActive.isNotEmpty) {
+      items.add(const _LegendSection('Capas activas'));
+      for (final (key, label, color) in MapLayerConfig.layers) {
+        if (atomicActive.contains(key)) {
+          items.add(_LegendDot(color: color, label: label));
+        }
       }
     }
 
     capasAsync.whenData((capas) {
-      for (final c in capas) {
-        if (customVisible[c.id] ?? false) {
+      final visibleCustom = capas.where((c) => customVisible[c.id] ?? false).toList();
+      if (visibleCustom.isNotEmpty) {
+        items.add(const _LegendSection('Capas personalizadas'));
+        for (final c in visibleCustom) {
           final colorVal =
               int.tryParse(c.color.replaceFirst('#', '0xFF')) ?? 0xFFFF5722;
           items.add(_LegendDot(
@@ -65,34 +96,44 @@ class PanelLeyenda extends ConsumerWidget {
       ));
     }
 
-    return Container(
-      width: 220,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E2327),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 16,
-          )
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Leyenda',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 360),
+      child: Container(
+        width: 240,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E2327),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 16,
+            )
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Leyenda',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          ...items,
-        ],
+            const SizedBox(height: 8),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: items,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -104,7 +145,7 @@ class _LegendSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 6, bottom: 2),
+        padding: const EdgeInsets.only(top: 8, bottom: 3),
         child: Text(
           title.toUpperCase(),
           style: const TextStyle(

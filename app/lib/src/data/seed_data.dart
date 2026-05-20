@@ -289,7 +289,7 @@ Color colorParaTipo(String tipo) {
   switch (tipo) {
     case 'centro_acopio': return const Color(0xFFEA580C);
     case 'sede_comunitaria': return const Color(0xFF16A34A);
-    case 'infraestructura': return const Color(0xFF1E3A8A);
+    case 'infraestructura': return const Color(0xFFC2410C);
     case 'reporte_robo': return const Color(0xFFB91C1C);
     case 'reporte_vandalismo': return const Color(0xFFA855F7);
     case 'reporte_accidente': return const Color(0xFFF97316);

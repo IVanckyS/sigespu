@@ -16,7 +16,7 @@ const _base = 'https://www.lotatransparente.cl';
 const _ua = 'SigespuLota/1.0 (+contacto@munilota.cl)';
 
 Future<void> scrapePatentes(
-    Connection db, Command redis, NominatimClient geocoder,
+    Session db, Command redis, NominatimClient geocoder,
     {int? year, int? semester, ProgressTracker? tracker}) async {
   final now = DateTime.now();
   final y = year ?? now.year;
@@ -55,7 +55,7 @@ Future<void> scrapePatentes(
 
 /// Itera años/semestres en modo histórico. Por defecto desde 2022 hasta hoy.
 Future<void> scrapePatentesHistorico(
-    Connection db, Command redis, NominatimClient geocoder,
+    Session db, Command redis, NominatimClient geocoder,
     {int yearFrom = 2022, int? yearTo, ProgressTracker? tracker}) async {
   final now = DateTime.now();
   final to = yearTo ?? now.year;
@@ -68,7 +68,7 @@ Future<void> scrapePatentesHistorico(
 }
 
 Future<void> _processCategoria(
-    Connection db,
+    Session db,
     Command redis,
     NominatimClient geocoder,
     String url,

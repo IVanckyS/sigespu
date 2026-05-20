@@ -20,7 +20,7 @@ export 'progress.dart';
 /// Corre las 4 fuentes en su modo "actual" (período vigente).
 /// Pensado para uso bajo demanda desde el backend.
 Future<void> runScrapingActual({
-  required Connection db,
+  required Session db,
   required Command redis,
 }) async {
   if (await ProgressTracker.isRunning(redis)) {
@@ -51,7 +51,7 @@ Future<void> runScrapingActual({
 /// y desde 2020 para organizaciones. Permisos DOM toma todos los meses
 /// disponibles en el índice.
 Future<void> runScrapingHistorico({
-  required Connection db,
+  required Session db,
   required Command redis,
   int patentesYearFrom = 2022,
   int organizacionesYearFrom = 2020,

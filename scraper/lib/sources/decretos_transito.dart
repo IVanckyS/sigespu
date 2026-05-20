@@ -4,7 +4,7 @@ import '../progress.dart';
 
 /// Stub — la fuente ig=269 aún no está implementada.
 /// Se mantiene la firma para que el orchestrator pueda llamarla sin condicionales.
-Future<void> scrapeDecretosTransito(Connection db, Command redis,
+Future<void> scrapeDecretosTransito(Session db, Command redis,
     {ProgressTracker? tracker}) async {
   await tracker?.stepStart(
       fuente: 'decretos_transito',

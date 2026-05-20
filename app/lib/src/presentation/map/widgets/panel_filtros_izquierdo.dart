@@ -51,7 +51,7 @@ class _PanelFiltrosIzquierdoState
     'zona_peligro': Color(0xFFB91C1C), 'reporte_robo': Color(0xFFEF4444),
     'reporte_vandalismo': Color(0xFF7C3AED), 'reporte_accidente': Color(0xFFEA580C),
     'centro_acopio': Color(0xFFEA580C), 'sede_comunitaria': Color(0xFF16A34A),
-    'infraestructura': Color(0xFF1E3A8A), 'arbol_caido': Color(0xFF16A34A),
+    'infraestructura': Color(0xFFC2410C), 'arbol_caido': Color(0xFF16A34A),
     'poste_caido': Color(0xFFEA580C), 'sector_sin_luz': Color(0xFF78716C),
     'cable_colgando': Color(0xFF78716C), 'semaforo_dañado': Color(0xFFEF4444),
     'socavon': Color(0xFF92400E), 'fuga_agua': Color(0xFF0891B2),

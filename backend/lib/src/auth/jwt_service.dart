@@ -2,18 +2,59 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
+import 'package:logging/logging.dart';
 import 'package:uuid/uuid.dart';
 import '../database/db_pool.dart';
 import 'package:postgres/postgres.dart';
 
+final _log = Logger('Jwt');
+
+/// Secret default solo para desarrollo. En producción se DEBE setear la env
+/// var `JWT_SECRET`; si no lo está, el constructor fallará (ver _resolveSecret).
+const _defaultDevSecret = 'dev_only_jwt_secret_DO_NOT_USE_IN_PROD';
+
 class JwtService {
   final DatabaseService _dbService;
-  final String _secret = Platform.environment['JWT_SECRET'] ?? 'tu_secreto_super_seguro_cambiar_en_prod';
+  final String _secret;
   final int _expMinutes = int.parse(Platform.environment['JWT_EXPIRATION_MINUTES'] ?? '15');
   final int _refreshExpDays = int.parse(Platform.environment['JWT_REFRESH_EXPIRATION_DAYS'] ?? '7');
   final _uuid = const Uuid();
 
-  JwtService(this._dbService);
+  JwtService._(this._dbService, this._secret);
+
+  /// Construye el servicio validando que en producción el secret venga por env.
+  /// Llamar desde server.dart al arrancar — si fallamos aquí en prod, el
+  /// proceso muere y nunca acepta requests con un secret débil.
+  factory JwtService(DatabaseService db) {
+    final secret = _resolveSecret();
+    return JwtService._(db, secret);
+  }
+
+  static String _resolveSecret() {
+    final envSecret = Platform.environment['JWT_SECRET'];
+    final env = Platform.environment['APP_ENV']?.toLowerCase() ?? 'development';
+    final isProd = env == 'production' || env == 'prod';
+
+    if (envSecret != null && envSecret.isNotEmpty) {
+      if (envSecret.length < 32 && isProd) {
+        throw StateError(
+            'JWT_SECRET debe tener al menos 32 caracteres en producción '
+            '(actualmente: ${envSecret.length}). Genera uno con `openssl rand -hex 32`.');
+      }
+      return envSecret;
+    }
+
+    if (isProd) {
+      throw StateError(
+          'JWT_SECRET no está seteado y APP_ENV=production. Negándose a arrancar '
+          'con un secret default — eso permitiría a cualquiera forjar tokens. '
+          'Setea JWT_SECRET con un valor aleatorio de 32+ caracteres.');
+    }
+    _log.warning(
+        'Usando JWT_SECRET de desarrollo. NO ES SEGURO EN PRODUCCIÓN — '
+        'setea la env var JWT_SECRET antes de desplegar.');
+    return _defaultDevSecret;
+  }
 
   String generateAccessToken(String userId, String nivelAcceso) {
     final jwt = JWT({
@@ -59,17 +100,24 @@ class JwtService {
   Future<void> blacklistToken(String token) async {
     final jwt = verifyAccessToken(token);
     if (jwt == null) return;
-    
+
     final exp = DateTime.fromMillisecondsSinceEpoch((jwt.payload['exp'] as int) * 1000);
     final ttl = exp.difference(DateTime.now()).inSeconds;
-    
+
     if (ttl > 0) {
-      await _dbService.redis.send_object(['SETEX', 'blacklist:\$token', ttl, '1']);
+      // Hash el token antes de usarlo como key para no almacenar el JWT plano
+      // en Redis (defensa en profundidad si alguien lee el dump).
+      final key = 'blacklist:${_hashToken(token)}';
+      await _dbService.redis.send_object(['SETEX', key, ttl, '1']);
     }
   }
 
   Future<bool> isBlacklisted(String token) async {
-    final reply = await _dbService.redis.send_object(['GET', 'blacklist:\$token']);
+    final key = 'blacklist:${_hashToken(token)}';
+    final reply = await _dbService.redis.send_object(['GET', key]);
     return reply != null;
   }
+
+  static String _hashToken(String token) =>
+      sha256.convert(utf8.encode(token)).toString();
 }

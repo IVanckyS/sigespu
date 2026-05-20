@@ -5,6 +5,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:postgres/postgres.dart';
 import 'package:uuid/uuid.dart';
 import '../database/db_pool.dart';
+import '../http/responses.dart' as resp;
 import '../middleware/auth_middleware.dart';
 import '../services/capas_service.dart';
 
@@ -43,11 +44,8 @@ Router buildCapasRouter(DatabaseService db) {
         jsonEncode({'capas': capas, 'total': capas.length}),
         headers: {'content-type': 'application/json'},
       );
-    } catch (e) {
-      return Response.internalServerError(
-        body: jsonEncode({'error': 'Error al listar capas: $e'}),
-        headers: {'content-type': 'application/json'},
-      );
+    } catch (e, st) {
+      return resp.serverError('listCapas', e, st);
     }
   });
 
@@ -93,11 +91,8 @@ Router buildCapasRouter(DatabaseService db) {
         jsonEncode({'type': 'FeatureCollection', 'features': features}),
         headers: {'content-type': 'application/json'},
       );
-    } catch (e) {
-      return Response.internalServerError(
-        body: jsonEncode({'error': 'Error al obtener capa sistema: $e'}),
-        headers: {'content-type': 'application/json'},
-      );
+    } catch (e, st) {
+      return resp.serverError('getCapaSistema', e, st);
     }
   });
 
@@ -169,11 +164,8 @@ Router buildCapasRouter(DatabaseService db) {
         }),
         headers: {'content-type': 'application/json'},
       );
-    } catch (e) {
-      return Response.internalServerError(
-        body: jsonEncode({'error': 'Error al obtener geometrÃ­as: $e'}),
-        headers: {'content-type': 'application/json'},
-      );
+    } catch (e, st) {
+      return resp.serverError('getGeometrias', e, st);
     }
   });
 
@@ -219,8 +211,8 @@ Router buildCapasRouter(DatabaseService db) {
           'content-disposition': 'attachment; filename="$fileName"',
         },
       );
-    } catch (e) {
-      return Response.internalServerError(body: 'Error al exportar: $e');
+    } catch (e, st) {
+      return resp.serverError('exportCapa', e, st);
     }
   });
 
@@ -345,11 +337,8 @@ Router buildCapasRouter(DatabaseService db) {
           }),
           headers: {'content-type': 'application/json'},
         );
-      } catch (e) {
-        return Response.internalServerError(
-          body: jsonEncode({'error': 'Error al procesar upload: $e'}),
-          headers: {'content-type': 'application/json'},
-        );
+      } catch (e, st) {
+        return resp.serverError('uploadCapa', e, st);
       }
     }),
   );
@@ -414,11 +403,8 @@ Router buildCapasRouter(DatabaseService db) {
           jsonEncode({'id': id, 'updated': true}),
           headers: {'content-type': 'application/json'},
         );
-      } catch (e) {
-        return Response.internalServerError(
-          body: jsonEncode({'error': 'Error al actualizar capa: $e'}),
-          headers: {'content-type': 'application/json'},
-        );
+      } catch (e, st) {
+        return resp.serverError('updateCapa', e, st);
       }
     }),
   );
@@ -462,11 +448,8 @@ Router buildCapasRouter(DatabaseService db) {
           jsonEncode({'id': id, 'deleted': true}),
           headers: {'content-type': 'application/json'},
         );
-      } catch (e) {
-        return Response.internalServerError(
-          body: jsonEncode({'error': 'Error al eliminar capa: $e'}),
-          headers: {'content-type': 'application/json'},
-        );
+      } catch (e, st) {
+        return resp.serverError('deleteCapa', e, st);
       }
     }),
   );

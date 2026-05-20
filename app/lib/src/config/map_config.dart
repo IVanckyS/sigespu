@@ -9,7 +9,7 @@ class MapLayerConfig {
     // Infraestructura comunitaria
     ('centro_acopio',      'Centros de acopio',      Color(0xFFEA580C)),
     ('sede_comunitaria',   'Sedes comunitarias',      Color(0xFF16A34A)),
-    ('infraestructura',    'Infraestructura',         Color(0xFF1E3A8A)),
+    ('infraestructura',    'Infraestructura',         Color(0xFFC2410C)),
     // Seguridad pública
     ('zona_peligro',       'Zona de peligro',         Color(0xFFB91C1C)),
     ('reporte_robo',       'Robo',                    Color(0xFFEF4444)),

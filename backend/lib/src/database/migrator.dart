@@ -33,9 +33,12 @@ Future<void> runMigrations(Pool db) async {
     );
     final applied = appliedRows.map((r) => r[0] as String).toSet();
 
-    final migrationsDir = Directory('/app/migrations');
+    // /app/migrations in Docker, fall back to backend/migrations for local dev
+    final migrationsDir = Directory('/app/migrations').existsSync()
+        ? Directory('/app/migrations')
+        : Directory('migrations');
     if (!migrationsDir.existsSync()) {
-      _log.warning('Directorio /app/migrations no encontrado. Sin migraciones.');
+      _log.warning('Directorio de migraciones no encontrado. Sin migraciones.');
       return;
     }
 

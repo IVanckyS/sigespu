@@ -21,6 +21,21 @@ void main() {
       );
       expect(ep.port, equals(5432));
     });
+
+    test('decodifica password con caracteres especiales (percent-encoded)', () {
+      final ep = DatabaseService.parseDbUrl(
+        'postgresql://user:p%40ssw%3Ard@host:5432/db',
+      );
+      expect(ep.password, equals('p@ssw:rd'));
+    });
+
+    test('retorna null username/password cuando userInfo está vacío', () {
+      final ep = DatabaseService.parseDbUrl(
+        'postgresql://host:5432/dbname',
+      );
+      expect(ep.username, isNull);
+      expect(ep.password, isNull);
+    });
   });
 
   group('DatabaseService.parseRedisUrl', () {
@@ -47,6 +62,21 @@ void main() {
         'redis://default:mypassword@host:6379',
       );
       expect(password, equals('mypassword'));
+    });
+
+    test('decodifica password con caracteres especiales', () {
+      final (_, _, password) = DatabaseService.parseRedisUrl(
+        'redis://default:p%40ss@host:6379',
+      );
+      expect(password, equals('p@ss'));
+    });
+
+    test('usa puerto 6379 por defecto si no está en la URL', () {
+      final (host, port, _) = DatabaseService.parseRedisUrl(
+        'redis://host',
+      );
+      expect(host, equals('host'));
+      expect(port, equals(6379));
     });
   });
 }

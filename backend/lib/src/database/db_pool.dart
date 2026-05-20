@@ -6,11 +6,19 @@ import 'package:redis/redis.dart';
 class DatabaseService {
   static final _log = Logger('DatabaseService');
 
-  late Pool _db;
-  late Command _redis;
+  Pool? _db;
+  Command? _redis;
+  RedisConnection? _redisConn;
 
-  Pool get db => _db;
-  Command get redis => _redis;
+  Pool get db {
+    if (_db == null) throw StateError('DatabaseService: initPostgres() no fue llamado');
+    return _db!;
+  }
+
+  Command get redis {
+    if (_redis == null) throw StateError('DatabaseService: initRedis() no fue llamado');
+    return _redis!;
+  }
 
   /// Inicializa Postgres. Llamar antes de runMigrations().
   Future<void> initPostgres() async {
@@ -24,7 +32,7 @@ class DatabaseService {
     } else {
       endpoint = Endpoint(
         host: Platform.environment['DB_HOST'] ?? 'localhost',
-        port: int.parse(Platform.environment['DB_PORT'] ?? '5432'),
+        port: int.tryParse(Platform.environment['DB_PORT'] ?? '') ?? 5432,
         database: Platform.environment['DB_NAME'] ?? 'sigespu',
         username: Platform.environment['DB_USER'] ?? 'sigespu_user',
         password: Platform.environment['DB_PASSWORD'] ?? 'secret_password',
@@ -33,19 +41,22 @@ class DatabaseService {
 
     int retries = 5;
     while (retries > 0) {
+      Pool? attempt;
       try {
-        _db = Pool.withEndpoints(
+        attempt = Pool.withEndpoints(
           [endpoint],
           settings: PoolSettings(
             sslMode: sslMode,
             maxConnectionCount: maxConn,
           ),
         );
-        await _db.execute('SELECT 1');
+        await attempt.execute('SELECT 1');
+        _db = attempt;
         _log.info(
             'Postgres ready (maxConn=$maxConn) on ${endpoint.host}:${endpoint.port}/${endpoint.database}');
         break;
       } catch (e) {
+        await attempt?.close();
         retries--;
         _log.warning(
             'Fallo al conectar a PostgreSQL. Reintentando en 3s... ($retries intentos restantes): $e');
@@ -66,7 +77,7 @@ class DatabaseService {
       (host, port, password) = parseRedisUrl(redisUrl);
     } else {
       host = Platform.environment['REDIS_HOST'] ?? 'localhost';
-      port = int.parse(Platform.environment['REDIS_PORT'] ?? '6379');
+      port = int.tryParse(Platform.environment['REDIS_PORT'] ?? '') ?? 6379;
       password = null;
     }
 
@@ -74,9 +85,10 @@ class DatabaseService {
     while (retries > 0) {
       try {
         final conn = RedisConnection();
+        _redisConn = conn;
         _redis = await conn.connect(host, port);
         if (password != null && password.isNotEmpty) {
-          await _redis.send_object(['AUTH', password]);
+          await _redis!.send_object(['AUTH', password]);
         }
         _log.info('Redis ready on $host:$port');
         break;
@@ -97,7 +109,8 @@ class DatabaseService {
   }
 
   Future<void> close() async {
-    await _db.close();
+    await _db?.close();
+    await _redisConn?.close();
   }
 
   // ── URL parsers (static, expuestos para tests) ──────────────────────────────
@@ -105,22 +118,27 @@ class DatabaseService {
   /// Parsea `postgresql://user:pass@host:port/dbname` → Endpoint.
   static Endpoint parseDbUrl(String url) {
     final uri = Uri.parse(url);
-    final userParts = uri.userInfo.split(':');
+    final userInfo = Uri.decodeComponent(uri.userInfo);
+    final sep = userInfo.indexOf(':');
+    final username = sep >= 0 ? userInfo.substring(0, sep) : userInfo;
+    final password = sep >= 0 ? userInfo.substring(sep + 1) : null;
     return Endpoint(
       host: uri.host,
       port: uri.port > 0 ? uri.port : 5432,
       database: uri.pathSegments.isNotEmpty ? uri.pathSegments.first : 'sigespu',
-      username: userParts.isNotEmpty ? userParts[0] : null,
-      password: userParts.length > 1 ? userParts.sublist(1).join(':') : null,
+      username: username.isEmpty ? null : username,
+      password: password?.isEmpty == true ? null : password,
     );
   }
 
   /// Parsea `redis://default:pass@host:port` → (host, port, password?).
   static (String, int, String?) parseRedisUrl(String url) {
     final uri = Uri.parse(url);
+    final userInfo = Uri.decodeComponent(uri.userInfo);
     String? password;
-    if (uri.userInfo.contains(':')) {
-      final pwd = uri.userInfo.split(':').sublist(1).join(':');
+    if (userInfo.contains(':')) {
+      final sep = userInfo.indexOf(':');
+      final pwd = userInfo.substring(sep + 1);
       password = pwd.isEmpty ? null : pwd;
     }
     return (uri.host, uri.port > 0 ? uri.port : 6379, password);

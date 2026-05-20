@@ -17,7 +17,7 @@ const _base = 'https://www.lotatransparente.cl';
 const _ua = 'SigespuLota/1.0 (+contacto@munilota.cl)';
 
 Future<void> scrapeOrganizaciones(
-    Connection db, Command redis, NominatimClient geocoder,
+    Session db, Command redis, NominatimClient geocoder,
     {int? year, ProgressTracker? tracker}) async {
   final y = year ?? DateTime.now().year;
   await tracker?.stepStart(
@@ -62,7 +62,7 @@ Future<void> scrapeOrganizaciones(
 
 /// Itera años hacia atrás (por defecto desde 2020).
 Future<void> scrapeOrganizacionesHistorico(
-    Connection db, Command redis, NominatimClient geocoder,
+    Session db, Command redis, NominatimClient geocoder,
     {int yearFrom = 2020, int? yearTo, ProgressTracker? tracker}) async {
   final to = yearTo ?? DateTime.now().year;
   for (var y = yearFrom; y <= to; y++) {
@@ -70,7 +70,7 @@ Future<void> scrapeOrganizacionesHistorico(
   }
 }
 
-Future<void> _processCategoria(Connection db, Command redis,
+Future<void> _processCategoria(Session db, Command redis,
     NominatimClient geocoder, String url, String sector,
     ProgressTracker? tracker) async {
   final body = await _get(url);

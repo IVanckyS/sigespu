@@ -36,8 +36,8 @@ class AppShell extends ConsumerWidget {
       error: (_, __) => true,
     );
 
-    final userName = auth.user?['nombre'] as String? ?? 'Director';
-    final userRole = auth.user?['nivel_acceso'] as String? ?? 'director';
+    final userName = auth.user?['nombre'] as String? ?? 'Usuario';
+    final userRole = auth.user?['nivel_acceso'] as String? ?? 'visitante';
     final initials = userName.isNotEmpty
         ? userName.trim().split(' ').take(2).map((w) => w[0].toUpperCase()).join()
         : 'US';
@@ -108,9 +108,8 @@ class AppShell extends ConsumerWidget {
                   _BrandLogo(compact: isMobile),
                   if (!isMobile) ...[
                     const SizedBox(width: 24),
-                    Flexible(child: _ModeSwitcher(location: location)),
+                    Expanded(child: _ModeSwitcher(location: location)),
                   ],
-                  const Spacer(),
                   if (!isMobile) _ConnBadge(isOnline: isOnline),
                   if (!isMobile) const SizedBox(width: 10),
                   if (!isMobile) const _ExportBtn(),
@@ -261,6 +260,9 @@ class _ModeSwitcher extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final actividadesCount = ref.watch(actividadesProvider).length;
+    final role = ref.watch(authProvider).user?['nivel_acceso'] as String? ?? 'visitante';
+    final canSeeActividades = role == 'operativo' || role == 'director';
+    final isDirector = role == 'director';
 
     return Container(
       padding: const EdgeInsets.all(3),
@@ -277,14 +279,16 @@ class _ModeSwitcher extends ConsumerWidget {
             _ModeBtn(label: 'Resumen', icon: Icons.dashboard_outlined, route: '/resumen', active: location == '/resumen'),
             _ModeBtn(label: 'Tabla', icon: Icons.grid_on_outlined, route: '/tabla', active: location == '/tabla'),
             _ModeBtn(label: 'Scraping', icon: Icons.download_for_offline_outlined, route: '/scraping', active: location == '/scraping'),
-            _ModeBtn(label: 'Usuarios', icon: Icons.people_outline, route: '/users', active: location == '/users'),
-            _ModeBtnBadged(
-              label: 'Actividades',
-              icon: Icons.view_kanban_outlined,
-              route: '/actividades',
-              active: location == '/actividades',
-              badge: '$actividadesCount',
-            ),
+            if (isDirector)
+              _ModeBtn(label: 'Usuarios', icon: Icons.people_outline, route: '/users', active: location == '/users'),
+            if (canSeeActividades)
+              _ModeBtnBadged(
+                label: 'Actividades',
+                icon: Icons.view_kanban_outlined,
+                route: '/actividades',
+                active: location == '/actividades',
+                badge: '$actividadesCount',
+              ),
           ],
         ),
       ),
@@ -758,20 +762,22 @@ class _BottomNav extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDirector = role == 'director';
+    final canSeeActividades = role == 'operativo' || role == 'director';
     final items = <BottomNavigationBarItem>[
       const BottomNavigationBarItem(icon: Icon(Icons.map_outlined), label: 'Mapa'),
       const BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), label: 'Resumen'),
       const BottomNavigationBarItem(icon: Icon(Icons.grid_on_outlined), label: 'Tabla'),
       if (isDirector)
         const BottomNavigationBarItem(icon: Icon(Icons.people_outline), label: 'Usuarios'),
-      const BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'Más'),
+      if (canSeeActividades)
+        const BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'Más'),
     ];
     final routes = <String?>[
       '/map',
       '/resumen',
       '/tabla',
       if (isDirector) '/users',
-      null,
+      if (canSeeActividades) null,
     ];
 
     int idx = routes.indexOf(location);
@@ -798,6 +804,7 @@ class _BottomNav extends ConsumerWidget {
   }
 
   void _showMas(BuildContext context) {
+    final canSeeActividades = role == 'operativo' || role == 'director';
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -815,14 +822,15 @@ class _BottomNav extends ConsumerWidget {
                 context.go('/scraping');
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.view_kanban_outlined, color: AppTheme.orange600),
-              title: const Text('Actividades'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/actividades');
-              },
-            ),
+            if (canSeeActividades)
+              ListTile(
+                leading: const Icon(Icons.view_kanban_outlined, color: AppTheme.orange600),
+                title: const Text('Actividades'),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.go('/actividades');
+                },
+              ),
           ],
         ),
       ),

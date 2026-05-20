@@ -55,10 +55,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/users',
+            redirect: (context, state) {
+              final role = authState.user?['nivel_acceso'] as String? ?? '';
+              if (role != 'director') return '/map';
+              return null;
+            },
             builder: (context, state) => const UsersScreen(),
           ),
           GoRoute(
             path: '/actividades',
+            redirect: (context, state) {
+              final role = authState.user?['nivel_acceso'] as String? ?? '';
+              if (role == 'visitante' || role.isEmpty) return '/map';
+              return null;
+            },
             builder: (context, state) => const ActividadesScreen(),
           ),
         ],

@@ -2716,6 +2716,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $PatentesComercialesTableTable(this);
   late final $SyncQueueTableTable syncQueueTable = $SyncQueueTableTable(this);
   late final $JsonCacheTableTable jsonCacheTable = $JsonCacheTableTable(this);
+  late final ReportesDao reportesDao = ReportesDao(this as AppDatabase);
+  late final ZonasDao zonasDao = ZonasDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();

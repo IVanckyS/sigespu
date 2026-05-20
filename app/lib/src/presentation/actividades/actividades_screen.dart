@@ -22,21 +22,38 @@ class ActividadesScreen extends ConsumerStatefulWidget {
 
 class _ActividadesScreenState extends ConsumerState<ActividadesScreen> {
   void _open(ActividadMunicipal a) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.60),
-      builder: (ctx) => Dialog(
+    final isMobile = MediaQuery.sizeOf(context).width < 768;
+    if (isMobile) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960, maxHeight: 640),
+        useSafeArea: true,
+        builder: (ctx) => SizedBox(
+          height: MediaQuery.sizeOf(ctx).height * 0.92,
           child: ActividadBottomSheet(
             actividad: a,
-            onClose: () => Navigator.of(ctx).pop(),
+            onClose: () => Navigator.pop(ctx),
           ),
         ),
-      ),
-    );
+      );
+    } else {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.60),
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 960, maxHeight: 640),
+            child: ActividadBottomSheet(
+              actividad: a,
+              onClose: () => Navigator.of(ctx).pop(),
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   void _openNuevaActividad({EstadoActividad? estado}) {
@@ -143,6 +160,24 @@ class _ActividadesToolbarState extends ConsumerState<_ActividadesToolbar> {
         dateFrom != null || dateTo != null ||
         ref.watch(actividadesSearchProvider).isNotEmpty;
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Desktop toolbar packs title + 220px search + 4 filter chips +
+        // 2 JSON buttons + divider + Nueva actividad — needs ~1100px to fit.
+        // Below that, fall back to mobile layout which stacks vertically.
+        final useMobileLayout = constraints.maxWidth < 1100;
+        if (useMobileLayout) {
+          return _buildMobile(
+              total, tipoFilter, deptFilter, dateFrom, dateTo, anyFilter);
+        }
+        return _buildDesktop(
+            total, tipoFilter, deptFilter, dateFrom, dateTo, anyFilter);
+      },
+    );
+  }
+
+  Widget _buildDesktop(int total, TipoActividad? tipoFilter, String? deptFilter,
+      DateTime? dateFrom, DateTime? dateTo, bool anyFilter) {
     return Container(
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -330,6 +365,167 @@ class _ActividadesToolbarState extends ConsumerState<_ActividadesToolbar> {
       ),
     );
   }
+
+  Widget _buildMobile(int total, TipoActividad? tipoFilter, String? deptFilter,
+      DateTime? dateFrom, DateTime? dateTo, bool anyFilter) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE7E5E4))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Row 1: icon + title + nueva button
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEDD5),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: const Icon(Icons.view_kanban_outlined,
+                    size: 14, color: Color(0xFFEA580C)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Actividades',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1C1917),
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                    Text(
+                      '$total actividades',
+                      style: const TextStyle(
+                          fontSize: 10, color: Color(0xFF78716C)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: widget.onNuevaActividad,
+                icon: const Icon(Icons.add, size: 13),
+                label: const Text(
+                  'Nueva',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEA580C),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 7),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Row 2: search + compact icon-only filter buttons
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 32,
+                  child: TextField(
+                    controller: _searchCtrl,
+                    onChanged: (v) =>
+                        ref.read(actividadesSearchProvider.notifier).state = v,
+                    style: const TextStyle(fontSize: 12.5),
+                    decoration: InputDecoration(
+                      hintText: 'Buscar…',
+                      hintStyle: const TextStyle(
+                          fontSize: 12.5, color: Color(0xFFA8A29E)),
+                      prefixIcon: const Icon(Icons.search,
+                          size: 15, color: Color(0xFFA8A29E)),
+                      contentPadding: EdgeInsets.zero,
+                      filled: true,
+                      fillColor: const Color(0xFFFAFAF9),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFE7E5E4)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                            color: Color(0xFFEA580C), width: 1.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              _TipoFilterBtn(
+                selected: tipoFilter,
+                compact: true,
+                onChanged: (t) =>
+                    ref.read(actividadesTipoFilterProvider.notifier).state = t,
+              ),
+              const SizedBox(width: 4),
+              _DeptFilterBtn(
+                selected: deptFilter,
+                compact: true,
+                onChanged: (d) =>
+                    ref.read(actividadesDeptFilterProvider.notifier).state = d,
+              ),
+              const SizedBox(width: 4),
+              _DateChip(
+                dateFrom: dateFrom,
+                dateTo: dateTo,
+                compact: true,
+                layerLink: _datePopupCtrl.link,
+                onTap: () => _datePopupCtrl.show(
+                  context,
+                  initialFrom: dateFrom,
+                  initialTo: dateTo,
+                  onApply: (from, to) {
+                    ref.read(actividadesDateFromProvider.notifier).state =
+                        from;
+                    ref.read(actividadesDateToProvider.notifier).state = to;
+                  },
+                ),
+                onClear: () {
+                  _datePopupCtrl.dismiss();
+                  ref.read(actividadesDateFromProvider.notifier).state = null;
+                  ref.read(actividadesDateToProvider.notifier).state = null;
+                },
+              ),
+              if (anyFilter) ...[
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: _clearAllFilters,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      border: Border.all(
+                          color: const Color(0xFFFED7AA), width: 1.5),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Icon(Icons.filter_alt_off_outlined,
+                        size: 14, color: Color(0xFFC2410C)),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
@@ -363,8 +559,9 @@ class _ToolbarBtn extends StatelessWidget {
 class _TipoFilterBtn extends StatefulWidget {
   final TipoActividad? selected;
   final ValueChanged<TipoActividad?> onChanged;
+  final bool compact;
 
-  const _TipoFilterBtn({required this.selected, required this.onChanged});
+  const _TipoFilterBtn({required this.selected, required this.onChanged, this.compact = false});
 
   @override
   State<_TipoFilterBtn> createState() => _TipoFilterBtnState();
@@ -422,19 +619,44 @@ class _TipoFilterBtnState extends State<_TipoFilterBtn> {
             borderRadius: BorderRadius.circular(7),
             color: selected != null ? const Color(0xFFFFF7ED) : Colors.transparent,
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(
-              _labels[selected] ?? 'Tipo: Todos',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: selected != null ? const Color(0xFFC2410C) : const Color(0xFF44403C),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(Icons.expand_more, size: 14,
-                color: selected != null ? const Color(0xFFC2410C) : const Color(0xFF78716C)),
-          ]),
+          child: widget.compact
+            ? Stack(clipBehavior: Clip.none, children: [
+                Icon(Icons.filter_list,
+                    size: 17,
+                    color: selected != null
+                        ? const Color(0xFFC2410C)
+                        : const Color(0xFF78716C)),
+                if (selected != null)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                          color: Color(0xFFEA580C),
+                          shape: BoxShape.circle),
+                    ),
+                  ),
+              ])
+            : Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(
+                  _labels[selected] ?? 'Tipo: Todos',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: selected != null
+                        ? const Color(0xFFC2410C)
+                        : const Color(0xFF44403C),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.expand_more,
+                    size: 14,
+                    color: selected != null
+                        ? const Color(0xFFC2410C)
+                        : const Color(0xFF78716C)),
+              ]),
         ),
       ),
     );
@@ -446,8 +668,9 @@ class _TipoFilterBtnState extends State<_TipoFilterBtn> {
 class _DeptFilterBtn extends StatefulWidget {
   final String? selected;
   final ValueChanged<String?> onChanged;
+  final bool compact;
 
-  const _DeptFilterBtn({required this.selected, required this.onChanged});
+  const _DeptFilterBtn({required this.selected, required this.onChanged, this.compact = false});
 
   @override
   State<_DeptFilterBtn> createState() => _DeptFilterBtnState();
@@ -497,19 +720,44 @@ class _DeptFilterBtnState extends State<_DeptFilterBtn> {
             ),
             borderRadius: BorderRadius.circular(7),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(
-              active ? widget.selected! : 'Depto.',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: active ? const Color(0xFFC2410C) : const Color(0xFF44403C),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(Icons.expand_more, size: 14,
-                color: active ? const Color(0xFFC2410C) : const Color(0xFF78716C)),
-          ]),
+          child: widget.compact
+              ? Stack(clipBehavior: Clip.none, children: [
+                  Icon(Icons.people_outline,
+                      size: 17,
+                      color: active
+                          ? const Color(0xFFC2410C)
+                          : const Color(0xFF78716C)),
+                  if (active)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                            color: Color(0xFFEA580C),
+                            shape: BoxShape.circle),
+                      ),
+                    ),
+                ])
+              : Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(
+                    active ? widget.selected! : 'Depto.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: active
+                          ? const Color(0xFFC2410C)
+                          : const Color(0xFF44403C),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.expand_more,
+                      size: 14,
+                      color: active
+                          ? const Color(0xFFC2410C)
+                          : const Color(0xFF78716C)),
+                ]),
         ),
       ),
     );
@@ -559,6 +807,7 @@ class _DateChip extends StatelessWidget {
   final LayerLink layerLink;
   final VoidCallback onTap;
   final VoidCallback onClear;
+  final bool compact;
 
   const _DateChip({
     required this.dateFrom,
@@ -566,6 +815,7 @@ class _DateChip extends StatelessWidget {
     required this.layerLink,
     required this.onTap,
     required this.onClear,
+    this.compact = false,
   });
 
   String _fmt(DateTime d) =>
@@ -588,7 +838,9 @@ class _DateChip extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: compact
+              ? const EdgeInsets.all(7)
+              : const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: active ? const Color(0xFFFFF7ED) : Colors.transparent,
             border: Border.all(
@@ -597,33 +849,64 @@ class _DateChip extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(7),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.calendar_today_outlined,
-                  size: 12,
-                  color: active ? const Color(0xFFC2410C) : const Color(0xFF78716C)),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: active ? const Color(0xFFC2410C) : const Color(0xFF44403C),
+          child: compact
+              ? Stack(clipBehavior: Clip.none, children: [
+                  Icon(Icons.calendar_today_outlined,
+                      size: 16,
+                      color: active
+                          ? const Color(0xFFC2410C)
+                          : const Color(0xFF78716C)),
+                  if (active)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: GestureDetector(
+                        onTap: onClear,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                              color: Color(0xFFEA580C),
+                              shape: BoxShape.circle),
+                          child: const Icon(Icons.close,
+                              size: 6, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                ])
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.calendar_today_outlined,
+                        size: 12,
+                        color: active
+                            ? const Color(0xFFC2410C)
+                            : const Color(0xFF78716C)),
+                    const SizedBox(width: 5),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: active
+                            ? const Color(0xFFC2410C)
+                            : const Color(0xFF44403C),
+                      ),
+                    ),
+                    if (active) ...[
+                      const SizedBox(width: 5),
+                      GestureDetector(
+                        onTap: onClear,
+                        child: const Icon(Icons.close,
+                            size: 12, color: Color(0xFFC2410C)),
+                      ),
+                    ] else ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.expand_more,
+                          size: 14, color: Color(0xFF78716C)),
+                    ],
+                  ],
                 ),
-              ),
-              if (active) ...[
-                const SizedBox(width: 5),
-                GestureDetector(
-                  onTap: onClear,
-                  child: const Icon(Icons.close, size: 12, color: Color(0xFFC2410C)),
-                ),
-              ] else ...[
-                const SizedBox(width: 4),
-                const Icon(Icons.expand_more, size: 14, color: Color(0xFF78716C)),
-              ],
-            ],
-          ),
         ),
       ),
     );

@@ -108,20 +108,112 @@ class _ActividadBottomSheetState extends ConsumerState<ActividadBottomSheet>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Breadcrumb + action buttons row
-                Row(
-                  children: [
+                LayoutBuilder(builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 560;
+                  void toggleArchive() {
+                    final next = a.estado == EstadoActividad.archivado
+                        ? EstadoActividad.planificado
+                        : EstadoActividad.archivado;
+                    ref
+                        .read(actividadesProvider.notifier)
+                        .updateEstado(a.id, next);
+                    widget.onClose();
+                  }
+
+                  void shareActividad() {
+                    final tipo = switch (a.tipo) {
+                      TipoActividad.reunion => 'Reunión',
+                      TipoActividad.operativo => 'Operativo',
+                      TipoActividad.evento => 'Evento',
+                      TipoActividad.capacitacion => 'Capacitación',
+                    };
+                    final estado = switch (a.estado) {
+                      EstadoActividad.planificado => 'Planificado',
+                      EstadoActividad.enCurso => 'En curso',
+                      EstadoActividad.completado => 'Completado',
+                      EstadoActividad.archivado => 'Archivado',
+                    };
+                    final fecha =
+                        '${a.fechaInicio.day.toString().padLeft(2, '0')}/${a.fechaInicio.month.toString().padLeft(2, '0')}/${a.fechaInicio.year}';
+                    final lines = [
+                      '📋 ${a.titulo}',
+                      'Tipo: $tipo · Estado: $estado',
+                      'Fecha: $fecha',
+                      if (a.sector != null) 'Sector: ${a.sector}',
+                      if (a.direccion != null) 'Dirección: ${a.direccion}',
+                      'ID: ${a.id}',
+                      '— SIGESPU Lota · Dirección de Seguridad Pública',
+                    ];
+                    Clipboard.setData(ClipboardData(text: lines.join('\n')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Resumen copiado al portapapeles'),
+                        behavior: SnackBarBehavior.floating,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+
+                  if (compact) {
+                    return Row(children: [
+                      _EstadoChip(
+                        estado: a.estado,
+                        compact: true,
+                        onSelect: (nuevo) {
+                          ref
+                              .read(actividadesProvider.notifier)
+                              .updateEstado(a.id, nuevo);
+                          widget.onClose();
+                        },
+                      ),
+                      const Spacer(),
+                      _IconBtn(
+                        icon: a.estado == EstadoActividad.archivado
+                            ? Icons.unarchive_outlined
+                            : Icons.archive_outlined,
+                        tooltip: a.estado == EstadoActividad.archivado
+                            ? 'Desarchivar'
+                            : 'Archivar',
+                        onTap: toggleArchive,
+                      ),
+                      const SizedBox(width: 4),
+                      _IconBtn(
+                        icon: Icons.delete_outline,
+                        tooltip: 'Eliminar',
+                        danger: true,
+                        onTap: () =>
+                            _confirmarEliminar(context, ref, a),
+                      ),
+                      const SizedBox(width: 4),
+                      _IconBtn(
+                        icon: Icons.share_outlined,
+                        tooltip: 'Copiar resumen',
+                        onTap: shareActividad,
+                      ),
+                      const SizedBox(width: 4),
+                      _IconBtn(
+                        icon: Icons.close,
+                        tooltip: 'Cerrar',
+                        onTap: widget.onClose,
+                      ),
+                    ]);
+                  }
+
+                  // Desktop: full header
+                  return Row(children: [
                     const Icon(Icons.view_kanban_outlined,
                         size: 14, color: Color(0xFF78716C)),
                     const SizedBox(width: 6),
-                    const Text(
-                      'Detalle',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF78716C)),
-                    ),
+                    const Text('Detalle',
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFF78716C))),
                     const SizedBox(width: 6),
-                    const Text('·', style: TextStyle(color: Color(0xFFD6D3D1))),
+                    const Text('·',
+                        style: TextStyle(color: Color(0xFFD6D3D1))),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFEDD5),
                         borderRadius: BorderRadius.circular(999),
@@ -136,16 +228,15 @@ class _ActividadBottomSheetState extends ConsumerState<ActividadBottomSheet>
                       ),
                     ),
                     const Spacer(),
-                    Flexible(
-                      child: _HeaderBtn(
-                        label: 'Mover a · ${_nextEstadoLabel(a.estado)}',
-                        icon: Icons.arrow_forward_outlined,
-                        onTap: () {
-                          ref.read(actividadesProvider.notifier)
-                              .updateEstado(a.id, _nextEstado(a.estado));
-                          widget.onClose();
-                        },
-                      ),
+                    _EstadoChip(
+                      estado: a.estado,
+                      compact: false,
+                      onSelect: (nuevo) {
+                        ref
+                            .read(actividadesProvider.notifier)
+                            .updateEstado(a.id, nuevo);
+                        widget.onClose();
+                      },
                     ),
                     const SizedBox(width: 6),
                     _HeaderBtn(
@@ -155,60 +246,21 @@ class _ActividadBottomSheetState extends ConsumerState<ActividadBottomSheet>
                       icon: a.estado == EstadoActividad.archivado
                           ? Icons.unarchive_outlined
                           : Icons.archive_outlined,
-                      onTap: () {
-                        final next = a.estado == EstadoActividad.archivado
-                            ? EstadoActividad.planificado
-                            : EstadoActividad.archivado;
-                        ref.read(actividadesProvider.notifier)
-                            .updateEstado(a.id, next);
-                        widget.onClose();
-                      },
+                      onTap: toggleArchive,
                     ),
                     const SizedBox(width: 6),
                     _HeaderBtn(
                       label: '',
                       icon: Icons.delete_outline,
                       danger: true,
-                      onTap: () => _confirmarEliminar(context, ref, a),
+                      onTap: () =>
+                          _confirmarEliminar(context, ref, a),
                     ),
                     const SizedBox(width: 6),
                     _HeaderBtn(
                       label: '',
                       icon: Icons.share_outlined,
-                      onTap: () {
-                        final tipo = switch (a.tipo) {
-                          TipoActividad.reunion => 'Reunión',
-                          TipoActividad.operativo => 'Operativo',
-                          TipoActividad.evento => 'Evento',
-                          TipoActividad.capacitacion => 'Capacitación',
-                        };
-                        final estado = switch (a.estado) {
-                          EstadoActividad.planificado => 'Planificado',
-                          EstadoActividad.enCurso => 'En curso',
-                          EstadoActividad.completado => 'Completado',
-                          EstadoActividad.archivado => 'Archivado',
-                        };
-                        final fecha =
-                            '${a.fechaInicio.day.toString().padLeft(2, '0')}/${a.fechaInicio.month.toString().padLeft(2, '0')}/${a.fechaInicio.year}';
-                        final lines = [
-                          '📋 ${a.titulo}',
-                          'Tipo: $tipo · Estado: $estado',
-                          'Fecha: $fecha',
-                          if (a.sector != null) 'Sector: ${a.sector}',
-                          if (a.direccion != null) 'Dirección: ${a.direccion}',
-                          'ID: ${a.id}',
-                          '— SIGESPU Lota · Dirección de Seguridad Pública',
-                        ];
-                        Clipboard.setData(
-                            ClipboardData(text: lines.join('\n')));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Resumen copiado al portapapeles'),
-                            behavior: SnackBarBehavior.floating,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
+                      onTap: shareActividad,
                     ),
                     const SizedBox(width: 6),
                     GestureDetector(
@@ -224,8 +276,8 @@ class _ActividadBottomSheetState extends ConsumerState<ActividadBottomSheet>
                             size: 15, color: Color(0xFF57534E)),
                       ),
                     ),
-                  ],
-                ),
+                  ]);
+                }),
                 const SizedBox(height: 10),
 
                 // Title
@@ -292,20 +344,6 @@ class _ActividadBottomSheetState extends ConsumerState<ActividadBottomSheet>
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-String _nextEstadoLabel(EstadoActividad e) => switch (e) {
-      EstadoActividad.planificado => 'En curso',
-      EstadoActividad.enCurso => 'Completado',
-      EstadoActividad.completado => 'Archivado',
-      EstadoActividad.archivado => 'Planificado',
-    };
-
-EstadoActividad _nextEstado(EstadoActividad e) => switch (e) {
-      EstadoActividad.planificado => EstadoActividad.enCurso,
-      EstadoActividad.enCurso => EstadoActividad.completado,
-      EstadoActividad.completado => EstadoActividad.archivado,
-      EstadoActividad.archivado => EstadoActividad.planificado,
-    };
-
 class _HeaderBtn extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -361,5 +399,236 @@ class _HeaderBtn extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _IconBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+  final bool danger;
+
+  const _IconBtn({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+    this.danger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: danger ? const Color(0xFFFEF2F2) : const Color(0xFFF5F5F4),
+            border: Border.all(
+              color: danger
+                  ? const Color(0xFFFCA5A5)
+                  : const Color(0xFFE7E5E4),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Icon(
+            icon,
+            size: 15,
+            color: danger
+                ? const Color(0xFFB91C1C)
+                : const Color(0xFF57534E),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Estado chip ──────────────────────────────────────────────────────────────
+
+({Color punto, Color texto, String label}) _estadoStyle(EstadoActividad e) =>
+    switch (e) {
+      EstadoActividad.planificado => (
+          punto: const Color(0xFFA8A29E),
+          texto: const Color(0xFF44403C),
+          label: 'Planificado',
+        ),
+      EstadoActividad.enCurso => (
+          punto: const Color(0xFFEA580C),
+          texto: const Color(0xFFC2410C),
+          label: 'En curso',
+        ),
+      EstadoActividad.completado => (
+          punto: const Color(0xFF16A34A),
+          texto: const Color(0xFF15803D),
+          label: 'Completado',
+        ),
+      EstadoActividad.archivado => (
+          punto: const Color(0xFFA8A29E),
+          texto: const Color(0xFF78716C),
+          label: 'Archivado',
+        ),
+    };
+
+class _EstadoChip extends StatelessWidget {
+  final EstadoActividad estado;
+  final ValueChanged<EstadoActividad> onSelect;
+  final bool compact;
+
+  const _EstadoChip({
+    required this.estado,
+    required this.onSelect,
+    required this.compact,
+  });
+
+  Future<void> _openPicker(BuildContext context) async {
+    if (compact) {
+      final picked = await showModalBottomSheet<EstadoActividad>(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(14)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                child: Row(children: [
+                  const Text('Mover a estado',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1C1917))),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close,
+                        size: 18, color: Color(0xFF78716C)),
+                  ),
+                ]),
+              ),
+              const Divider(height: 1, color: Color(0xFFE7E5E4)),
+              for (final e in EstadoActividad.values)
+                _PickerRow(
+                  estado: e,
+                  selected: e == estado,
+                  onTap: () => Navigator.pop(ctx, e),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+      if (picked != null && picked != estado) onSelect(picked);
+    } else {
+      final RenderBox box = context.findRenderObject() as RenderBox;
+      final Offset offset = box.localToGlobal(Offset.zero);
+      final picked = await showMenu<EstadoActividad>(
+        context: context,
+        position: RelativeRect.fromLTRB(
+          offset.dx,
+          offset.dy + box.size.height + 4,
+          offset.dx + box.size.width,
+          offset.dy,
+        ),
+        items: [
+          for (final e in EstadoActividad.values)
+            PopupMenuItem<EstadoActividad>(
+              value: e,
+              child: _PickerRow(
+                estado: e,
+                selected: e == estado,
+                onTap: null,
+              ),
+            ),
+        ],
+      );
+      if (picked != null && picked != estado) onSelect(picked);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _estadoStyle(estado);
+    return GestureDetector(
+      key: const Key('estado_chip'),
+      onTap: () => _openPicker(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFAFAF9),
+          border: Border.all(color: const Color(0xFFE7E5E4), width: 1.5),
+          borderRadius: BorderRadius.circular(7),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration:
+                BoxDecoration(color: style.punto, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            style.label,
+            style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: style.texto),
+          ),
+          const SizedBox(width: 4),
+          Icon(Icons.keyboard_arrow_down,
+              size: 14, color: style.texto.withValues(alpha: 0.7)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _PickerRow extends StatelessWidget {
+  final EstadoActividad estado;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  const _PickerRow({
+    required this.estado,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _estadoStyle(estado);
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration:
+              BoxDecoration(color: style.punto, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            style.label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: const Color(0xFF1C1917),
+            ),
+          ),
+        ),
+        if (selected)
+          const Icon(Icons.check, size: 16, color: Color(0xFFEA580C)),
+      ]),
+    );
+    if (onTap == null) return row;
+    return InkWell(onTap: onTap, child: row);
   }
 }

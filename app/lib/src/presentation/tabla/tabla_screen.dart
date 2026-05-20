@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:latlong2/latlong.dart';
+import '../../config/constants.dart';
 import '../../config/theme.dart';
 import '../../data/seed_data.dart';
+import '../map/layers/custom_markers.dart';
 import '../map/providers/map_providers.dart';
 import '../shared/date_range_popup.dart';
 
@@ -14,7 +19,7 @@ class TablaScreen extends ConsumerStatefulWidget {
 }
 
 class _TablaScreenState extends ConsumerState<TablaScreen> {
-  String _filterCat = 'todos'; // 'todos' | 'zonas' | 'patente' | 'infra' | 'otros'
+  String _filterCat = 'todos';
   String _filterTipo = 'all';
   String _filterSector = 'all';
   String _filterEstado = 'all';
@@ -25,6 +30,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
   String _sortCol = 'fecha';
   bool _sortAsc = false;
   bool _filtersExpanded = false;
+  ElementoMapa? _selected;
   final _datePopupCtrl = DateRangePopupController(LayerLink());
 
   @override
@@ -35,12 +41,14 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
 
   List<ElementoMapa> get _filtered {
     final list = kElementosSeed.where((e) {
-      // ── filtro de categoría (chips) ──
       if (_filterCat == 'zonas' && e.layerKey != 'zona_peligro') return false;
       if (_filterCat == 'patente' && e.layerKey != 'patente') return false;
-      if (_filterCat == 'infra' && !const ['centro_acopio', 'sede_comunitaria', 'infraestructura'].contains(e.layerKey)) return false;
-      if (_filterCat == 'otros' && const ['zona_peligro', 'patente', 'centro_acopio', 'sede_comunitaria', 'infraestructura'].contains(e.layerKey)) return false;
-      // ── filtros existentes (no tocar) ──
+      if (_filterCat == 'infra' &&
+          !const ['centro_acopio', 'sede_comunitaria', 'infraestructura']
+              .contains(e.layerKey)) return false;
+      if (_filterCat == 'otros' &&
+          const ['zona_peligro', 'patente', 'centro_acopio', 'sede_comunitaria', 'infraestructura']
+              .contains(e.layerKey)) return false;
       if (_filterTipo != 'all' && e.layerKey != _filterTipo) return false;
       if (_filterSector != 'all' && e.sector != _filterSector) return false;
       if (_filterEstado != 'all' && e.estado != _filterEstado) return false;
@@ -70,7 +78,8 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
         final d = DateTime.tryParse(e.fecha);
         if (d != null) {
           if (_filterDateFrom != null && d.isBefore(_filterDateFrom!)) return false;
-          if (_filterDateTo != null && d.isAfter(_filterDateTo!.add(const Duration(days: 1)))) return false;
+          if (_filterDateTo != null &&
+              d.isAfter(_filterDateTo!.add(const Duration(days: 1)))) return false;
         }
       }
       return true;
@@ -108,297 +117,1125 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
     ref.read(tablaFilteredProvider.notifier).state = _filtered;
   }
 
-  Widget _buildFilterControls(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.stone200),
+  void _selectElement(ElementoMapa e, bool isMobile) {
+    setState(() => _selected = e);
+    if (!isMobile) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MobileDetailSheet(
+        elemento: e,
+        onClose: () => Navigator.of(context).pop(),
       ),
-      child: Wrap(spacing: 10, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        const _FilterLabel('Tipo'),
-        _FilterSelect(
-          value: _filterTipo,
-          items: const [
-            ('all', 'Todos los tipos'),
-            ('zona_peligro', 'Zonas de peligro'),
-            ('reporte', 'Reportes'),
-            ('patente', 'Patentes'),
-            ('centro_acopio', 'Centros de acopio'),
-            ('sede_comunitaria', 'Sedes comunitarias'),
-            ('infraestructura', 'Infraestructura'),
-          ],
-          onChanged: (v) { setState(() => _filterTipo = v); _syncProvider(); },
-        ),
-        const _FilterLabel('Sector'),
-        _FilterSelect(
-          value: _filterSector,
-          items: const [
-            ('all', 'Todos'),
-            ('S-2', 'S-2 · Residencial Los Aromos'),
-            ('S-3', 'S-3 · Mixto Los Aromos'),
-            ('S-4', 'S-4 · Equipamiento'),
-            ('S-5', 'S-5 · Vivienda Periférica'),
-            ('Centro', 'Centro Histórico'),
-          ],
-          onChanged: (v) { setState(() => _filterSector = v); _syncProvider(); },
-        ),
-        const _FilterLabel('Estado'),
-        _FilterSelect(
-          value: _filterEstado,
-          items: const [
-            ('all', 'Todos'),
-            ('activo', 'Activo'),
-            ('en_revision', 'En revisión'),
-            ('cerrado', 'Cerrado'),
-          ],
-          onChanged: (v) { setState(() => _filterEstado = v); _syncProvider(); },
-        ),
-        const _FilterLabel('Por'),
-        _FilterSelect(
-          value: _filterBy,
-          items: const [
-            ('all', 'Todos'),
-            ('dir_seg', 'Dir. Seg. Pública'),
-            ('dideco', 'DIDECO'),
-            ('scraping', 'Scraping'),
-            ('sepulveda', 'R. Sepúlveda'),
-            ('munoz', 'C. Muñoz'),
-            ('castro', 'P. Castro'),
-            ('historico', 'Reg. histórico'),
-          ],
-          onChanged: (v) { setState(() => _filterBy = v); _syncProvider(); },
-        ),
-        _FilterDateChip(
-          from: _filterDateFrom,
-          to: _filterDateTo,
-          layerLink: _datePopupCtrl.link,
-          onTap: () => _datePopupCtrl.show(
-            context,
-            initialFrom: _filterDateFrom,
-            initialTo: _filterDateTo,
-            onApply: (f, t) {
-              setState(() { _filterDateFrom = f; _filterDateTo = t; });
-              _syncProvider();
-            },
-          ),
-          onClear: () {
-            setState(() { _filterDateFrom = null; _filterDateTo = null; });
-            _syncProvider();
-          },
-        ),
-        SizedBox(
-          width: 220,
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Buscar por nombre, dirección, RUT…',
-              hintStyle: const TextStyle(fontSize: 12.5, color: AppTheme.stone400),
-              prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.stone400),
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: AppTheme.stone200)),
-            ),
-            style: const TextStyle(fontSize: 12.5),
-            onChanged: (v) { setState(() => _search = v); _syncProvider(); },
-          ),
-        ),
-      ]),
-    );
+    ).whenComplete(() {
+      if (mounted) setState(() => _selected = null);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
 
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        // ── View banner ──────────────────────────────────────────────────────
-        _TablaBanner(total: kElementosSeed.length),
-        const SizedBox(height: 16),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 768;
+        final isCompact = constraints.maxWidth < 1100;
+        final showDetailInline = !isCompact && _selected != null;
 
-        // ── Filtros ──────────────────────────────────────────────────────────
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < 768;
-            if (!isMobile) {
-              return Column(children: [
-                _buildFilterControls(context),
-                const SizedBox(height: 10),
-              ]);
-            }
-            return Column(children: [
-              GestureDetector(
-                onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppTheme.stone200),
+        return Padding(
+          padding: EdgeInsets.all(isMobile ? 12 : 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _TablaBanner(total: kElementosSeed.length),
+              const SizedBox(height: 16),
+
+              // Filtros
+              if (!isMobile)
+                _FiltersBar(
+                  filterTipo: _filterTipo,
+                  filterSector: _filterSector,
+                  filterEstado: _filterEstado,
+                  filterBy: _filterBy,
+                  search: _search,
+                  dateFrom: _filterDateFrom,
+                  dateTo: _filterDateTo,
+                  datePopupLink: _datePopupCtrl.link,
+                  onTipo: (v) { setState(() => _filterTipo = v); _syncProvider(); },
+                  onSector: (v) { setState(() => _filterSector = v); _syncProvider(); },
+                  onEstado: (v) { setState(() => _filterEstado = v); _syncProvider(); },
+                  onBy: (v) { setState(() => _filterBy = v); _syncProvider(); },
+                  onSearch: (v) { setState(() => _search = v); _syncProvider(); },
+                  onDateTap: () => _datePopupCtrl.show(
+                    context,
+                    initialFrom: _filterDateFrom,
+                    initialTo: _filterDateTo,
+                    onApply: (f, t) {
+                      setState(() { _filterDateFrom = f; _filterDateTo = t; });
+                      _syncProvider();
+                    },
                   ),
-                  child: Row(children: [
-                    const Text('FILTROS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF78716C))),
-                    const Spacer(),
-                    Icon(
-                      _filtersExpanded ? Icons.expand_less : Icons.expand_more,
-                      size: 16,
-                      color: const Color(0xFF78716C),
+                  onDateClear: () {
+                    setState(() { _filterDateFrom = null; _filterDateTo = null; });
+                    _syncProvider();
+                  },
+                )
+              else
+                _MobileFilters(
+                  expanded: _filtersExpanded,
+                  onToggle: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                  child: _FiltersBar(
+                    filterTipo: _filterTipo,
+                    filterSector: _filterSector,
+                    filterEstado: _filterEstado,
+                    filterBy: _filterBy,
+                    search: _search,
+                    dateFrom: _filterDateFrom,
+                    dateTo: _filterDateTo,
+                    datePopupLink: _datePopupCtrl.link,
+                    onTipo: (v) { setState(() => _filterTipo = v); _syncProvider(); },
+                    onSector: (v) { setState(() => _filterSector = v); _syncProvider(); },
+                    onEstado: (v) { setState(() => _filterEstado = v); _syncProvider(); },
+                    onBy: (v) { setState(() => _filterBy = v); _syncProvider(); },
+                    onSearch: (v) { setState(() => _search = v); _syncProvider(); },
+                    onDateTap: () => _datePopupCtrl.show(
+                      context,
+                      initialFrom: _filterDateFrom,
+                      initialTo: _filterDateTo,
+                      onApply: (f, t) {
+                        setState(() { _filterDateFrom = f; _filterDateTo = t; });
+                        _syncProvider();
+                      },
                     ),
-                  ]),
+                    onDateClear: () {
+                      setState(() { _filterDateFrom = null; _filterDateTo = null; });
+                      _syncProvider();
+                    },
+                  ),
+                ),
+              const SizedBox(height: 12),
+
+              _CategoryChips(
+                active: _filterCat,
+                onChanged: (cat) {
+                  setState(() => _filterCat = cat);
+                  _syncProvider();
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Tabla + detalle
+              Expanded(
+                child: isMobile
+                    ? _MobileCardList(
+                        rows: filtered,
+                        onSelect: (e) => _selectElement(e, true),
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _TablaContenido(
+                              rows: filtered,
+                              selectedId: _selected?.id,
+                              sortCol: _sortCol,
+                              sortAsc: _sortAsc,
+                              onSort: _sort,
+                              onSelect: (e) => _selectElement(e, false),
+                            ),
+                          ),
+                          if (showDetailInline) ...[
+                            const SizedBox(width: 16),
+                            SizedBox(
+                              width: 360,
+                              child: _DetailPanel(
+                                elemento: _selected!,
+                                onClose: () => setState(() => _selected = null),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Tabla contenido ───────────────────────────────────────────────────────────
+
+class _TablaContenido extends StatelessWidget {
+  final List<ElementoMapa> rows;
+  final String? selectedId;
+  final String sortCol;
+  final bool sortAsc;
+  final ValueChanged<String> onSort;
+  final ValueChanged<ElementoMapa> onSelect;
+
+  const _TablaContenido({
+    required this.rows,
+    required this.selectedId,
+    required this.sortCol,
+    required this.sortAsc,
+    required this.onSort,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.stone200),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          _TablaHeader(sortCol: sortCol, sortAsc: sortAsc, onSort: onSort),
+          if (rows.isEmpty)
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'Sin resultados con los filtros actuales',
+                  style: TextStyle(color: AppTheme.stone500, fontSize: 13),
                 ),
               ),
-              AnimatedCrossFade(
-                duration: const Duration(milliseconds: 200),
-                crossFadeState: _filtersExpanded
-                    ? CrossFadeState.showFirst
-                    : CrossFadeState.showSecond,
-                firstChild: Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: _buildFilterControls(context),
-                ),
-                secondChild: const SizedBox.shrink(),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: rows.length,
+                itemBuilder: (ctx, i) {
+                  final e = rows[i];
+                  return _TablaFila(
+                    elemento: e,
+                    selected: e.id == selectedId,
+                    onTap: () => onSelect(e),
+                  );
+                },
               ),
-              const SizedBox(height: 10),
-            ]);
-          },
-        ),
-
-        // ── Category chips ────────────────────────────────────────────────────────
-        _CategoryChips(
-          active: _filterCat,
-          onChanged: (cat) {
-            setState(() => _filterCat = cat);
-            _syncProvider();
-          },
-        ),
-        const SizedBox(height: 8),
-
-        // ── Tabla ────────────────────────────────────────────────────────────
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppTheme.stone200),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: WidgetStateProperty.all(AppTheme.stone50),
-                    headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.stone600, letterSpacing: 0.05),
-                    dataTextStyle: const TextStyle(fontSize: 12.5, color: AppTheme.stone800),
-                    columnSpacing: 16,
-                    horizontalMargin: 12,
-                    dividerThickness: 1,
-                    dataRowColor: WidgetStateProperty.resolveWith((states) =>
-                        states.contains(WidgetState.hovered) ? AppTheme.orange50 : null),
-                    columns: [
-                      _sortCol2('tipo', 'Tipo'),
-                      _sortCol2('nombre', 'Nombre / Descripción'),
-                      _sortCol2('sector', 'Sector'),
-                      _sortCol2('direccion', 'Dirección'),
-                      _sortCol2('fecha', 'Fecha'),
-                      _sortCol2('estado', 'Estado'),
-                      const DataColumn(label: Text('Registrado por')),
-                    ],
-                    rows: filtered.map((e) => _buildRow(e)).toList(),
+        ],
+      ),
+    );
+  }
+}
+
+class _TablaHeader extends StatelessWidget {
+  final String sortCol;
+  final bool sortAsc;
+  final ValueChanged<String> onSort;
+
+  const _TablaHeader({
+    required this.sortCol,
+    required this.sortAsc,
+    required this.onSort,
+  });
+
+  Widget _headerCell(String col, String label, int flex) {
+    return Expanded(
+      flex: flex,
+      child: InkWell(
+        onTap: () => onSort(col),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.stone600,
+                    letterSpacing: 0.4,
                   ),
                 ),
               ),
-            ),
+              if (sortCol == col) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  sortAsc ? Icons.arrow_upward : Icons.arrow_downward,
+                  size: 12,
+                  color: AppTheme.orange600,
+                ),
+              ],
+            ],
           ),
         ),
-      ]),
+      ),
     );
   }
 
-  DataColumn _sortCol2(String col, String label) {
-    return DataColumn(
-      onSort: (_, __) => _sort(col),
-      label: Row(mainAxisSize: MainAxisSize.min, children: [
-        Text(label),
-        const SizedBox(width: 4),
-        if (_sortCol == col)
-          Icon(_sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: AppTheme.orange600),
-      ]),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.stone50,
+        border: Border(bottom: BorderSide(color: AppTheme.stone200)),
+      ),
+      child: Row(
+        children: [
+          _headerCell('tipo', 'Tipo', 2),
+          _headerCell('nombre', 'Nombre / Descripción', 4),
+          _headerCell('sector', 'Sector', 1),
+          _headerCell('direccion', 'Dirección', 3),
+          _headerCell('fecha', 'Fecha', 2),
+          _headerCell('estado', 'Estado', 2),
+          _headerCell('by', 'Registrado por', 3),
+        ],
+      ),
     );
   }
+}
 
-  DataRow _buildRow(ElementoMapa e) {
+class _TablaFila extends StatefulWidget {
+  final ElementoMapa elemento;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TablaFila({
+    required this.elemento,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  State<_TablaFila> createState() => _TablaFilaState();
+}
+
+class _TablaFilaState extends State<_TablaFila> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = widget.elemento;
     final tipoColor = colorParaTipo(e.tipo);
     final estadoColor = colorParaEstado(e.estado);
     final estadoBg = bgParaEstado(e.estado);
     final tipoLabel = nombreParaTipo(e.tipo);
     final estadoLabel = _labelEstado(e.estado);
 
-    return DataRow(cells: [
-      // Tipo badge
-      DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(color: tipoColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-        child: Text(tipoLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: tipoColor)),
-      )),
-      // Nombre
-      DataCell(SizedBox(
-        width: 180,
-        child: Text(e.nombre, style: const TextStyle(fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
-      )),
-      // Sector
-      DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(color: AppTheme.stone100, borderRadius: BorderRadius.circular(4)),
-        child: Text(e.sector, style: const TextStyle(fontSize: 11, color: AppTheme.stone700)),
-      )),
-      // Dirección
-      DataCell(SizedBox(
-        width: 160,
-        child: Text(e.direccion, style: const TextStyle(color: AppTheme.stone600), overflow: TextOverflow.ellipsis),
-      )),
-      // Fecha
-      DataCell(Text(e.fecha, style: const TextStyle(color: AppTheme.stone500, fontSize: 12))),
-      // Estado
-      DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(color: estadoBg, borderRadius: BorderRadius.circular(10)),
-        child: Text(estadoLabel, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: estadoColor)),
-      )),
-      // Por
-      DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 26, height: 26,
+    final bg = widget.selected
+        ? AppTheme.orange50
+        : _hover
+            ? const Color(0xFFFAFAF9)
+            : Colors.white;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 80),
           decoration: BoxDecoration(
-            color: _byColor(e.by),
-            shape: BoxShape.circle,
+            color: bg,
+            border: Border(
+              left: BorderSide(
+                color: widget.selected ? AppTheme.orange600 : Colors.transparent,
+                width: 3,
+              ),
+              bottom: const BorderSide(color: AppTheme.stone100),
+            ),
           ),
-          alignment: Alignment.center,
-          child: Text(
-            _byInitials(e.by),
-            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
+          child: Row(
+            children: [
+              // Tipo
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: tipoColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        tipoLabel,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: tipoColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Nombre
+              Expanded(
+                flex: 4,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Text(
+                    e.nombre,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.stone800,
+                    ),
+                  ),
+                ),
+              ),
+              // Sector
+              Expanded(
+                flex: 1,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.stone100,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        e.sector,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.stone700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Dirección
+              Expanded(
+                flex: 3,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Text(
+                    e.direccion,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12.5, color: AppTheme.stone600),
+                  ),
+                ),
+              ),
+              // Fecha
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Text(
+                    e.fecha,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.stone500,
+                    ),
+                  ),
+                ),
+              ),
+              // Estado
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: estadoBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        estadoLabel,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: estadoColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Por
+              Expanded(
+                flex: 3,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: _byColor(e.by),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          _byInitials(e.by),
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          e.by,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: AppTheme.stone600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 6),
-        Text(e.by, style: const TextStyle(color: AppTheme.stone600, fontSize: 11.5)),
-      ])),
-    ]);
-  }
-
-  String _labelEstado(String e) {
-    const m = {
-      'activo': 'Activo', 'en_revision': 'En revisión',
-      'cerrado': 'Cerrado', 'vigente': 'Vigente', 'vencido': 'Vencido',
-    };
-    return m[e] ?? e;
+      ),
+    );
   }
 }
 
-// ── View banner ───────────────────────────────────────────────────────────────
+String _labelEstado(String e) {
+  const m = {
+    'activo': 'Activo',
+    'en_revision': 'En revisión',
+    'cerrado': 'Cerrado',
+    'vigente': 'Vigente',
+    'vencido': 'Vencido',
+  };
+  return m[e] ?? e;
+}
+
+// ── Detail Panel ──────────────────────────────────────────────────────────────
+
+class _DetailPanel extends StatelessWidget {
+  final ElementoMapa elemento;
+  final VoidCallback onClose;
+
+  const _DetailPanel({required this.elemento, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    final e = elemento;
+    final tipoColor = colorParaTipo(e.tipo);
+    final tipoLabel = nombreParaTipo(e.tipo);
+    final estadoColor = colorParaEstado(e.estado);
+    final estadoBg = bgParaEstado(e.estado);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.stone200),
+      ),
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppTheme.stone100)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: tipoColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    tipoLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: tipoColor,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close, size: 18),
+                  splashRadius: 18,
+                  color: AppTheme.stone500,
+                  tooltip: 'Cerrar',
+                ),
+              ],
+            ),
+          ),
+
+          // Mini-map
+          SizedBox(
+            height: 200,
+            child: _MiniMapa(elemento: e),
+          ),
+
+          // Body
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  e.nombre,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.stone900,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: estadoBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _labelEstado(e.estado),
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: estadoColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _DetailRow(
+                  icon: Icons.place_outlined,
+                  label: 'Dirección',
+                  value: e.direccion.isEmpty ? '—' : e.direccion,
+                ),
+                _DetailRow(
+                  icon: Icons.layers_outlined,
+                  label: 'Sector',
+                  value: e.sector,
+                ),
+                _DetailRow(
+                  icon: Icons.calendar_today_outlined,
+                  label: 'Fecha',
+                  value: e.fecha,
+                ),
+                _DetailRow(
+                  icon: Icons.person_outline,
+                  label: 'Registrado por',
+                  value: e.by,
+                ),
+                _DetailRow(
+                  icon: Icons.my_location_outlined,
+                  label: 'Coordenadas',
+                  value:
+                      '${e.lat.toStringAsFixed(5)}, ${e.lng.toStringAsFixed(5)}',
+                ),
+                if (e.rut != null && e.rut!.isNotEmpty)
+                  _DetailRow(
+                    icon: Icons.badge_outlined,
+                    label: 'RUT',
+                    value: e.rut!,
+                  ),
+                if (e.giro != null && e.giro!.isNotEmpty)
+                  _DetailRow(
+                    icon: Icons.storefront_outlined,
+                    label: 'Giro',
+                    value: e.giro!,
+                  ),
+                if (e.capacidad != null)
+                  _DetailRow(
+                    icon: Icons.group_outlined,
+                    label: 'Capacidad',
+                    value: '${e.capacidad} personas',
+                  ),
+                if (e.nivel != null)
+                  _DetailRow(
+                    icon: Icons.warning_amber_outlined,
+                    label: 'Nivel',
+                    value: 'Nivel ${e.nivel}',
+                  ),
+                if (e.tipoPeligro != null && e.tipoPeligro!.isNotEmpty)
+                  _DetailRow(
+                    icon: Icons.report_problem_outlined,
+                    label: 'Tipo de peligro',
+                    value: e.tipoPeligro!,
+                  ),
+                if (e.horario != null && e.horario!.isNotEmpty)
+                  _DetailRow(
+                    icon: Icons.schedule_outlined,
+                    label: 'Horario',
+                    value: e.horario!,
+                  ),
+                if (e.notas.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                    'NOTAS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.stone500,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    e.notas,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: AppTheme.stone700,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _DetailRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: AppTheme.stone500),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.stone500,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppTheme.stone800,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniMapa extends StatelessWidget {
+  final ElementoMapa elemento;
+  const _MiniMapa({required this.elemento});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCoords = elemento.lat != 0 && elemento.lng != 0;
+    if (!hasCoords) {
+      return Container(
+        color: AppTheme.stone50,
+        alignment: Alignment.center,
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.location_off_outlined, size: 24, color: AppTheme.stone400),
+            SizedBox(height: 6),
+            Text(
+              'Sin coordenadas',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: AppTheme.stone500,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final color = colorParaTipo(elemento.tipo);
+    return RepaintBoundary(
+      child: AbsorbPointer(
+        // Bloqueamos interacciones para que el mini-mapa sea solo visual.
+        // Si más adelante quieres pan/zoom, basta con quitar el AbsorbPointer.
+        child: FlutterMap(
+          options: MapOptions(
+            initialCenter: LatLng(elemento.lat, elemento.lng),
+            initialZoom: 16,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.none,
+            ),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: AppConstants.mapTileUrl,
+              subdomains: AppConstants.mapSubdomains,
+              userAgentPackageName: 'cl.lota.sigespu',
+              tileProvider: CancellableNetworkTileProvider(),
+            ),
+            MarkerLayer(
+              markers: [
+                CustomMarkers.buildMarker(
+                  point: LatLng(elemento.lat, elemento.lng),
+                  icon: CustomMarkers.getIconForTipo(elemento.tipo),
+                  color: color,
+                  isPending: false,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Filters bar ───────────────────────────────────────────────────────────────
+
+class _FiltersBar extends StatelessWidget {
+  final String filterTipo;
+  final String filterSector;
+  final String filterEstado;
+  final String filterBy;
+  final String search;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
+  final LayerLink datePopupLink;
+  final ValueChanged<String> onTipo;
+  final ValueChanged<String> onSector;
+  final ValueChanged<String> onEstado;
+  final ValueChanged<String> onBy;
+  final ValueChanged<String> onSearch;
+  final VoidCallback onDateTap;
+  final VoidCallback onDateClear;
+
+  const _FiltersBar({
+    required this.filterTipo,
+    required this.filterSector,
+    required this.filterEstado,
+    required this.filterBy,
+    required this.search,
+    required this.dateFrom,
+    required this.dateTo,
+    required this.datePopupLink,
+    required this.onTipo,
+    required this.onSector,
+    required this.onEstado,
+    required this.onBy,
+    required this.onSearch,
+    required this.onDateTap,
+    required this.onDateClear,
+  });
+
+  static const _tipoItems = <(String, String)>[
+    ('all', 'Todos los tipos'),
+    ('zona_peligro', 'Zonas de peligro'),
+    ('reporte', 'Reportes'),
+    ('patente', 'Patentes'),
+    ('centro_acopio', 'Centros de acopio'),
+    ('sede_comunitaria', 'Sedes comunitarias'),
+    ('infraestructura', 'Infraestructura'),
+  ];
+
+  static const _sectorItems = <(String, String)>[
+    ('all', 'Todos'),
+    ('S-2', 'S-2 · Residencial Los Aromos'),
+    ('S-3', 'S-3 · Mixto Los Aromos'),
+    ('S-4', 'S-4 · Equipamiento'),
+    ('S-5', 'S-5 · Vivienda Periférica'),
+    ('Centro', 'Centro Histórico'),
+  ];
+
+  static const _estadoItems = <(String, String)>[
+    ('all', 'Todos'),
+    ('activo', 'Activo'),
+    ('en_revision', 'En revisión'),
+    ('cerrado', 'Cerrado'),
+  ];
+
+  static const _byItems = <(String, String)>[
+    ('all', 'Todos'),
+    ('dir_seg', 'Dir. Seg. Pública'),
+    ('dideco', 'DIDECO'),
+    ('scraping', 'Scraping'),
+    ('sepulveda', 'R. Sepúlveda'),
+    ('munoz', 'C. Muñoz'),
+    ('castro', 'P. Castro'),
+    ('historico', 'Reg. histórico'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.stone200),
+      ),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.end,
+        children: [
+          _FilterField(
+            label: 'Tipo',
+            child: _FilterDropdown(
+              value: filterTipo,
+              items: _tipoItems,
+              onChanged: onTipo,
+              width: 200,
+            ),
+          ),
+          _FilterField(
+            label: 'Sector',
+            child: _FilterDropdown(
+              value: filterSector,
+              items: _sectorItems,
+              onChanged: onSector,
+              width: 180,
+            ),
+          ),
+          _FilterField(
+            label: 'Estado',
+            child: _FilterDropdown(
+              value: filterEstado,
+              items: _estadoItems,
+              onChanged: onEstado,
+              width: 140,
+            ),
+          ),
+          _FilterField(
+            label: 'Registrado por',
+            child: _FilterDropdown(
+              value: filterBy,
+              items: _byItems,
+              onChanged: onBy,
+              width: 180,
+            ),
+          ),
+          _FilterField(
+            label: 'Fecha',
+            child: _FilterDateChip(
+              from: dateFrom,
+              to: dateTo,
+              layerLink: datePopupLink,
+              onTap: onDateTap,
+              onClear: onDateClear,
+            ),
+          ),
+          _FilterField(
+            label: 'Buscar',
+            child: SizedBox(
+              width: 240,
+              height: 36,
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Nombre, dirección, RUT…',
+                  hintStyle: const TextStyle(fontSize: 12.5, color: AppTheme.stone400),
+                  prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.stone400),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.stone200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.stone200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.orange600, width: 1.5),
+                  ),
+                ),
+                style: const TextStyle(fontSize: 12.5),
+                onChanged: onSearch,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterField extends StatelessWidget {
+  final String label;
+  final Widget child;
+  const _FilterField({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.stone500,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: 5),
+        child,
+      ],
+    );
+  }
+}
+
+class _FilterDropdown extends StatelessWidget {
+  final String value;
+  final List<(String, String)> items;
+  final ValueChanged<String> onChanged;
+  final double width;
+
+  const _FilterDropdown({
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    required this.width,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.stone200),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isDense: true,
+          isExpanded: true,
+          icon: const Icon(Icons.expand_more, size: 16, color: AppTheme.stone500),
+          style: const TextStyle(fontSize: 12.5, color: AppTheme.stone800),
+          borderRadius: BorderRadius.circular(8),
+          items: items.map((item) {
+            final (val, label) = item;
+            return DropdownMenuItem(
+              value: val,
+              child: Text(label, overflow: TextOverflow.ellipsis),
+            );
+          }).toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileFilters extends StatelessWidget {
+  final bool expanded;
+  final VoidCallback onToggle;
+  final Widget child;
+
+  const _MobileFilters({
+    required this.expanded,
+    required this.onToggle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onToggle,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.stone200),
+            ),
+            child: Row(children: [
+              const Text(
+                'FILTROS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF78716C),
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                expanded ? Icons.expand_less : Icons.expand_more,
+                size: 16,
+                color: const Color(0xFF78716C),
+              ),
+            ]),
+          ),
+        ),
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 200),
+          crossFadeState: expanded
+              ? CrossFadeState.showFirst
+              : CrossFadeState.showSecond,
+          firstChild: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: child,
+          ),
+          secondChild: const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Banner ────────────────────────────────────────────────────────────────────
 
 class _TablaBanner extends StatelessWidget {
   final int total;
@@ -450,11 +1287,18 @@ class _TablaBanner extends StatelessWidget {
                   const Row(children: [
                     Icon(Icons.grid_on_outlined, size: 12, color: Color(0x80FFFFFF)),
                     SizedBox(width: 6),
-                    Flexible(child: Text(
-                      'Vista · Registro de elementos',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0x80FFFFFF), letterSpacing: 0.9),
-                      overflow: TextOverflow.ellipsis,
-                    )),
+                    Flexible(
+                      child: Text(
+                        'Vista · Registro de elementos',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0x80FFFFFF),
+                          letterSpacing: 0.9,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ]),
                   const SizedBox(height: 6),
                   Text(
@@ -470,13 +1314,21 @@ class _TablaBanner extends StatelessWidget {
                   const SizedBox(height: 5),
                   const Text(
                     'Todos los elementos georreferenciados. Filtrable por tipo, sector y estado.',
-                    style: TextStyle(fontSize: 12, color: Color(0xBFFFFFFF), height: 1.5),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xBFFFFFFF),
+                      height: 1.5,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(children: [
-                      _TablaStat(value: '$total', label: 'Total registros', valueColor: const Color(0xFFFB923C)),
+                      _TablaStat(
+                        value: '$total',
+                        label: 'Total registros',
+                        valueColor: const Color(0xFFFB923C),
+                      ),
                       const SizedBox(width: 16),
                       _TablaStat(value: '$sectors', label: 'Sectores'),
                       const SizedBox(width: 16),
@@ -527,56 +1379,48 @@ class _TableDecoPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final p = Paint()..color = Colors.white;
     final s = size.width / 120;
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5*s,15*s,110*s,10*s), Radius.circular(2*s)), p);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5*s,33*s,110*s,8*s), Radius.circular(2*s)), Paint()..color = Colors.white.withValues(alpha: 0.6));
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5*s,49*s,110*s,8*s), Radius.circular(2*s)), Paint()..color = Colors.white.withValues(alpha: 0.4));
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5*s,65*s,110*s,8*s), Radius.circular(2*s)), Paint()..color = Colors.white.withValues(alpha: 0.3));
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5*s,81*s,70*s,8*s), Radius.circular(2*s)), Paint()..color = Colors.white.withValues(alpha: 0.2));
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(5 * s, 15 * s, 110 * s, 10 * s),
+        Radius.circular(2 * s),
+      ),
+      p,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(5 * s, 33 * s, 110 * s, 8 * s),
+        Radius.circular(2 * s),
+      ),
+      Paint()..color = Colors.white.withValues(alpha: 0.6),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(5 * s, 49 * s, 110 * s, 8 * s),
+        Radius.circular(2 * s),
+      ),
+      Paint()..color = Colors.white.withValues(alpha: 0.4),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(5 * s, 65 * s, 110 * s, 8 * s),
+        Radius.circular(2 * s),
+      ),
+      Paint()..color = Colors.white.withValues(alpha: 0.3),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(5 * s, 81 * s, 70 * s, 8 * s),
+        Radius.circular(2 * s),
+      ),
+      Paint()..color = Colors.white.withValues(alpha: 0.2),
+    );
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ── Helpers de filtro ─────────────────────────────────────────────────────────
-
-class _FilterLabel extends StatelessWidget {
-  final String text;
-  const _FilterLabel(this.text);
-  @override
-  Widget build(BuildContext context) => Text(
-    text.toUpperCase(),
-    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.stone600, letterSpacing: 0.05),
-  );
-}
-
-class _FilterSelect extends StatelessWidget {
-  final String value;
-  final List<(String, String)> items;
-  final ValueChanged<String> onChanged;
-  const _FilterSelect({required this.value, required this.items, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      child: DropdownButton<String>(
-        value: value,
-        isDense: true,
-        underline: const SizedBox.shrink(),
-        style: const TextStyle(fontSize: 12.5, color: AppTheme.stone800),
-        borderRadius: BorderRadius.circular(8),
-        items: items.map((item) {
-          final (val, label) = item;
-          return DropdownMenuItem(value: val, child: Text(label));
-        }).toList(),
-        onChanged: (v) { if (v != null) onChanged(v); },
-      ),
-    );
-  }
-}
-
-// ── CategoryChips ─────────────────────────────────────────────────────────────
+// ── Category chips ────────────────────────────────────────────────────────────
 
 class _CategoryChips extends StatelessWidget {
   final String active;
@@ -588,16 +1432,52 @@ class _CategoryChips extends StatelessWidget {
   Widget build(BuildContext context) {
     const seed = kElementosSeed;
     final chips = [
-      (id: 'todos',   label: 'Total',           count: seed.length,
-        fg: AppTheme.stone600, bg: AppTheme.stone100),
-      (id: 'zonas',   label: 'Zonas peligro',   count: seed.where((e) => e.layerKey == 'zona_peligro').length,
-        fg: AppTheme.redDanger, bg: const Color(0xFFFEE2E2)),
-      (id: 'patente', label: 'Patentes',         count: seed.where((e) => e.layerKey == 'patente').length,
-        fg: AppTheme.amberWarning, bg: const Color(0xFFFEF3C7)),
-      (id: 'infra',   label: 'Infraestructura',  count: seed.where((e) => const ['centro_acopio','sede_comunitaria','infraestructura'].contains(e.layerKey)).length,
-        fg: AppTheme.greenSuccess, bg: const Color(0xFFDCFCE7)),
-      (id: 'otros',   label: 'Otros',            count: seed.where((e) => !const ['zona_peligro','patente','centro_acopio','sede_comunitaria','infraestructura'].contains(e.layerKey)).length,
-        fg: AppTheme.stone500, bg: AppTheme.stone100),
+      (
+        id: 'todos',
+        label: 'Total',
+        count: seed.length,
+        fg: AppTheme.stone600,
+        bg: AppTheme.stone100,
+      ),
+      (
+        id: 'zonas',
+        label: 'Zonas peligro',
+        count: seed.where((e) => e.layerKey == 'zona_peligro').length,
+        fg: AppTheme.redDanger,
+        bg: const Color(0xFFFEE2E2),
+      ),
+      (
+        id: 'patente',
+        label: 'Patentes',
+        count: seed.where((e) => e.layerKey == 'patente').length,
+        fg: AppTheme.amberWarning,
+        bg: const Color(0xFFFEF3C7),
+      ),
+      (
+        id: 'infra',
+        label: 'Infraestructura',
+        count: seed
+            .where((e) => const ['centro_acopio', 'sede_comunitaria', 'infraestructura']
+                .contains(e.layerKey))
+            .length,
+        fg: AppTheme.greenSuccess,
+        bg: const Color(0xFFDCFCE7),
+      ),
+      (
+        id: 'otros',
+        label: 'Otros',
+        count: seed
+            .where((e) => !const [
+                  'zona_peligro',
+                  'patente',
+                  'centro_acopio',
+                  'sede_comunitaria',
+                  'infraestructura'
+                ].contains(e.layerKey))
+            .length,
+        fg: AppTheme.stone500,
+        bg: AppTheme.stone100,
+      ),
     ];
 
     return SingleChildScrollView(
@@ -621,15 +1501,19 @@ class _CategoryChips extends StatelessWidget {
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Container(
-                    width: 7, height: 7,
+                    width: 7,
+                    height: 7,
                     decoration: BoxDecoration(color: c.fg, shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 6),
-                  Text(c.label,
+                  Text(
+                    c.label,
                     style: TextStyle(
-                      fontSize: 12, fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                      fontSize: 12,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                       color: isActive ? c.fg : AppTheme.stone600,
-                    )),
+                    ),
+                  ),
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -637,11 +1521,14 @@ class _CategoryChips extends StatelessWidget {
                       color: isActive ? c.fg.withValues(alpha: 0.15) : AppTheme.stone100,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Text('${c.count}',
+                    child: Text(
+                      '${c.count}',
                       style: TextStyle(
-                        fontSize: 10.5, fontWeight: FontWeight.w700,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
                         color: isActive ? c.fg : AppTheme.stone500,
-                      )),
+                      ),
+                    ),
                   ),
                 ]),
               ),
@@ -653,13 +1540,18 @@ class _CategoryChips extends StatelessWidget {
   }
 }
 
-// ── Avatar helpers ────────────────────────────────────────────────────────
+// ── Avatar helpers ────────────────────────────────────────────────────────────
 
 Color _byColor(String by) {
   const colors = [
-    Color(0xFF9A3412), Color(0xFF15803D), Color(0xFF7C3AED),
-    Color(0xFFCA8A04), Color(0xFF57534E), Color(0xFFB91C1C),
-    Color(0xFF0284C7), Color(0xFF92400E),
+    Color(0xFF9A3412),
+    Color(0xFF15803D),
+    Color(0xFF7C3AED),
+    Color(0xFFCA8A04),
+    Color(0xFF57534E),
+    Color(0xFFB91C1C),
+    Color(0xFF0284C7),
+    Color(0xFF92400E),
   ];
   return colors[by.codeUnits.fold(0, (a, b) => a + b) % colors.length];
 }
@@ -669,6 +1561,184 @@ String _byInitials(String by) {
   if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   if (parts[0].length >= 2) return parts[0].substring(0, 2).toUpperCase();
   return parts[0][0].toUpperCase();
+}
+
+// ── Mobile card list (móvil) ──────────────────────────────────────────────────
+
+class _MobileCardList extends StatelessWidget {
+  final List<ElementoMapa> rows;
+  final ValueChanged<ElementoMapa> onSelect;
+
+  const _MobileCardList({required this.rows, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    if (rows.isEmpty) {
+      return const Center(
+        child: Text(
+          'Sin resultados con los filtros actuales',
+          style: TextStyle(color: AppTheme.stone500, fontSize: 13),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 16),
+      itemCount: rows.length,
+      itemBuilder: (ctx, i) => _MobileElementoCard(
+        elemento: rows[i],
+        onTap: () => onSelect(rows[i]),
+      ),
+    );
+  }
+}
+
+class _MobileElementoCard extends StatelessWidget {
+  final ElementoMapa elemento;
+  final VoidCallback onTap;
+
+  const _MobileElementoCard({required this.elemento, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final e = elemento;
+    final tipoColor = colorParaTipo(e.tipo);
+    final tipoLabel = nombreParaTipo(e.tipo);
+    final estadoColor = colorParaEstado(e.estado);
+    final estadoBg = bgParaEstado(e.estado);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppTheme.stone200),
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: tipoColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(Icons.location_on_outlined, size: 18, color: tipoColor),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: tipoColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text(tipoLabel,
+                      style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: tipoColor)),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: estadoBg,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text(_labelEstado(e.estado),
+                      style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: estadoColor)),
+                ),
+              ]),
+              const SizedBox(height: 5),
+              Text(e.nombre,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.stone900),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 3),
+              Row(children: [
+                const Icon(Icons.place_outlined, size: 11, color: AppTheme.stone400),
+                const SizedBox(width: 3),
+                Expanded(
+                  child: Text(
+                    '${e.direccion} · ${e.sector}',
+                    style: const TextStyle(fontSize: 11, color: AppTheme.stone500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 2),
+              Row(children: [
+                const Icon(Icons.schedule_outlined, size: 11, color: AppTheme.stone400),
+                const SizedBox(width: 3),
+                Text(e.fecha,
+                    style: const TextStyle(fontSize: 11, color: AppTheme.stone500)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(e.by,
+                      style: const TextStyle(fontSize: 11, color: AppTheme.stone500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ]),
+            ]),
+          ),
+          const Icon(Icons.chevron_right, size: 16, color: AppTheme.stone300),
+        ]),
+      ),
+    );
+  }
+}
+
+class _MobileDetailSheet extends StatelessWidget {
+  final ElementoMapa elemento;
+  final VoidCallback onClose;
+
+  const _MobileDetailSheet({required this.elemento, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.72,
+      minChildSize: 0.45,
+      maxChildSize: 0.95,
+      builder: (_, ctrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Column(children: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.stone300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _DetailPanel(
+              elemento: elemento,
+              onClose: onClose,
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
 }
 
 // ── FilterDateChip ────────────────────────────────────────────────────────────
@@ -689,7 +1759,7 @@ class _FilterDateChip extends StatelessWidget {
   });
 
   String get _label {
-    if (from == null && to == null) return 'Fecha';
+    if (from == null && to == null) return 'Cualquiera';
     String fmt(DateTime d) =>
         '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
     final f = from != null ? fmt(from!) : '…';
@@ -706,27 +1776,40 @@ class _FilterDateChip extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          height: 34,
+          height: 36,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: _active ? AppTheme.orange50 : Colors.white,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: _active ? AppTheme.orange600 : AppTheme.stone200),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _active ? AppTheme.orange600 : AppTheme.stone200,
+            ),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.calendar_today_outlined, size: 13,
-                color: _active ? AppTheme.orange600 : AppTheme.stone500),
-            const SizedBox(width: 5),
-            Text(_label, style: TextStyle(
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 13,
+              color: _active ? AppTheme.orange600 : AppTheme.stone500,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _label,
+              style: TextStyle(
                 fontSize: 12.5,
-                color: _active ? AppTheme.orange700 : AppTheme.stone700)),
+                color: _active ? AppTheme.orange700 : AppTheme.stone700,
+              ),
+            ),
             if (_active) ...[
               const SizedBox(width: 6),
               GestureDetector(
                 onTap: onClear,
                 child: const Icon(Icons.close, size: 13, color: AppTheme.orange600),
               ),
-            ],
+            ] else
+              const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Icon(Icons.expand_more, size: 16, color: AppTheme.stone500),
+              ),
           ]),
         ),
       ),

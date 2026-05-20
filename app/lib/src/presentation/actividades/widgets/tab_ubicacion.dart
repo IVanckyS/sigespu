@@ -140,96 +140,112 @@ class _TabUbicacionState extends ConsumerState<TabUbicacion> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // KV row: dirección + coords + sector
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 5,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _FieldLabel('Dirección / lugar'),
-                    const SizedBox(height: 6),
-                    _KV(
-                      Row(
-                        children: [
-                          Icon(Icons.place_outlined,
-                              size: 13,
-                              color: sinUbicacion
-                                  ? const Color(0xFFA8A29E)
-                                  : const Color(0xFF78716C)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              a.direccion ?? 'Sin ubicación',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: sinUbicacion
-                                    ? const Color(0xFFA8A29E)
-                                    : const Color(0xFF1C1917),
-                                fontStyle: sinUbicacion
-                                    ? FontStyle.italic
-                                    : FontStyle.normal,
-                              ),
-                            ),
+          // KV row: dirección + coords + sector (responsive)
+          LayoutBuilder(builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 560;
+
+            final direccion = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _FieldLabel('Dirección / lugar'),
+                const SizedBox(height: 6),
+                _KV(
+                  Row(
+                    children: [
+                      Icon(Icons.place_outlined,
+                          size: 13,
+                          color: sinUbicacion
+                              ? const Color(0xFFA8A29E)
+                              : const Color(0xFF78716C)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          a.direccion ?? 'Sin ubicación',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: sinUbicacion
+                                ? const Color(0xFFA8A29E)
+                                : const Color(0xFF1C1917),
+                            fontStyle: sinUbicacion
+                                ? FontStyle.italic
+                                : FontStyle.normal,
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 4,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _FieldLabel('Coordenadas'),
-                    const SizedBox(height: 6),
-                    _KV(
-                      Text(
-                        hasCoords
-                            ? '${a.lat!.toStringAsFixed(5)}, ${a.lng!.toStringAsFixed(5)}'
-                            : 'Sin coordenadas',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 11.5,
-                          color: hasCoords
-                              ? const Color(0xFF1C1917)
-                              : const Color(0xFFA8A29E),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 80,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _FieldLabel('Sector'),
-                    const SizedBox(height: 6),
-                    _KV(
-                      Text(
-                        a.sector ?? '—',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 12.5,
-                          color: const Color(0xFF1C1917),
-                        ),
-                      ),
+              ],
+            );
+
+            final coordenadas = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _FieldLabel('Coordenadas'),
+                const SizedBox(height: 6),
+                _KV(
+                  Text(
+                    hasCoords
+                        ? '${a.lat!.toStringAsFixed(5)}, ${a.lng!.toStringAsFixed(5)}'
+                        : 'Sin coordenadas',
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 11.5,
+                      color: hasCoords
+                          ? const Color(0xFF1C1917)
+                          : const Color(0xFFA8A29E),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            );
+
+            final sector = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _FieldLabel('Sector'),
+                const SizedBox(height: 6),
+                _KV(
+                  Text(
+                    a.sector ?? '—',
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 12.5,
+                      color: const Color(0xFF1C1917),
+                    ),
+                  ),
+                ),
+              ],
+            );
+
+            if (narrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  direccion,
+                  const SizedBox(height: 10),
+                  coordenadas,
+                  const SizedBox(height: 10),
+                  sector,
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 5, child: direccion),
+                const SizedBox(width: 12),
+                Expanded(flex: 4, child: coordenadas),
+                const SizedBox(width: 12),
+                SizedBox(width: 80, child: sector),
+              ],
+            );
+          }),
           const SizedBox(height: 14),
 
-          // Action row
-          Row(
+          // Action row (Wrap para no desbordar en narrow)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               ElevatedButton.icon(
                 onPressed: _loadingGps ? null : _usarUbicacionActual,
@@ -255,7 +271,6 @@ class _TabUbicacionState extends ConsumerState<TabUbicacion> {
                   elevation: 0,
                 ),
               ),
-              const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: () => setState(() => _markingMode = !_markingMode),
                 icon: const Icon(Icons.push_pin_outlined, size: 13),
@@ -281,7 +296,6 @@ class _TabUbicacionState extends ConsumerState<TabUbicacion> {
                       borderRadius: BorderRadius.circular(8)),
                 ),
               ),
-              const Spacer(),
               _GpsConfidenceBadge(hasCoords: hasCoords),
             ],
           ),

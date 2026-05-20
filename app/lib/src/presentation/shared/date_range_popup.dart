@@ -201,11 +201,12 @@ class _TabChip extends StatelessWidget {
   }
 }
 
-/// Helper to show [DateRangePopup] as an [OverlayEntry] anchored to a widget.
-/// Use a [CompositedTransformTarget] on the anchor widget with [link].
+/// Helper to show [DateRangePopup] as a dialog.
+/// [link] is kept for backward compatibility with [CompositedTransformTarget]
+/// wrappers in callers — it is no longer used for positioning.
 class DateRangePopupController {
-  OverlayEntry? _entry;
   final LayerLink link;
+  BuildContext? _dialogCtx;
 
   DateRangePopupController(this.link);
 
@@ -215,39 +216,29 @@ class DateRangePopupController {
     DateTime? initialTo,
     required void Function(DateTime? from, DateTime? to) onApply,
   }) {
-    _entry?.remove();
-    _entry = OverlayEntry(
-      builder: (_) => Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: dismiss,
-              child: const SizedBox.expand(),
-            ),
+    dismiss();
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.20),
+      builder: (ctx) {
+        _dialogCtx = ctx;
+        return Center(
+          child: DateRangePopup(
+            initialFrom: initialFrom,
+            initialTo: initialTo,
+            onApply: onApply,
+            onDismiss: dismiss,
           ),
-          CompositedTransformFollower(
-            link: link,
-            showWhenUnlinked: false,
-            offset: const Offset(0, 36),
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: DateRangePopup(
-                initialFrom: initialFrom,
-                initialTo: initialTo,
-                onApply: onApply,
-                onDismiss: dismiss,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    Overlay.of(context).insert(_entry!);
+        );
+      },
+    ).then((_) => _dialogCtx = null);
   }
 
   void dismiss() {
-    _entry?.remove();
-    _entry = null;
+    final ctx = _dialogCtx;
+    _dialogCtx = null;
+    if (ctx != null && ctx.mounted) {
+      Navigator.of(ctx).pop();
+    }
   }
 }

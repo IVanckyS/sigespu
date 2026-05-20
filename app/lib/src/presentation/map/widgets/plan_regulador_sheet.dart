@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
 import '../../../config/theme.dart';
 import '../../../presentation/auth/auth_provider.dart';
 import '../providers/map_providers.dart';
@@ -46,6 +45,7 @@ class _PlanReguladorSheetState extends ConsumerState<PlanReguladorSheet> {
     final code = widget.sector['code'] as String;
     final name = widget.sector['name'] as String;
     final attr = ref.watch(planReguladorAttrProvider)[code];
+    final hasEdit = ref.watch(planReguladorEditsProvider).containsKey(code);
 
     return Container(
       decoration: const BoxDecoration(
@@ -108,29 +108,51 @@ class _PlanReguladorSheetState extends ConsumerState<PlanReguladorSheet> {
           child: OutlinedButton.icon(
             onPressed: () {
               Navigator.pop(context);
-              final coords = widget.sector['coords'] as List;
-              final points = coords.map((c) => LatLng(c[0] as double, c[1] as double)).toList();
-
+              // Empezar desde cero: el polígono original se oculta mientras se
+              // dibuja (vía hiddenCode en planReguladorPolygonsProvider) y los
+              // vértices arrancan vacíos para evitar el "estiramiento" raro.
+              ref.read(drawingTargetProvider.notifier).state = widget.sector['code'] as String;
+              ref.read(drawingPointsProvider.notifier).state = [];
               ref.read(isDrawingModeProvider.notifier).state = true;
-              ref.read(drawingPointsProvider.notifier).state = points;
-              ref.read(drawingTargetProvider.notifier).state = widget.sector['code'];
 
               ScaffoldMessenger.of(context).showSnackBar(
-
                 SnackBar(
-                  content: Text('Editando contorno de ${widget.sector['code']}'),
+                  content: Text(
+                    'Re-dibujando ${widget.sector['code']} desde cero — toca el mapa para colocar vértices',
+                  ),
                   backgroundColor: AppTheme.amberWarning,
                 ),
               );
             },
             icon: const Icon(Icons.edit, size: 16),
-            label: const Text('Re-dibujar sector'),
+            label: const Text('Re-dibujar sector desde cero'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppTheme.amberWarning,
               side: const BorderSide(color: AppTheme.amberWarning),
             ),
           ),
         ),
+        if (hasEdit) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: () {
+                ref.read(planReguladorEditsProvider.notifier).clearSector(code);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Contorno original de $code restaurado'),
+                    backgroundColor: AppTheme.stone700,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.restore, size: 14),
+              label: const Text('Restaurar contorno original'),
+              style: TextButton.styleFrom(foregroundColor: AppTheme.stone600),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
 
         SizedBox(

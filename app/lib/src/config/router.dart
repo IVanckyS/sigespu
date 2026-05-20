@@ -8,8 +8,10 @@ import '../presentation/auth/auth_provider.dart';
 import '../presentation/resumen/resumen_screen.dart';
 import '../presentation/tabla/tabla_screen.dart';
 import '../presentation/scraping/scraping_screen.dart';
+import '../presentation/sync/conflicts_screen.dart';
 import '../presentation/users/users_screen.dart';
 import '../presentation/actividades/actividades_screen.dart';
+import '../presentation/profile/profile_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -31,6 +33,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const AuthScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
       ),
       ShellRoute(
         builder: (context, state, child) {
@@ -70,6 +76,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               return null;
             },
             builder: (context, state) => const ActividadesScreen(),
+          ),
+          GoRoute(
+            path: '/conflicts',
+            builder: (context, state) => const ConflictsScreen(),
           ),
         ],
       ),

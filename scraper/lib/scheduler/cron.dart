@@ -1,81 +1,57 @@
+import 'dart:async' show unawaited;
+import 'dart:io';
 import 'package:cron/cron.dart';
+import 'package:postgres/postgres.dart';
+import 'package:redis/redis.dart';
 import '../sources/patentes_mensuales.dart';
 import '../sources/permisos_dom.dart';
 import '../sources/decretos_transito.dart';
 import '../sources/organizaciones.dart';
 import '../geocoder/nominatim_client.dart';
-import 'dart:io';
-import 'package:postgres/postgres.dart';
-import 'package:redis/redis.dart';
 
-Future<void> startCron() async {
+/// Registers scraper cron jobs using the Pool and Command already initialized
+/// by the backend. Does not create its own connections.
+///
+/// If RUN_INITIAL_SCRAPE=true, immediately launches a full scrape in background
+/// (useful on first deploy to populate historical data).
+void startScraperCron(Pool db, Command redis) {
   final cron = Cron();
-  
-  final dbHost = Platform.environment['DB_HOST'] ?? 'localhost';
-  final dbPort = int.parse(Platform.environment['DB_PORT'] ?? '5432');
-  final dbName = Platform.environment['DB_NAME'] ?? 'sigespu';
-  final dbUser = Platform.environment['DB_USER'] ?? 'sigespu_user';
-  final dbPass = Platform.environment['DB_PASSWORD'] ?? 'secret_password';
-  
-  late Connection db;
-  int retries = 5;
-  while (retries > 0) {
-    try {
-      db = await Connection.open(
-        Endpoint(host: dbHost, port: dbPort, database: dbName, username: dbUser, password: dbPass),
-        settings: ConnectionSettings(sslMode: SslMode.disable),
-      );
-      break;
-    } catch (e) {
-      retries--;
-      print('Fallo al conectar a PostgreSQL. Reintentando en 3s... (\$retries intentos restantes)');
-      if (retries == 0) rethrow;
-      await Future.delayed(const Duration(seconds: 3));
-    }
-  }
-  
-  final redisHost = Platform.environment['REDIS_HOST'] ?? 'localhost';
-  final redisPort = int.parse(Platform.environment['REDIS_PORT'] ?? '6379');
-  
-  late Command redis;
-  retries = 5;
-  while (retries > 0) {
-    try {
-      final redisConn = RedisConnection();
-      redis = await redisConn.connect(redisHost, redisPort);
-      break;
-    } catch (e) {
-      retries--;
-      print('Fallo al conectar a Redis. Reintentando en 3s... (\$retries intentos restantes)');
-      if (retries == 0) rethrow;
-      await Future.delayed(const Duration(seconds: 3));
-    }
-  }
-  
   final geocoder = NominatimClient();
-  
-  // Ejecución inicial para asegurar funcionamiento
-  await scrapePatentes(db, redis, geocoder);
+
+  if (Platform.environment['RUN_INITIAL_SCRAPE'] == 'true') {
+    print('[scraper] RUN_INITIAL_SCRAPE=true — lanzando scrape inicial en background');
+    unawaited(_runAllSources(db, redis, geocoder));
+  }
 
   cron.schedule(Schedule.parse('0 3 * * *'), () async {
-    print('Ejecutando cron diario 03:00 AM');
+    print('[scraper] Cron 03:00 — scrapePatentes');
     await scrapePatentes(db, redis, geocoder);
   });
-  
+
   cron.schedule(Schedule.parse('10 3 * * *'), () async {
-    print('Ejecutando cron diario 03:10 AM');
+    print('[scraper] Cron 03:10 — scrapePermisosDom');
     await scrapePermisosDom(db, redis, geocoder);
   });
-  
+
   cron.schedule(Schedule.parse('20 3 * * *'), () async {
-    print('Ejecutando cron diario 03:20 AM');
+    print('[scraper] Cron 03:20 — scrapeDecretosTransito');
     await scrapeDecretosTransito(db, redis);
   });
-  
+
   cron.schedule(Schedule.parse('0 4 * * 0'), () async {
-    print('Ejecutando cron semanal domingo 04:00 AM');
+    print('[scraper] Cron domingo 04:00 — scrapeOrganizaciones');
     await scrapeOrganizaciones(db, redis, geocoder);
   });
-  
-  print('Scheduler configurado y en espera...');
+
+  print('[scraper] Cron scheduler iniciado');
+}
+
+Future<void> _runAllSources(
+    Pool db, Command redis, NominatimClient geocoder) async {
+  print('[scraper] Iniciando scrape completo de todas las fuentes...');
+  await scrapePatentes(db, redis, geocoder);
+  await scrapePermisosDom(db, redis, geocoder);
+  await scrapeDecretosTransito(db, redis);
+  await scrapeOrganizaciones(db, redis, geocoder);
+  print('[scraper] Scrape completo finalizado');
 }

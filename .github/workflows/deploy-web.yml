@@ -1,0 +1,48 @@
+name: Deploy Flutter Web → Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/deploy-web.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.pub-cache
+          key: flutter-${{ hashFiles('app/pubspec.lock') }}
+          restore-keys: |
+            flutter-
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.0'
+          channel: stable
+
+      - name: Build Flutter Web
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build web --release \
+            --dart-define=API_BASE_URL=${{ vars.BACKEND_URL }}
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: sigespu-web
+          directory: app/build/web
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

@@ -147,19 +147,18 @@ class _TabDatosState extends ConsumerState<TabDatos> {
           // ── Chips + badge de modo ──────────────────────────────────────
           Row(
             children: [
-              Wrap(spacing: 8, runSpacing: 6, children: [
-                _Chip(labelParaTipo(T), bg: bg, fg: color, icon: iconoParaTipo(T)),
-                _Chip('Sector ${a.sector ?? "—"}',
-                    bg: const Color(0xFFE7E5E4),
-                    fg: const Color(0xFF44403C),
-                    mono: true),
-                _Chip(a.id,
-                    bg: const Color(0xFFFFEDD5),
-                    fg: const Color(0xFFC2410C),
-                    mono: true),
-                _EstadoChip(a.estado),
-              ]),
-              const Spacer(),
+              Flexible(
+                child: Wrap(spacing: 8, runSpacing: 6, children: [
+                  _Chip(labelParaTipo(T),
+                      bg: bg, fg: color, icon: iconoParaTipo(T)),
+                  _Chip('Sector ${a.sector ?? "—"}',
+                      bg: const Color(0xFFE7E5E4),
+                      fg: const Color(0xFF44403C),
+                      mono: true),
+                  _EstadoChip(a.estado),
+                ]),
+              ),
+              const SizedBox(width: 8),
               _ModeBadge(editable: editable),
             ],
           ),
@@ -258,36 +257,62 @@ class _TabDatosState extends ConsumerState<TabDatos> {
           const SizedBox(height: 14),
 
           // ── Fechas + Presupuesto ──────────────────────────────────────
-          Row(children: [
-            Expanded(
-              child: _DateField('Inicio', a.fechaInicio,
-                  editable: editable, onTap: () => _pickDate(true)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _DateField('Término', a.fechaFin,
-                  editable: editable, onTap: () => _pickDate(false)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: editable
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _FieldLabel('Presupuesto estimado'),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _presupuestoCtrl,
-                          keyboardType: TextInputType.number,
-                          style: GoogleFonts.jetBrainsMono(
-                              fontSize: 12, color: const Color(0xFF1C1917)),
-                          decoration: _inputDeco(hint: '0', prefix: 'CLP \$'),
-                        ),
-                      ],
-                    )
-                  : _BudgetField(a.presupuestoEstimado),
-            ),
-          ]),
+          LayoutBuilder(builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 400;
+            final budgetWidget = editable
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _FieldLabel('Presupuesto estimado'),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _presupuestoCtrl,
+                        keyboardType: TextInputType.number,
+                        style: GoogleFonts.jetBrainsMono(
+                            fontSize: 12,
+                            color: const Color(0xFF1C1917)),
+                        decoration:
+                            _inputDeco(hint: '0', prefix: 'CLP \$'),
+                      ),
+                    ],
+                  )
+                : _BudgetField(a.presupuestoEstimado);
+
+            if (narrow) {
+              return Column(children: [
+                Row(children: [
+                  Expanded(
+                    child: _DateField('Inicio', a.fechaInicio,
+                        editable: editable,
+                        onTap: () => _pickDate(true)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _DateField('Término', a.fechaFin,
+                        editable: editable,
+                        onTap: () => _pickDate(false)),
+                  ),
+                ]),
+                const SizedBox(height: 12),
+                budgetWidget,
+              ]);
+            }
+
+            return Row(children: [
+              Expanded(
+                child: _DateField('Inicio', a.fechaInicio,
+                    editable: editable, onTap: () => _pickDate(true)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _DateField('Término', a.fechaFin,
+                    editable: editable,
+                    onTap: () => _pickDate(false)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: budgetWidget),
+            ]);
+          }),
           const SizedBox(height: 14),
 
           // ── Dirección municipal ───────────────────────────────────────
@@ -635,18 +660,21 @@ class _TipoSelector extends StatelessWidget {
                                       ? const Color(0xFF78716C)
                                       : const Color(0xFFA8A29E))),
                           const SizedBox(width: 4),
-                          Text(
-                            labelParaTipo(t),
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: on
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                              color: on
-                                  ? c
-                                  : (editable
-                                      ? const Color(0xFF78716C)
-                                      : const Color(0xFFA8A29E)),
+                          Flexible(
+                            child: Text(
+                              labelParaTipo(t),
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: on
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                color: on
+                                    ? c
+                                    : (editable
+                                        ? const Color(0xFF78716C)
+                                        : const Color(0xFFA8A29E)),
+                              ),
                             ),
                           ),
                         ],
@@ -759,13 +787,17 @@ class _DateField extends StatelessWidget {
             ),
             child: Row(children: [
               Expanded(
-                child: Text(
-                  text,
-                  style: GoogleFonts.jetBrainsMono(
-                      fontSize: 11.5,
-                      color: date != null
-                          ? const Color(0xFF1C1917)
-                          : const Color(0xFFA8A29E)),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    text,
+                    style: GoogleFonts.jetBrainsMono(
+                        fontSize: 11.5,
+                        color: date != null
+                            ? const Color(0xFF1C1917)
+                            : const Color(0xFFA8A29E)),
+                  ),
                 ),
               ),
               if (editable)

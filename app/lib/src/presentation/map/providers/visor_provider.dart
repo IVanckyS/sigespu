@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared/shared.dart';
 import '../../../config/constants.dart';
+import '../../../data/remote/cached_api.dart';
 import '../../auth/auth_provider.dart';
 
 // ── Active panel ──────────────────────────────────────────────────────────────
@@ -51,16 +53,24 @@ final sismosProvider = FutureProvider<List<SismoDto>>((ref) async {
   final storage = ref.read(secureStorageProvider);
   final token = await storage.read(key: 'access_token');
   const apiBase = AppConstants.apiBaseUrl;
-  
-  final resp = await http.get(
+  final api = ref.read(cachedApiProvider);
+
+  final resp = await api.get(
     Uri.parse('$apiBase/api/sismos?dias=7&minmagnitude=3.0&maxradiuskm=500'),
     headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-  ).timeout(const Duration(seconds: 15));
-  
-  if (resp.statusCode != 200) return [];
-  final data = jsonDecode(resp.body) as Map<String, dynamic>;
-  final list = (data['sismos'] as List).cast<Map<String, dynamic>>();
-  return list.map(SismoDto.fromJson).toList();
+    cacheKey: 'api:/api/sismos',
+    timeout: const Duration(seconds: 15),
+  );
+
+  if (!resp.hasData) return [];
+  try {
+    final data = jsonDecode(resp.body!) as Map<String, dynamic>;
+    final list = (data['sismos'] as List).cast<Map<String, dynamic>>();
+    return list.map(SismoDto.fromJson).toList();
+  } catch (e) {
+    if (kDebugMode) debugPrint('[sismos] parse error: $e');
+    return [];
+  }
 });
 
 // ── Custom layers ──────────────────────────────────────────────────────────────
@@ -70,16 +80,24 @@ final capasPersonalizadasProvider =
   final storage = ref.read(secureStorageProvider);
   final token = await storage.read(key: 'access_token');
   const apiBase = AppConstants.apiBaseUrl;
-  
-  final resp = await http.get(
+  final api = ref.read(cachedApiProvider);
+
+  final resp = await api.get(
     Uri.parse('$apiBase/api/capas'),
     headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-  ).timeout(const Duration(seconds: 15));
-  
-  if (resp.statusCode != 200) return [];
-  final data = jsonDecode(resp.body) as Map<String, dynamic>;
-  final list = (data['capas'] as List).cast<Map<String, dynamic>>();
-  return list.map(CapaPersonalizadaDto.fromJson).toList();
+    cacheKey: 'api:/api/capas',
+    timeout: const Duration(seconds: 15),
+  );
+
+  if (!resp.hasData) return [];
+  try {
+    final data = jsonDecode(resp.body!) as Map<String, dynamic>;
+    final list = (data['capas'] as List).cast<Map<String, dynamic>>();
+    return list.map(CapaPersonalizadaDto.fromJson).toList();
+  } catch (e) {
+    if (kDebugMode) debugPrint('[capas] parse error: $e');
+    return [];
+  }
 });
 
 /// GeoJSON FeatureCollection for a specific custom capa
@@ -89,19 +107,29 @@ final capaGeoJsonProvider =
   final token = await storage.read(key: 'access_token');
   final bounds = ref.watch(mapBoundsProvider);
   const apiBase = AppConstants.apiBaseUrl;
+  final api = ref.read(cachedApiProvider);
 
   String url = '$apiBase/api/capas/$id/geometrias';
   if (bounds != null && bounds.length == 4) {
     url += '?bbox=${bounds.join(',')}';
   }
 
-  final resp = await http.get(
+  // El cacheKey ignora el bbox: queremos el último GeoJSON para esta capa,
+  // independiente del recorte espacial actual.
+  final resp = await api.get(
     Uri.parse(url),
     headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-  ).timeout(const Duration(seconds: 15));
+    cacheKey: 'api:/api/capas/$id/geometrias',
+    timeout: const Duration(seconds: 15),
+  );
 
-  if (resp.statusCode != 200) return null;
-  return jsonDecode(resp.body) as Map<String, dynamic>;
+  if (!resp.hasData) return null;
+  try {
+    return jsonDecode(resp.body!) as Map<String, dynamic>;
+  } catch (e) {
+    if (kDebugMode) debugPrint('[capa $id] parse error: $e');
+    return null;
+  }
 });
 
 /// GeoJSON FeatureCollection unificado para una capa base del sistema (tsunami, incendio)
@@ -110,14 +138,22 @@ final sistemaTipoGeojsonProvider =
   final storage = ref.read(secureStorageProvider);
   final token = await storage.read(key: 'access_token');
   const apiBase = AppConstants.apiBaseUrl;
+  final api = ref.read(cachedApiProvider);
 
-  final resp = await http.get(
+  final resp = await api.get(
     Uri.parse('$apiBase/api/capas/sistema/$tipo'),
     headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-  ).timeout(const Duration(seconds: 20));
+    cacheKey: 'api:/api/capas/sistema/$tipo',
+    timeout: const Duration(seconds: 20),
+  );
 
-  if (resp.statusCode != 200) return null;
-  return jsonDecode(resp.body) as Map<String, dynamic>;
+  if (!resp.hasData) return null;
+  try {
+    return jsonDecode(resp.body!) as Map<String, dynamic>;
+  } catch (e) {
+    if (kDebugMode) debugPrint('[sistema $tipo] parse error: $e');
+    return null;
+  }
 });
 
 /// Export/Download a layer

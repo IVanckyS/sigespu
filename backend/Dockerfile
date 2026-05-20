@@ -4,6 +4,7 @@ WORKDIR /app
 COPY shared/pubspec.* shared/
 COPY scraper/pubspec.* scraper/
 COPY backend/pubspec.* backend/
+COPY scraper/pubspec.* scraper/
 
 # Get shared dependencies first
 WORKDIR /app/shared
@@ -29,5 +30,6 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends gdal-bin \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/backend/bin/server /app/bin/
+COPY --from=build /app/backend/migrations /app/migrations/
 EXPOSE 8080
 CMD ["/app/bin/server"]

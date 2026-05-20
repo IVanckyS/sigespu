@@ -42,8 +42,11 @@ class ResumenScreen extends StatelessWidget {
         .toList()
       ..sort((a, b) => b.fecha.compareTo(a.fecha));
 
+    final isMobile = MediaQuery.of(context).size.width < 768;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: isMobile
+          ? const EdgeInsets.fromLTRB(14, 14, 14, 20)
+          : const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -200,14 +203,18 @@ class _ResumenBanner extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 24, 140, 24),
+              padding: EdgeInsets.fromLTRB(
+                MediaQuery.of(context).size.width < 768 ? 16 : 28,
+                MediaQuery.of(context).size.width < 768 ? 16 : 24,
+                16, 16,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
-                    const Icon(Icons.dashboard_outlined, size: 12, color: Colors.white70),
-                    const SizedBox(width: 6),
-                    const Text(
+                  const Row(children: [
+                    Icon(Icons.dashboard_outlined, size: 12, color: Colors.white70),
+                    SizedBox(width: 6),
+                    Flexible(child: Text(
                       'Vista · Resumen operativo',
                       style: TextStyle(
                         fontSize: 10,
@@ -215,7 +222,8 @@ class _ResumenBanner extends StatelessWidget {
                         color: Colors.white70,
                         letterSpacing: 0.09 * 10,
                       ),
-                    ),
+                      overflow: TextOverflow.ellipsis,
+                    )),
                   ]),
                   const SizedBox(height: 6),
                   Text(
@@ -238,15 +246,18 @@ class _ResumenBanner extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Row(children: [
-                    _VStat(value: '$reportes', label: 'Reportes'),
-                    const SizedBox(width: 16),
-                    _VStat(value: '$zonas', label: 'Zonas activas'),
-                    const SizedBox(width: 16),
-                    _VStat(value: '$patentes', label: 'Patentes (mes)'),
-                    const SizedBox(width: 16),
-                    _VStat(value: '$acopios', label: 'Centros acopio'),
-                  ]),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: [
+                      _VStat(value: '$reportes', label: 'Reportes'),
+                      const SizedBox(width: 16),
+                      _VStat(value: '$zonas', label: 'Zonas activas'),
+                      const SizedBox(width: 16),
+                      _VStat(value: '$patentes', label: 'Patentes (mes)'),
+                      const SizedBox(width: 16),
+                      _VStat(value: '$acopios', label: 'Centros acopio'),
+                    ]),
+                  ),
                 ],
               ),
             ),
@@ -313,7 +324,7 @@ class _KpiGrid extends StatelessWidget {
           icon: Icons.warning_amber_outlined, trend: '3 nuevas esta semana', trendUp: false),
       _KpiCard(label: 'Patentes nuevas (mes)', value: '$patentes', accent: AppTheme.amberWarning,
           icon: Icons.store_outlined, trend: 'scraping · hace 3h', trendUp: true),
-      _KpiCard(label: 'Centros de acopio', value: '$acopios', accent: AppTheme.blue800,
+      _KpiCard(label: 'Centros de acopio', value: '$acopios', accent: AppTheme.orange600,
           icon: Icons.home_outlined, trend: 'Listos para emergencias', trendUp: true),
       _KpiCard(label: 'Sedes comunitarias', value: '$sedes', accent: AppTheme.greenSuccess,
           icon: Icons.people_outline, trend: 'Activas e identificadas', trendUp: true),
@@ -321,7 +332,14 @@ class _KpiGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < 768) {
-          return Column(children: cards);
+          final cardWidth = (constraints.maxWidth - 8) / 2;
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: cards
+                .map((c) => SizedBox(width: cardWidth, child: c))
+                .toList(),
+          );
         }
         return Row(children: cards.map((c) => Expanded(child: c)).toList());
       },
@@ -345,7 +363,6 @@ class _KpiCard extends StatelessWidget {
     final trendColor = trendUp ? AppTheme.greenSuccess : AppTheme.redDanger;
 
     return Container(
-      width: 200,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,

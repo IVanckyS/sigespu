@@ -4,13 +4,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:shared/shared.dart';
 import 'package:uuid/uuid.dart';
 
 import '../actividades_provider.dart';
+import '../../auth/auth_provider.dart';
+import '../../shared/pdf_export_service.dart';
 import '../../users/solicitudes_provider.dart';
 
 const _uuid = Uuid();
@@ -464,351 +464,15 @@ class _TabActaState extends ConsumerState<TabActa> {
     ));
   }
 
-  String _tipoLabel(TipoActividad t) => switch (t) {
-        TipoActividad.reunion => 'Reunión',
-        TipoActividad.operativo => 'Operativo',
-        TipoActividad.evento => 'Evento',
-        TipoActividad.capacitacion => 'Capacitación',
-      };
-
-  String _estadoLabel(EstadoActividad e) => switch (e) {
-        EstadoActividad.planificado => 'Planificado',
-        EstadoActividad.enCurso => 'En curso',
-        EstadoActividad.completado => 'Completado',
-        EstadoActividad.archivado => 'Archivado',
-      };
-
   Future<void> _exportarPDF() async {
     final a = _actividad;
-    final doc = pw.Document();
-    final now = DateTime.now();
-
-    doc.addPage(pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(40),
-      header: (ctx) => pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'MUNICIPALIDAD DE LOTA',
-                      style: pw.TextStyle(
-                        fontSize: 9,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.grey600,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    pw.Text(
-                      'Dirección de Seguridad Pública',
-                      style: const pw.TextStyle(
-                          fontSize: 9, color: PdfColors.grey500),
-                    ),
-                  ],
-                ),
-              ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
-                  pw.Text(
-                    'ACTA DE ACTIVIDAD MUNICIPAL',
-                    style: pw.TextStyle(
-                      fontSize: 9,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.grey600,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  pw.Text(
-                    'ID: ${a.id.substring(0, 8).toUpperCase()}',
-                    style: const pw.TextStyle(
-                        fontSize: 8, color: PdfColors.grey400),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 4),
-          pw.Divider(thickness: 2, color: PdfColors.deepOrange700),
-          pw.SizedBox(height: 4),
-        ],
-      ),
-      footer: (ctx) => pw.Column(
-        children: [
-          pw.Divider(color: PdfColors.grey300, thickness: 0.5),
-          pw.SizedBox(height: 4),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text(
-                'SIGESPU Lota · Dirección de Seguridad Pública · ${_fmtDt(now)}',
-                style: const pw.TextStyle(
-                    fontSize: 7.5, color: PdfColors.grey500),
-              ),
-              pw.Text(
-                'Pág. ${ctx.pageNumber} / ${ctx.pagesCount}',
-                style: const pw.TextStyle(
-                    fontSize: 7.5, color: PdfColors.grey500),
-              ),
-            ],
-          ),
-        ],
-      ),
-      build: (ctx) => [
-        // ── Título principal ────────────────────────────────────────────
-        pw.Text(
-          a.titulo,
-          style: pw.TextStyle(
-            fontSize: 18,
-            fontWeight: pw.FontWeight.bold,
-            color: PdfColors.grey900,
-          ),
-        ),
-        pw.SizedBox(height: 4),
-        pw.Row(children: [
-          _pdfChip(_tipoLabel(a.tipo), PdfColors.deepOrange50,
-              PdfColors.deepOrange700),
-          pw.SizedBox(width: 6),
-          _pdfChip(_estadoLabel(a.estado), PdfColors.grey100,
-              PdfColors.grey600),
-          if (a.sector != null) ...[
-            pw.SizedBox(width: 6),
-            _pdfChip(a.sector!, PdfColors.grey100, PdfColors.grey600),
-          ],
-        ]),
-        pw.SizedBox(height: 18),
-
-        // ── Datos generales ─────────────────────────────────────────────
-        _pdfSection('1. DATOS GENERALES'),
-        _pdfKV('Descripción', a.descripcion.isNotEmpty ? a.descripcion : '—'),
-        _pdfKV('Tipo de actividad', _tipoLabel(a.tipo)),
-        _pdfKV('Estado', _estadoLabel(a.estado)),
-        _pdfKV('Fecha de inicio', _fmtDtHora(a.fechaInicio)),
-        if (a.fechaFin != null)
-          _pdfKV('Fecha de término', _fmtDtHora(a.fechaFin!)),
-        if (a.direccionMunicipal != null)
-          _pdfKV('Dirección municipal', a.direccionMunicipal!),
-        if (a.presupuestoEstimado != null)
-          _pdfKV('Presupuesto estimado',
-              '\$${a.presupuestoEstimado!.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}'),
-        _pdfKV('Registrado por', a.creadoPor),
-        _pdfKV('Fecha de registro', _fmtDtHora(a.creadoEn)),
-        if (a.actualizadoEn != null)
-          _pdfKV('Última modificación', _fmtDtHora(a.actualizadoEn!)),
-        pw.SizedBox(height: 16),
-
-        // ── Ubicación ───────────────────────────────────────────────────
-        if (a.direccion != null || a.lat != null) ...[
-          _pdfSection('2. UBICACIÓN'),
-          if (a.direccion != null) _pdfKV('Dirección', a.direccion!),
-          if (a.sector != null) _pdfKV('Sector', a.sector!),
-          if (a.lat != null && a.lng != null)
-            _pdfKV('Coordenadas',
-                '${a.lat!.toStringAsFixed(6)}, ${a.lng!.toStringAsFixed(6)}'),
-          pw.SizedBox(height: 16),
-        ],
-
-        // ── Cuerpo del acta ─────────────────────────────────────────────
-        _pdfSection('${(a.direccion != null || a.lat != null) ? '3' : '2'}. CUERPO DEL ACTA'),
-        pw.Container(
-          width: double.infinity,
-          padding: const pw.EdgeInsets.all(12),
-          decoration: pw.BoxDecoration(
-            color: PdfColors.grey50,
-            border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
-          child: pw.Text(
-            a.acta?.contenido?.trim().isNotEmpty == true
-                ? a.acta!.contenido!
-                : '(Sin contenido registrado)',
-            style: const pw.TextStyle(fontSize: 11, lineSpacing: 6),
-          ),
-        ),
-        pw.SizedBox(height: 16),
-
-        // ── Asistentes ──────────────────────────────────────────────────
-        if ((a.acta?.asistentes ?? []).isNotEmpty) ...[
-          _pdfSection('ASISTENTES (${a.acta!.asistentes.length})'),
-          pw.TableHelper.fromTextArray(
-            headers: ['N°', 'Nombre completo', 'Cargo', 'RUT', 'Asistencia'],
-            data: a.acta!.asistentes.asMap().entries
-                .map((e) => [
-                      '${e.key + 1}',
-                      e.value.nombre,
-                      e.value.cargo,
-                      e.value.rut ?? '—',
-                      e.value.asistio ? '✓ Asistió' : '✗ Ausente',
-                    ])
-                .toList(),
-            headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                fontSize: 9,
-                color: PdfColors.white),
-            cellStyle: const pw.TextStyle(fontSize: 9.5),
-            cellAlignments: {
-              0: pw.Alignment.center,
-              4: pw.Alignment.center,
-            },
-            headerDecoration: const pw.BoxDecoration(
-                color: PdfColors.deepOrange700),
-            rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
-            oddRowDecoration:
-                const pw.BoxDecoration(color: PdfColors.orange50),
-            border: pw.TableBorder.all(
-                color: PdfColors.grey300, width: 0.5),
-          ),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            '${a.acta!.asistentes.where((p) => p.asistio).length} de ${a.acta!.asistentes.length} asistentes presentes.',
-            style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey600),
-          ),
-          pw.SizedBox(height: 16),
-        ],
-
-        // ── Acuerdos ────────────────────────────────────────────────────
-        if ((a.acta?.acuerdos ?? []).isNotEmpty) ...[
-          _pdfSection('ACUERDOS Y COMPROMISOS (${a.acta!.acuerdos.length})'),
-          pw.TableHelper.fromTextArray(
-            headers: [
-              'N°',
-              'Descripción',
-              'Responsable',
-              'Fecha límite',
-              'Estado'
-            ],
-            data: a.acta!.acuerdos.asMap().entries
-                .map((e) {
-                  final ac = e.value;
-                  final vencido = !ac.completado &&
-                      ac.fechaLimite.isBefore(DateTime.now());
-                  return [
-                    '${e.key + 1}',
-                    ac.descripcion,
-                    ac.responsable,
-                    _fmtDt(ac.fechaLimite),
-                    ac.completado
-                        ? 'Completado'
-                        : vencido
-                            ? 'Vencido'
-                            : 'Pendiente',
-                  ];
-                })
-                .toList(),
-            headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                fontSize: 9,
-                color: PdfColors.white),
-            cellStyle: const pw.TextStyle(fontSize: 9.5),
-            cellAlignments: {
-              0: pw.Alignment.center,
-              4: pw.Alignment.center,
-            },
-            headerDecoration: const pw.BoxDecoration(
-                color: PdfColors.deepOrange700),
-            rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
-            oddRowDecoration:
-                const pw.BoxDecoration(color: PdfColors.orange50),
-            border: pw.TableBorder.all(
-                color: PdfColors.grey300, width: 0.5),
-          ),
-          pw.SizedBox(height: 16),
-        ],
-
-        // ── Archivos adjuntos ───────────────────────────────────────────
-        if (a.adjuntos.isNotEmpty) ...[
-          _pdfSection('ARCHIVOS ADJUNTOS'),
-          ...a.adjuntos.asMap().entries.map(
-                (e) => pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 3),
-                  child: pw.Text(
-                    '${e.key + 1}. ${e.value}',
-                    style: const pw.TextStyle(fontSize: 10),
-                  ),
-                ),
-              ),
-          pw.SizedBox(height: 16),
-        ],
-
-        // ── Firmas ──────────────────────────────────────────────────────
-        pw.SizedBox(height: 24),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
-          children: [
-            _pdfFirmaBox('Director/a de Seguridad Pública'),
-            _pdfFirmaBox('Responsable de la actividad'),
-          ],
-        ),
-      ],
-    ));
-
-    final bytes = await doc.save();
+    final userName = ref.read(authProvider).user?['nombre'] as String? ?? 'Funcionario';
+    final bytes = await PdfExportService.generateActaReport(a, userName);
     await Printing.sharePdf(
       bytes: bytes,
       filename: 'Acta-${a.id.substring(0, 8).toUpperCase()}-${a.fechaInicio.year}.pdf',
     );
   }
-
-  pw.Widget _pdfChip(String label, PdfColor bg, PdfColor fg) =>
-      pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: pw.BoxDecoration(
-          color: bg,
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(99)),
-        ),
-        child: pw.Text(label,
-            style: pw.TextStyle(
-                fontSize: 9, fontWeight: pw.FontWeight.bold, color: fg)),
-      );
-
-  pw.Widget _pdfFirmaBox(String cargo) => pw.Column(
-        children: [
-          pw.Container(
-            width: 180,
-            height: 40,
-            decoration: const pw.BoxDecoration(
-              border: pw.Border(
-                  bottom: pw.BorderSide(color: PdfColors.grey600, width: 0.8)),
-            ),
-          ),
-          pw.SizedBox(height: 6),
-          pw.Text(cargo,
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
-              textAlign: pw.TextAlign.center),
-        ],
-      );
-
-  pw.Widget _pdfSection(String title) => pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 6),
-        child: pw.Text(title,
-            style: pw.TextStyle(
-                fontSize: 11,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.deepOrange700)),
-      );
-
-  pw.Widget _pdfKV(String label, String value) => pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 3),
-        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.SizedBox(
-              width: 130,
-              child: pw.Text('$label:',
-                  style: pw.TextStyle(
-                      fontSize: 10, fontWeight: pw.FontWeight.bold))),
-          pw.Expanded(
-              child: pw.Text(value,
-                  style: const pw.TextStyle(fontSize: 10))),
-        ]),
-      );
-
-  String _fmtDt(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   String _fmtDtHora(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
@@ -835,13 +499,18 @@ class _TabActaState extends ConsumerState<TabActa> {
           // ── Cuerpo del acta ──────────────────────────────────────────
           Row(children: [
             const _SectionLabel('Cuerpo del acta'),
-            const Spacer(),
-            Text(
-              a.actualizadoEn != null
-                  ? 'Última edición · ${_fmtDtHora(a.actualizadoEn!)}'
-                  : 'Sin modificaciones',
-              style: GoogleFonts.jetBrainsMono(
-                  fontSize: 10, color: const Color(0xFFA8A29E)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                a.actualizadoEn != null
+                    ? 'Última edición · ${_fmtDtHora(a.actualizadoEn!)}'
+                    : 'Sin modificaciones',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: GoogleFonts.jetBrainsMono(
+                    fontSize: 10, color: const Color(0xFFA8A29E)),
+              ),
             ),
           ]),
           const SizedBox(height: 8),
@@ -871,38 +540,38 @@ class _TabActaState extends ConsumerState<TabActa> {
           ),
           const SizedBox(height: 18),
 
-          // ── Asistentes + Acuerdos ────────────────────────────────────
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Asistentes
-              Expanded(
-                child: Column(
+          // ── Asistentes + Acuerdos (responsive) ───────────────────────
+          LayoutBuilder(builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 560;
+            final asistentesSection = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(children: [
-                      const _SectionLabel('Asistentes'),
-                      const SizedBox(width: 8),
-                      _Badge('$presentes/${asistentes.length} presentes',
-                          bg: const Color(0xFFDCFCE7),
-                          fg: const Color(0xFF15803D)),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: _showAddAsistenteDialog,
-                        icon: const Icon(Icons.add,
-                            size: 11, color: Color(0xFFC2410C)),
-                        label: const Text('Añadir',
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFC2410C))),
-                        style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap),
-                      ),
-                    ]),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        const _SectionLabel('Asistentes'),
+                        _Badge('$presentes/${asistentes.length} presentes',
+                            bg: const Color(0xFFDCFCE7),
+                            fg: const Color(0xFF15803D)),
+                        TextButton.icon(
+                          onPressed: _showAddAsistenteDialog,
+                          icon: const Icon(Icons.add,
+                              size: 11, color: Color(0xFFC2410C)),
+                          label: const Text('Añadir',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFC2410C))),
+                          style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     Container(
                       decoration: BoxDecoration(
@@ -1005,40 +674,39 @@ class _TabActaState extends ConsumerState<TabActa> {
                             ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 18),
+                );
 
-              // Acuerdos
-              Expanded(
-                child: Column(
+            final acuerdosSection = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(children: [
-                      const _SectionLabel('Acuerdos'),
-                      const SizedBox(width: 8),
-                      if (vencidos > 0)
-                        _Badge(
-                            '$vencidos vencido${vencidos > 1 ? "s" : ""}',
-                            bg: const Color(0xFFFFF7ED),
-                            fg: const Color(0xFFC2410C)),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: _showAddAcuerdoDialog,
-                        icon: const Icon(Icons.add,
-                            size: 11, color: Color(0xFFC2410C)),
-                        label: const Text('Nuevo acuerdo',
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFC2410C))),
-                        style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap),
-                      ),
-                    ]),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        const _SectionLabel('Acuerdos'),
+                        if (vencidos > 0)
+                          _Badge(
+                              '$vencidos vencido${vencidos > 1 ? "s" : ""}',
+                              bg: const Color(0xFFFFF7ED),
+                              fg: const Color(0xFFC2410C)),
+                        TextButton.icon(
+                          onPressed: _showAddAcuerdoDialog,
+                          icon: const Icon(Icons.add,
+                              size: 11, color: Color(0xFFC2410C)),
+                          label: const Text('Nuevo acuerdo',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFC2410C))),
+                          style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     acuerdos.isEmpty
                         ? Container(
@@ -1184,10 +852,27 @@ class _TabActaState extends ConsumerState<TabActa> {
                             }).toList(),
                           ),
                   ],
-                ),
-              ),
-            ],
-          ),
+                );
+
+            if (narrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  asistentesSection,
+                  const SizedBox(height: 18),
+                  acuerdosSection,
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: asistentesSection),
+                const SizedBox(width: 18),
+                Expanded(child: acuerdosSection),
+              ],
+            );
+          }),
           const SizedBox(height: 18),
 
           // ── Archivos adjuntos ────────────────────────────────────────
@@ -1212,14 +897,14 @@ class _TabActaState extends ConsumerState<TabActa> {
           // ── Footer ───────────────────────────────────────────────────
           const Divider(height: 1, color: Color(0xFFE7E5E4)),
           const SizedBox(height: 12),
-          Row(children: [
-            Text(
+          LayoutBuilder(builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 560;
+            final pdfLabel = Text(
               'Acta-${a.id.substring(0, 8)}-2026.pdf',
               style: GoogleFonts.jetBrainsMono(
                   fontSize: 10.5, color: const Color(0xFF78716C)),
-            ),
-            const Spacer(),
-            OutlinedButton.icon(
+            );
+            final adjuntar = OutlinedButton.icon(
               onPressed: _adjuntarArchivo,
               icon: const Icon(Icons.attach_file_outlined, size: 13),
               label: const Text('Adjuntar archivo',
@@ -1233,9 +918,8 @@ class _TabActaState extends ConsumerState<TabActa> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
+            );
+            final exportar = ElevatedButton.icon(
               onPressed: _exportarPDF,
               icon: const Icon(Icons.description_outlined, size: 13),
               label: const Text('Exportar PDF',
@@ -1250,8 +934,30 @@ class _TabActaState extends ConsumerState<TabActa> {
                     borderRadius: BorderRadius.circular(8)),
                 elevation: 0,
               ),
-            ),
-          ]),
+            );
+
+            if (narrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  pdfLabel,
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: adjuntar),
+                    const SizedBox(width: 8),
+                    Expanded(child: exportar),
+                  ]),
+                ],
+              );
+            }
+            return Row(children: [
+              pdfLabel,
+              const Spacer(),
+              adjuntar,
+              const SizedBox(width: 8),
+              exportar,
+            ]);
+          }),
         ],
       ),
     );

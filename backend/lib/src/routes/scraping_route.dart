@@ -22,8 +22,28 @@ Router buildScrapingRouter(DatabaseService db) {
 
   router.post('/run', (Request req) async => _runActual(db));
   router.post('/historico', (Request req) async => _runHistorico(db, req));
+  router.post('/stop', (Request req) async => _stop(db));
 
   return router;
+}
+
+// ── Stop ──────────────────────────────────────────────────────────────────────
+
+/// Solicita la cancelación cooperativa del scraping en curso.
+/// Setea el flag `scraping:cancel` en Redis; el scraper lo checkea entre rows
+/// y categorías, y lanza ScrapingCancelledException para terminar limpiamente.
+/// Es idempotente — llamarlo dos veces no cambia el resultado.
+Future<Response> _stop(DatabaseService db) async {
+  if (!(await scraper.ProgressTracker.isRunning(db.redis))) {
+    return Response(409,
+        body: jsonEncode({'error': 'No hay scraping en curso'}),
+        headers: {'content-type': 'application/json'});
+  }
+  await scraper.ProgressTracker.requestCancel(db.redis);
+  return Response.ok(
+    jsonEncode({'message': 'Cancelación solicitada'}),
+    headers: {'content-type': 'application/json'},
+  );
 }
 
 // ── Status ────────────────────────────────────────────────────────────────────

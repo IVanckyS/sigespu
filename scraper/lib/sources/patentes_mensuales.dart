@@ -46,6 +46,7 @@ Future<void> scrapePatentes(
   print('[patentes] ${dataLinks.length} categorías encontradas');
 
   for (final url in dataLinks) {
+    await ProgressTracker.throwIfCancelled(redis);
     await _processCategoria(db, redis, geocoder, url, y, s, tracker);
     await Future.delayed(const Duration(milliseconds: 700));
   }
@@ -117,6 +118,30 @@ Future<void> _processCategoria(
     if (fechaDecretoDate == null) continue; // requerido para UNIQUE(numero_decreto, fecha_decreto)
 
     final fechaIso = _isoDate(fechaDecretoDate);
+
+    // ─── Cancel cooperativo ──────────────────────────────────────────────────
+    // Checkear cada row para responder rápido al botón "Detener" sin requerir
+    // que termine la categoría entera (puede tomar minutos con N rows).
+    await ProgressTracker.throwIfCancelled(redis);
+
+    // ─── Dedup pre-flight ────────────────────────────────────────────────────
+    // Si la patente ya está en BD con geocoding exitoso, saltarla: re-procesarla
+    // gasta 1 request a Nominatim (rate-limit 1 req/s) sin aportar dato nuevo.
+    // Solo re-procesamos rows con geocoding_confianza='fallo' por si Lota cambió
+    // la dirección o el normalizer mejoró.
+    final existing = await db.execute(
+      Sql.named(r'''
+        SELECT 1 FROM patentes_comerciales
+        WHERE numero_decreto = @rol AND fecha_decreto = @fecha::date
+          AND geocoding_confianza != 'fallo'
+        LIMIT 1
+      '''),
+      parameters: {'rol': rol, 'fecha': fechaIso},
+    );
+    if (existing.isNotEmpty) {
+      ok++;
+      continue;
+    }
 
     // ─── Geocoding con caché Redis (30 días) ─────────────────────────────────
     double? lat, lng;

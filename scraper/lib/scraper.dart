@@ -26,6 +26,8 @@ Future<void> runScrapingActual({
   if (await ProgressTracker.isRunning(redis)) {
     throw StateError('Ya hay un scraping en curso');
   }
+  // Limpia cualquier flag de cancel previo para no abortar al instante.
+  await ProgressTracker.clearCancel(redis);
 
   // 4 pasos: patentes, permisos, transito, organizaciones
   final tracker = ProgressTracker(redis, modo: 'actual', totalSteps: 4);
@@ -34,14 +36,22 @@ Future<void> runScrapingActual({
 
   try {
     await scrapePatentes(db, redis, geocoder, tracker: tracker);
+    await ProgressTracker.throwIfCancelled(redis);
     await scrapePermisosDom(db, redis, geocoder, tracker: tracker);
+    await ProgressTracker.throwIfCancelled(redis);
     await scrapeDecretosTransito(db, redis, tracker: tracker);
+    await ProgressTracker.throwIfCancelled(redis);
     await scrapeOrganizaciones(db, redis, geocoder, tracker: tracker);
     await tracker.finish();
+  } on ScrapingCancelledException {
+    print('[scraper] runScrapingActual cancelado por usuario');
+    await tracker.finish(error: 'Cancelado por usuario');
   } catch (e, st) {
     print('[scraper] Error en runScrapingActual: $e\n$st');
     await tracker.finish(error: e.toString());
     rethrow;
+  } finally {
+    await ProgressTracker.clearCancel(redis);
   }
 }
 
@@ -59,6 +69,7 @@ Future<void> runScrapingHistorico({
   if (await ProgressTracker.isRunning(redis)) {
     throw StateError('Ya hay un scraping en curso');
   }
+  await ProgressTracker.clearCancel(redis);
 
   final now = DateTime.now();
   final yearTo = now.year;
@@ -76,15 +87,23 @@ Future<void> runScrapingHistorico({
   try {
     await scrapePatentesHistorico(db, redis, geocoder,
         yearFrom: patentesYearFrom, tracker: tracker);
+    await ProgressTracker.throwIfCancelled(redis);
     await scrapePermisosDom(db, redis, geocoder,
         maxMonths: null /* todos */, tracker: tracker);
+    await ProgressTracker.throwIfCancelled(redis);
     await scrapeDecretosTransito(db, redis, tracker: tracker);
+    await ProgressTracker.throwIfCancelled(redis);
     await scrapeOrganizacionesHistorico(db, redis, geocoder,
         yearFrom: organizacionesYearFrom, tracker: tracker);
     await tracker.finish();
+  } on ScrapingCancelledException {
+    print('[scraper] runScrapingHistorico cancelado por usuario');
+    await tracker.finish(error: 'Cancelado por usuario');
   } catch (e, st) {
     print('[scraper] Error en runScrapingHistorico: $e\n$st');
     await tracker.finish(error: e.toString());
     rethrow;
+  } finally {
+    await ProgressTracker.clearCancel(redis);
   }
 }

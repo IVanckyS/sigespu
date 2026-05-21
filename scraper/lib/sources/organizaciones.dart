@@ -46,6 +46,7 @@ Future<void> scrapeOrganizaciones(
   print('[organizaciones] ${categoryAnchors.length} categorías encontradas');
 
   for (final anchor in categoryAnchors) {
+    await ProgressTracker.throwIfCancelled(redis);
     final href = anchor.attributes['href'] ?? '';
     final url = href.startsWith('http') ? href : '$_base/$href';
     // Usar el texto del enlace como nombre del sector

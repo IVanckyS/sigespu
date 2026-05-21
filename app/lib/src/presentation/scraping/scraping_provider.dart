@@ -2,11 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 
 import '../../config/constants.dart';
+import '../../data/remote/authed_http.dart';
 import '../../data/seed_data.dart';
-import '../auth/auth_provider.dart';
 
 const _scrapingBase = '${AppConstants.apiBaseUrl}/api/scraping';
 
@@ -59,17 +58,13 @@ class ScrapingStatus {
 /// Polling cada 1s mientras la pantalla escucha. La UI lo activa solo durante el
 /// scraping para no martillar al backend cuando no hace falta.
 final scrapingStatusProvider = StreamProvider.autoDispose<ScrapingStatus>((ref) {
-  final storage = ref.watch(secureStorageProvider);
+  final authed = ref.watch(authedHttpProvider);
   final controller = StreamController<ScrapingStatus>();
   Timer? timer;
 
   Future<void> tick() async {
     try {
-      final token = await storage.read(key: 'access_token');
-      final resp = await http.get(
-        Uri.parse('$_scrapingBase/status'),
-        headers: token == null ? {} : {'Authorization': 'Bearer $token'},
-      );
+      final resp = await authed.get(Uri.parse('$_scrapingBase/status'));
       if (resp.statusCode == 200) {
         final json = jsonDecode(resp.body) as Map<String, dynamic>;
         controller.add(ScrapingStatus.fromJson(json));
@@ -95,12 +90,14 @@ Future<List<T>> _fetchList<T>(
   String path,
   T Function(Map<String, dynamic>) parser,
 ) async {
-  final storage = ref.read(secureStorageProvider);
-  final token = await storage.read(key: 'access_token');
-  final resp = await http.get(
-    Uri.parse('$_scrapingBase/$path?limit=500'),
-    headers: token == null ? {} : {'Authorization': 'Bearer $token'},
-  );
+  final authed = ref.read(authedHttpProvider);
+  final resp = await authed.get(Uri.parse('$_scrapingBase/$path?limit=500'));
+  if (resp.statusCode == 401) {
+    // El refresh ya se intentó dentro de authed.get y falló — sesión muerta.
+    // Devolvemos lista vacía en vez de tirar excepción para no crashear la UI;
+    // el usuario verá "Sin datos" y el guard de auth lo expulsará al login.
+    return <T>[];
+  }
   if (resp.statusCode != 200) {
     throw Exception('Error al cargar $path: HTTP ${resp.statusCode}');
   }
@@ -132,19 +129,14 @@ class ScrapingController {
   Future<({bool ok, String? error})> runHistorico() => _post('historico');
 
   Future<({bool ok, String? error})> _post(String path) async {
-    final storage = ref.read(secureStorageProvider);
-    final token = await storage.read(key: 'access_token');
-    if (token == null) return (ok: false, error: 'Sesión expirada');
+    final authed = ref.read(authedHttpProvider);
     try {
-      final resp = await http.post(
+      final resp = await authed.post(
         Uri.parse('$_scrapingBase/$path'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
         body: '{}',
       );
       if (resp.statusCode == 200) return (ok: true, error: null);
+      if (resp.statusCode == 401) return (ok: false, error: 'Sesión expirada');
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
       return (ok: false, error: data['error'] as String? ?? 'Error');
     } catch (e) {

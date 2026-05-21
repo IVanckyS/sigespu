@@ -209,6 +209,20 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
+          if (isScraping) ...[
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: _stopScraping,
+              icon: const Icon(Icons.stop_circle_outlined, size: 14),
+              label: const Text('Detener', style: TextStyle(fontSize: 12)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.redDanger,
+                side: const BorderSide(color: AppTheme.redDanger),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
         ]),
         const SizedBox(height: 6),
         Container(
@@ -436,6 +450,23 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
         SnackBar(content: Text(res.error ?? 'No se pudo iniciar el scraping')),
       );
     }
+  }
+
+  Future<void> _stopScraping() async {
+    final confirm = await _confirmDialog(
+      title: 'Detener scraping',
+      message:
+          'Se cancelará la extracción en curso. Los datos ya insertados se '
+          'mantienen; los pendientes se descartan.\n\n¿Continuar?',
+    );
+    if (confirm != true || !mounted) return;
+    final res = await ref.read(scrapingControllerProvider).stop();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(
+        res.ok ? 'Solicitud de detención enviada' : (res.error ?? 'No se pudo detener'),
+      )),
+    );
   }
 
   Future<bool?> _confirmDialog({required String title, required String message}) {

@@ -19,9 +19,46 @@ import 'package:redis/redis.dart';
 ///   "errores": 0
 /// }
 /// ```
+/// Excepción lanzada cuando el operador pide detener el scraping en curso.
+/// La capturan runScrapingActual / runScrapingHistorico para hacer finish()
+/// con error="cancelado por usuario" en vez de propagarla.
+class ScrapingCancelledException implements Exception {
+  const ScrapingCancelledException();
+  @override
+  String toString() => 'ScrapingCancelledException';
+}
+
 class ProgressTracker {
   static const _key = 'scraping:status';
+  static const _cancelKey = 'scraping:cancel';
   static const _ttlSeconds = 3600;
+
+  /// Marca el scraping en curso para que se detenga en el próximo checkpoint.
+  /// El backend lo invoca desde POST /api/scraping/stop. Es idempotente.
+  static Future<void> requestCancel(Command redis) async {
+    await redis.send_object(['SET', _cancelKey, '1', 'EX', '$_ttlSeconds']);
+  }
+
+  /// Lectura no-bloqueante: los scrapers la llaman cada N rows / entre categorías.
+  /// Si devuelve true deben lanzar ScrapingCancelledException.
+  static Future<bool> isCancelRequested(Command redis) async {
+    final raw = await redis.send_object(['GET', _cancelKey]);
+    return raw != null;
+  }
+
+  /// Limpia el flag al iniciar un scraping nuevo, para que un cancel previo
+  /// no aborte instantáneamente la nueva corrida.
+  static Future<void> clearCancel(Command redis) async {
+    await redis.send_object(['DEL', _cancelKey]);
+  }
+
+  /// Helper combinado: verifica el flag y lanza si está activo.
+  /// Llamar entre rows o entre pasos para tener una salida cooperativa.
+  static Future<void> throwIfCancelled(Command redis) async {
+    if (await isCancelRequested(redis)) {
+      throw const ScrapingCancelledException();
+    }
+  }
 
   final Command _redis;
   final String _modo;

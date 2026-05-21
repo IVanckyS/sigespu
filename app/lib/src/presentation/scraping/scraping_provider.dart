@@ -127,6 +127,7 @@ class ScrapingController {
 
   Future<({bool ok, String? error})> runActual() => _post('run');
   Future<({bool ok, String? error})> runHistorico() => _post('historico');
+  Future<({bool ok, String? error})> stop() => _post('stop');
 
   Future<({bool ok, String? error})> _post(String path) async {
     final authed = ref.read(authedHttpProvider);

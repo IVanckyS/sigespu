@@ -777,12 +777,7 @@ class _DateField extends StatelessWidget {
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
             decoration: BoxDecoration(
               color: const Color(0xFFFAFAF9),
-              border: Border.all(
-                color: editable
-                    ? const Color(0xFFE7E5E4)
-                    : const Color(0xFFE7E5E4),
-                width: 1.5,
-              ),
+              border: Border.all(color: const Color(0xFFE7E5E4), width: 1.5),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(children: [

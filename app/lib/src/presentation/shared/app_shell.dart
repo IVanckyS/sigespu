@@ -46,7 +46,6 @@ class _AppShellState extends ConsumerState<AppShell> {
     final location      = GoRouterState.of(context).uri.path;
     final connectAsync  = ref.watch(connectivityProvider);
     final auth          = ref.watch(authProvider);
-    final conflicts     = ref.watch(conflictCountProvider).asData?.value ?? 0;
     final avatarBytes   = ref.watch(avatarBytesProvider).valueOrNull;
 
     final isOnline = connectAsync.when(
@@ -99,7 +98,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
             // ── Banners ──────────────────────────────────────────────────────
             if (userRole == 'visitante') const _SolicitarAccesoBanner(),
-            if (conflicts > 0) _ConflictsBanner(count: conflicts),
+            const _ConflictsBanner(),
 
             // ── Content ──────────────────────────────────────────────────────
             Expanded(child: widget.child),
@@ -202,10 +201,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       } else if (location == '/scraping') {
         bytes = await PdfExportService.generateScrapingReport(
           userName,
-          patentes: ref.read(scrapingFilteredPatenteProvider),
-          permisos: ref.read(scrapingFilteredPermisoProvider),
-          transito: ref.read(scrapingFilteredTransitoProvider),
-          orgs:     ref.read(scrapingFilteredOrgProvider),
+          patentes: ref.read(scrapingPagedPatenteProvider),
+          permisos: ref.read(scrapingPagedPermisoProvider),
+          orgs:     ref.read(scrapingPagedOrgProvider),
         );
       } else if (location == '/actividades') {
         bytes = await PdfExportService.generateActividadesReport(
@@ -381,7 +379,7 @@ class _MobileBottomTabs extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final actividadesCount = ref.watch(actividadesProvider).length;
+    final actividadesCount = ref.watch(actividadesProvider.select((l) => l.length));
 
     final items = [
       const _TabItem(id: '/map',         label: 'Mapa',      icon: Icons.map_outlined),
@@ -662,8 +660,6 @@ class _BrandLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      SizedBox(width: 36, height: 36, child: CustomPaint(painter: _MunicipalLogoPainter())),
-      const SizedBox(width: 8),
       const SigespuEmblem(size: 36),
       const SizedBox(width: 10),
       Column(
@@ -687,33 +683,6 @@ class _BrandLogo extends StatelessWidget {
   }
 }
 
-class _MunicipalLogoPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = size.width / 48;
-    canvas.drawCircle(Offset(24 * s, 24 * s), 22 * s, Paint()..color = const Color(0xFF44403C));
-    canvas.drawPath(
-      Path()
-        ..moveTo(12 * s, 30 * s)..lineTo(12 * s, 20 * s)
-        ..quadraticBezierTo(12 * s, 14 * s, 18 * s, 14 * s)
-        ..lineTo(30 * s, 14 * s)
-        ..quadraticBezierTo(36 * s, 14 * s, 36 * s, 20 * s)
-        ..lineTo(36 * s, 30 * s)..close(),
-      Paint()..color = const Color(0xFFEA580C),
-    );
-    final win = Paint()..color = Colors.white.withValues(alpha: 0.9);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(18 * s, 22 * s, 4 * s, 8 * s), Radius.circular(s)), win);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(26 * s, 22 * s, 4 * s, 8 * s), Radius.circular(s)), win);
-    canvas.drawPath(
-      Path()..moveTo(20 * s, 14 * s)..lineTo(24 * s, 10 * s)..lineTo(28 * s, 14 * s)..close(),
-      Paint()..color = const Color(0xFFFED7AA),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter _) => false;
-}
-
 // ── Mode switcher (desktop) ───────────────────────────────────────────────────
 
 class _ModeSwitcher extends ConsumerWidget {
@@ -722,7 +691,7 @@ class _ModeSwitcher extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final actividadesCount = ref.watch(actividadesProvider).length;
+    final actividadesCount = ref.watch(actividadesProvider.select((l) => l.length));
 
     return Container(
       padding: const EdgeInsets.all(3),
@@ -919,10 +888,9 @@ class _ExportBtn extends ConsumerWidget {
         );
       } else if (location == '/scraping') {
         bytes = await PdfExportService.generateScrapingReport(userName,
-          patentes: ref.read(scrapingFilteredPatenteProvider),
-          permisos: ref.read(scrapingFilteredPermisoProvider),
-          transito: ref.read(scrapingFilteredTransitoProvider),
-          orgs:     ref.read(scrapingFilteredOrgProvider),
+          patentes: ref.read(scrapingPagedPatenteProvider),
+          permisos: ref.read(scrapingPagedPermisoProvider),
+          orgs:     ref.read(scrapingPagedOrgProvider),
         );
       } else if (location == '/actividades') {
         bytes = await PdfExportService.generateActividadesReport(
@@ -992,12 +960,13 @@ class _UserChip extends StatelessWidget {
 
 // ── Conflicts banner ──────────────────────────────────────────────────────────
 
-class _ConflictsBanner extends StatelessWidget {
-  final int count;
-  const _ConflictsBanner({required this.count});
+class _ConflictsBanner extends ConsumerWidget {
+  const _ConflictsBanner();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(conflictCountProvider).asData?.value ?? 0;
+    if (count == 0) return const SizedBox.shrink();
     final plural = count == 1 ? '' : 's';
     return Material(
       color: const Color(0xFFFEE2E2),

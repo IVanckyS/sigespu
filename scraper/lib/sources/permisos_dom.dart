@@ -88,6 +88,7 @@ Future<void> _processMes(Session db, String url, ProgressTracker? tracker) async
     final tipoActo = cells[4].text.trim();
     final denominacion = cells[5].text.trim();
     final fechaStr = cells[7].text.trim(); // DD-MM-YYYY
+    final fechaPubStr = cells[8].text.trim(); // DD-MM-YYYY
     final descripcion = cells[12].text.trim();
 
     // Obtener href del enlace (columna 13 si existe)
@@ -102,6 +103,8 @@ Future<void> _processMes(Session db, String url, ProgressTracker? tracker) async
 
     final fechaDate = _parseDate(fechaStr);
     final fechaIso = fechaDate != null ? _isoDate(fechaDate) : null;
+    final fechaPubDate = _parseDate(fechaPubStr);
+    final fechaPubIso = fechaPubDate != null ? _isoDate(fechaPubDate) : null;
 
     // tipo combina tipología + tipo de acto para mayor especificidad
     final tipo = [tipologia, tipoActo].where((s) => s.isNotEmpty).join(' — ');
@@ -134,10 +137,12 @@ Future<void> _processMes(Session db, String url, ProgressTracker? tracker) async
         Sql.named('''
           INSERT INTO permisos_dom (
             id, numero_permiso, tipo, descripcion,
-            fecha_otorgamiento, estado, url_fuente, scraped_at, raw_data
+            fecha_otorgamiento, fecha_publicacion, tipo_acto, denominacion_acto,
+            estado, url_fuente, scraped_at, raw_data
           ) VALUES (
             gen_random_uuid(), @num, @tipo, @desc,
-            @fecha::date, @estado, @urlFuente, NOW(), @raw::jsonb
+            @fecha::date, @fechaPub::date, @tipoActo, @denominacion,
+            @estado, @urlFuente, NOW(), @raw::jsonb
           )
         '''),
         parameters: {
@@ -145,6 +150,9 @@ Future<void> _processMes(Session db, String url, ProgressTracker? tracker) async
           'tipo': tipo.isNotEmpty ? tipo : denominacion,
           'desc': descripcion,
           'fecha': fechaIso,
+          'fechaPub': fechaPubIso,
+          'tipoActo': tipoActo,
+          'denominacion': denominacion,
           'estado': 'publicado',
           'urlFuente': urlFuente,
           'raw': rawData,

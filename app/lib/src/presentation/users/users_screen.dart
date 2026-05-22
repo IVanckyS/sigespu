@@ -137,7 +137,7 @@ class _UsuariosTab extends ConsumerWidget {
           ),
           child: Column(children: [
             _UsersToolbar(
-              onCreatePressed: () => _showCreateDialog(context, ref),
+              onCreatePressed: () => _showCreateDialog(context),
               onExportPressed: () =>
                   _exportExcel(context, ref.read(usersFiltradosProvider)),
             ),
@@ -171,7 +171,7 @@ class _UsuariosTab extends ConsumerWidget {
     );
   }
 
-  void _showCreateDialog(BuildContext context, WidgetRef ref) {
+  void _showCreateDialog(BuildContext context) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -194,11 +194,7 @@ class _UsuariosTab extends ConsumerWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          path != null
-              ? '${users.length} usuarios exportados → $path'
-              : '${users.length} usuarios exportados como Excel',
-        ),
+        content: Text('${users.length} usuarios exportados → $path'),
         duration: const Duration(seconds: 3),
         backgroundColor: AppTheme.greenSuccess,
       ),
@@ -1860,7 +1856,9 @@ class _UserFormDialogState extends ConsumerState<_UserFormDialog> {
   final _rutCtrl = TextEditingController();
 
   String _rol = 'operativo';
-  String _unidad = 'Inspección';
+  // Siempre se sobreescribe en initState; el valor inicial no importa
+  // mientras sea un elemento válido de kUnidadesDisponibles.
+  late String _unidad;
   bool _showPassword = false;
   bool _saving = false;
   String? _error;
@@ -1875,9 +1873,12 @@ class _UserFormDialogState extends ConsumerState<_UserFormDialog> {
       _cargoCtrl.text = u.cargo ?? '';
       _rutCtrl.text = u.rut ?? '';
       _rol = u.nivelAcceso;
-      _unidad = u.unidad;
+      _unidad = kUnidadesDisponibles.contains(u.unidad)
+          ? u.unidad
+          : kUnidadesDisponibles.first;
     } else {
-      // En "crear" pre-cargamos una password sugerida segura.
+      // En "crear" arrancamos con la primera unidad de la lista.
+      _unidad = kUnidadesDisponibles.first;
       _passwordCtrl.text = generarPasswordSegura();
     }
   }
@@ -2301,7 +2302,7 @@ class _UsersHeader extends ConsumerWidget {
               color: Colors.white.withValues(alpha: 0.13),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: const [
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(Icons.shield_outlined, size: 11, color: Color(0xFFFED7AA)),
               SizedBox(width: 6),
               Flexible(child: Text(
@@ -2405,20 +2406,20 @@ class _RolesTab extends StatelessWidget {
         LayoutBuilder(builder: (context, constraints) {
           final wide = constraints.maxWidth >= 500;
           if (wide) {
-            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            return const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Expanded(child: _RolCard(rol: 'Visitante', color: AppTheme.stone500, bg: AppTheme.stone100)),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(child: _RolCard(rol: 'Operativo', color: AppTheme.orange700, bg: AppTheme.orange100)),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(child: _RolCard(rol: 'Director', color: Color(0xFF292524), bg: Color(0xFFE7E5E4))),
             ]);
           }
-          return Column(children: [
+          return const Column(children: [
             _RolCard(rol: 'Visitante', color: AppTheme.stone500, bg: AppTheme.stone100),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             _RolCard(rol: 'Operativo', color: AppTheme.orange700, bg: AppTheme.orange100),
-            const SizedBox(height: 14),
-            _RolCard(rol: 'Director', color: const Color(0xFF292524), bg: const Color(0xFFE7E5E4)),
+            SizedBox(height: 14),
+            _RolCard(rol: 'Director', color: Color(0xFF292524), bg: Color(0xFFE7E5E4)),
           ]);
         }),
       ]),
@@ -2497,23 +2498,25 @@ class _BitacoraTab extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
+        const Row(children: [
           Flexible(child: Text('Registro de acciones administrativas.',
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, color: AppTheme.stone500))),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            style: TextStyle(fontSize: 13, color: AppTheme.stone500))),
+          SizedBox(width: 8),
+          DecoratedBox(
             decoration: BoxDecoration(
               color: AppTheme.stone100,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.all(Radius.circular(8)),
             ),
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.info_outline, size: 13, color: AppTheme.stone400),
-              SizedBox(width: 6),
-              Text('Datos de demo · Ley 19.628',
-                style: TextStyle(fontSize: 11.5, color: AppTheme.stone500)),
-            ]),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.info_outline, size: 13, color: AppTheme.stone400),
+                SizedBox(width: 6),
+                Text('Datos de demo · Ley 21.719',
+                  style: TextStyle(fontSize: 11.5, color: AppTheme.stone500)),
+              ]),
+            ),
           ),
         ]),
         const SizedBox(height: 16),

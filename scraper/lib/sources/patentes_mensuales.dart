@@ -10,7 +10,9 @@ import '../progress.dart';
 // ig=103: Patentes por categoría semestral
 // Flujo:  plantillas_selec_archivo&ig=103&m=[semestre]&a=[año]
 //         → enlaces plantillas_generar_plantilla&ig=103&...&ia=XXXXX (una por categoría)
-//         → tabla HTML: N°, ROL, R.U.T., NOMBRE, DIRECCION, GIRO, FECHA, MONTO, PATENTE
+//         → tabla HTML: N°, ROL, R.U.T., NOMBRE, DIRECCION, GIRO, [FECHA,] MONTO, [PATENTE]
+// El texto del enlace de cada categoría (ej. "Comercial", "Industrial") se usa como
+// tipo_patente cuando la tabla no incluye una columna PATENTE propia.
 
 const _base = 'https://www.lotatransparente.cl';
 const _ua = 'SigespuLota/1.0 (+contacto@munilota.cl)';
@@ -30,24 +32,27 @@ Future<void> scrapePatentes(
   if (indexBody == null) return;
 
   final doc = html.parse(indexBody);
-  final dataLinks = doc
+  // Capturar tanto el href como el texto del enlace para usar como categoria
+  final dataAnchors = doc
       .querySelectorAll('a[href]')
-      .map((a) => a.attributes['href'] ?? '')
-      .where((h) =>
-          h.contains('plantillas_generar_plantilla') && h.contains('ig=103'))
-      .map((h) => h.startsWith('http') ? h : '$_base/$h')
+      .where((a) =>
+          (a.attributes['href'] ?? '').contains('plantillas_generar_plantilla') &&
+          (a.attributes['href'] ?? '').contains('ig=103'))
       .toList();
 
-  if (dataLinks.isEmpty) {
+  if (dataAnchors.isEmpty) {
     print('[patentes] Sin categorías en el índice — abortando');
     return;
   }
 
-  print('[patentes] ${dataLinks.length} categorías encontradas');
+  print('[patentes] ${dataAnchors.length} categorías encontradas');
 
-  for (final url in dataLinks) {
+  for (final anchor in dataAnchors) {
     await ProgressTracker.throwIfCancelled(redis);
-    await _processCategoria(db, redis, geocoder, url, y, s, tracker);
+    final href = anchor.attributes['href'] ?? '';
+    final url = href.startsWith('http') ? href : '$_base/$href';
+    final categoria = anchor.text.trim().isNotEmpty ? anchor.text.trim() : '';
+    await _processCategoria(db, redis, geocoder, url, y, s, categoria, tracker);
     await Future.delayed(const Duration(milliseconds: 700));
   }
 
@@ -75,6 +80,7 @@ Future<void> _processCategoria(
     String url,
     int y,
     int s,
+    String categoria,
     ProgressTracker? tracker) async {
   final body = await _get(url);
   if (body == null) return;
@@ -84,7 +90,7 @@ Future<void> _processCategoria(
 
   for (final row in doc.querySelectorAll('table tr')) {
     final cells = row.querySelectorAll('td');
-    if (cells.length < 8) continue; // saltar encabezados (th) y filas vacías
+    if (cells.length < 7) continue; // saltar encabezados (th) y filas vacías
 
     final rolStr = cells[1].text.trim();
     final rol = int.tryParse(rolStr.replaceAll(RegExp(r'[^\d]'), ''));
@@ -93,22 +99,56 @@ Future<void> _processCategoria(
     final rut = cells[2].text.trim();
     final nombre = cells[3].text.trim();
     final direccionRaw = cells[4].text.trim();
-    final giro = cells[5].text.trim();
-    
-    // El formato cambió en 2024: desapareció la columna FECHA (ahora son 8 columnas)
-    final isOldFormat = cells.length >= 9;
+    final giroRaw = cells[5].text.trim();
+
+    // GIRO tiene formato "62524-BAZARES Y CORDONERÍAS" — separar código y descripción
+    String codigoGiro = '';
+    String giro = giroRaw;
+    final dashIdx = giroRaw.indexOf('-');
+    if (dashIdx > 0) {
+      final maybeCodigo = giroRaw.substring(0, dashIdx).trim();
+      if (RegExp(r'^\d+$').hasMatch(maybeCodigo)) {
+        codigoGiro = maybeCodigo;
+        giro = giroRaw.substring(dashIdx + 1).trim();
+      }
+    }
+
+    // Cuatro formatos posibles según columnas disponibles:
+    //   Formato A (≥9 cols): N°, ROL, RUT, NOMBRE, DIR, GIRO, FECHA, MONTO, PATENTE
+    //   Formato B (8 cols, 2024+): N°, ROL, RUT, NOMBRE, DIR, GIRO, MONTO, PATENTE
+    //   Formato C (8 cols histórico): N°, ROL, RUT, NOMBRE, DIR, GIRO, FECHA, MONTO (sin PATENTE)
+    //   Formato D (7 cols): N°, ROL, RUT, NOMBRE, DIR, GIRO, MONTO
+    //     → tipo_patente viene del texto del enlace de la categoría
+    // Formato C se detecta porque cells[7] es un monto numérico, no un tipo de patente.
     String fechaStr;
     String monto;
     String tipoPatente;
 
-    if (isOldFormat) {
+    if (cells.length >= 9) {
+      // Formato A
       fechaStr = cells[6].text.trim();
       monto = cells[7].text.trim();
       tipoPatente = cells[8].text.trim();
+    } else if (cells.length == 8) {
+      final col6 = cells[6].text.trim();
+      final col7 = cells[7].text.trim();
+      // Formato C: col7 es solo dígitos/puntos/comas → es un monto, no un tipo
+      final isFormatC = RegExp(r'^[\d.,]+$').hasMatch(col7);
+      if (isFormatC) {
+        // Formato C
+        fechaStr = col6;
+        monto = col7;
+        tipoPatente = categoria;
+      } else {
+        // Formato B: col6 = MONTO, col7 = PATENTE
+        monto = col6;
+        tipoPatente = col7.isNotEmpty ? col7 : categoria;
+        fechaStr = s == 1 ? '01-01-$y' : '01-07-$y';
+      }
     } else {
+      // Formato D (7 cols): solo tiene MONTO en col6
       monto = cells[6].text.trim();
-      tipoPatente = cells[7].text.trim();
-      // Usar fecha nominal del semestre
+      tipoPatente = categoria;
       fechaStr = s == 1 ? '01-01-$y' : '01-07-$y';
     }
 
@@ -120,15 +160,10 @@ Future<void> _processCategoria(
     final fechaIso = _isoDate(fechaDecretoDate);
 
     // ─── Cancel cooperativo ──────────────────────────────────────────────────
-    // Checkear cada row para responder rápido al botón "Detener" sin requerir
-    // que termine la categoría entera (puede tomar minutos con N rows).
     await ProgressTracker.throwIfCancelled(redis);
 
     // ─── Dedup pre-flight ────────────────────────────────────────────────────
-    // Si la patente ya está en BD con geocoding exitoso, saltarla: re-procesarla
-    // gasta 1 request a Nominatim (rate-limit 1 req/s) sin aportar dato nuevo.
-    // Solo re-procesamos rows con geocoding_confianza='fallo' por si Lota cambió
-    // la dirección o el normalizer mejoró.
+    // Si la patente ya está en BD con geocoding exitoso, saltarla.
     final existing = await db.execute(
       Sql.named(r'''
         SELECT 1 FROM patentes_comerciales
@@ -187,13 +222,17 @@ Future<void> _processCategoria(
 
     final rawData = jsonEncode({
       'rol': rolStr,
+      'numero_rol': rol,
       'rut': rut,
       'nombre': nombre,
       'direccion': direccionRaw,
+      'giro_raw': giroRaw,
       'giro': giro,
+      'codigo_giro': codigoGiro,
       'fecha_otorgamiento': fechaStr,
       'monto': monto,
       'tipo_patente': tipoPatente,
+      'categoria': categoria,
     });
 
     try {
@@ -202,17 +241,21 @@ Future<void> _processCategoria(
           Sql.named('''
             INSERT INTO patentes_comerciales (
               id, numero_decreto, fecha_decreto, tipo_patente, rut,
-              razon_social, giro, direccion_raw, direccion_normalizada,
+              razon_social, giro, codigo_giro, numero_rol,
+              direccion_raw, direccion_normalizada,
               geom, geocoding_confianza, url_fuente, scraped_at, raw_data
             ) VALUES (
               gen_random_uuid(), @rol, @fecha::date, @tipo, @rut,
-              @nombre, @giro, @dirRaw, @dirNorm,
+              @nombre, @giro, @codigoGiro, @numeroRol,
+              @dirRaw, @dirNorm,
               ST_SetSRID(ST_MakePoint(@lng, @lat), 4326),
               @confianza, @url, NOW(), @raw::jsonb
             )
             ON CONFLICT (numero_decreto, fecha_decreto) DO UPDATE SET
               razon_social          = EXCLUDED.razon_social,
               giro                  = EXCLUDED.giro,
+              codigo_giro           = EXCLUDED.codigo_giro,
+              numero_rol            = EXCLUDED.numero_rol,
               direccion_raw         = EXCLUDED.direccion_raw,
               direccion_normalizada = EXCLUDED.direccion_normalizada,
               geom                  = COALESCE(EXCLUDED.geom, patentes_comerciales.geom),
@@ -227,6 +270,8 @@ Future<void> _processCategoria(
             'rut': rut,
             'nombre': nombre,
             'giro': giro,
+            'codigoGiro': codigoGiro.isNotEmpty ? codigoGiro : null,
+            'numeroRol': rol,
             'dirRaw': direccionRaw,
             'dirNorm': direccionNorm,
             'lng': lng,
@@ -241,16 +286,20 @@ Future<void> _processCategoria(
           Sql.named('''
             INSERT INTO patentes_comerciales (
               id, numero_decreto, fecha_decreto, tipo_patente, rut,
-              razon_social, giro, direccion_raw, direccion_normalizada,
+              razon_social, giro, codigo_giro, numero_rol,
+              direccion_raw, direccion_normalizada,
               geocoding_confianza, url_fuente, scraped_at, raw_data
             ) VALUES (
               gen_random_uuid(), @rol, @fecha::date, @tipo, @rut,
-              @nombre, @giro, @dirRaw, @dirNorm,
+              @nombre, @giro, @codigoGiro, @numeroRol,
+              @dirRaw, @dirNorm,
               @confianza, @url, NOW(), @raw::jsonb
             )
             ON CONFLICT (numero_decreto, fecha_decreto) DO UPDATE SET
               razon_social  = EXCLUDED.razon_social,
               giro          = EXCLUDED.giro,
+              codigo_giro   = EXCLUDED.codigo_giro,
+              numero_rol    = EXCLUDED.numero_rol,
               direccion_raw = EXCLUDED.direccion_raw,
               scraped_at    = EXCLUDED.scraped_at,
               raw_data      = EXCLUDED.raw_data
@@ -262,6 +311,8 @@ Future<void> _processCategoria(
             'rut': rut,
             'nombre': nombre,
             'giro': giro,
+            'codigoGiro': codigoGiro.isNotEmpty ? codigoGiro : null,
+            'numeroRol': rol,
             'dirRaw': direccionRaw,
             'dirNorm': direccionNorm,
             'confianza': confianza,
@@ -282,7 +333,7 @@ Future<void> _processCategoria(
   await tracker?.tick();
 
   final ia = Uri.parse(url).queryParameters['ia'] ?? url;
-  print('[patentes] ia=$ia — $ok insertados/actualizados, $err errores');
+  print('[patentes] ia=$ia categoria="$categoria" — $ok insertados/actualizados, $err errores');
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

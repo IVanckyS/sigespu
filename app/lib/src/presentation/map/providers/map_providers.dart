@@ -497,11 +497,19 @@ final scrapingFilteredPatenteProvider =
 final scrapingFilteredPermisoProvider =
     StateProvider<List<DatoPermiso>>((ref) => kPermisos);
 
-final scrapingFilteredTransitoProvider =
-    StateProvider<List<DatoTransito>>((ref) => kTransito);
-
 final scrapingFilteredOrgProvider =
     StateProvider<List<DatoOrganizacion>>((ref) => kOrganizaciones);
+
+// Página actual del scraping (los 20 registros visibles en pantalla).
+// Usado por el PDF export para exportar solo lo que está en pantalla.
+final scrapingPagedPatenteProvider =
+    StateProvider<List<DatoPatente>>((ref) => const []);
+
+final scrapingPagedPermisoProvider =
+    StateProvider<List<DatoPermiso>>((ref) => const []);
+
+final scrapingPagedOrgProvider =
+    StateProvider<List<DatoOrganizacion>>((ref) => const []);
 
 // ── Capa actividades municipales ──────────────────────────────────────────────
 

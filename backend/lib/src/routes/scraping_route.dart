@@ -103,7 +103,7 @@ Future<Response> _runHistorico(DatabaseService db, Request req) async {
 // ── Lecturas paginadas desde la BD ────────────────────────────────────────────
 
 (int, int) _paging(Map<String, String> q) {
-  final limit = (int.tryParse(q['limit'] ?? '200') ?? 200).clamp(1, 1000);
+  final limit = (int.tryParse(q['limit'] ?? '200') ?? 200).clamp(1, 10000);
   final offset = (int.tryParse(q['offset'] ?? '0') ?? 0).clamp(0, 100000);
   return (limit, offset);
 }
@@ -118,7 +118,9 @@ Future<Response> _listPatentes(DatabaseService db, Map<String, String> q) async 
       SELECT numero_decreto, fecha_decreto, tipo_patente, rut, razon_social, giro,
              direccion_raw, direccion_normalizada,
              ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng,
-             geocoding_confianza, url_fuente, scraped_at
+             geocoding_confianza, url_fuente, scraped_at,
+             raw_data->>'monto' AS monto,
+             numero_rol, codigo_giro, fecha_publicacion
       FROM patentes_comerciales
       ORDER BY fecha_decreto DESC NULLS LAST
       LIMIT @limit OFFSET @offset
@@ -140,6 +142,10 @@ Future<Response> _listPatentes(DatabaseService db, Map<String, String> q) async 
         'confianza': r[10],
         'url': r[11],
         'scraped_at': _isoString(r[12]),
+        'monto': r[13],
+        'numero_rol': r[14],
+        'codigo_giro': r[15],
+        'fecha_publicacion': _isoString(r[16]),
       }).toList();
 
   return Response.ok(
@@ -154,7 +160,8 @@ Future<Response> _listPermisos(DatabaseService db, Map<String, String> q) async 
     Sql.named(r'''
       SELECT numero_permiso, tipo, descripcion,
              ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng,
-             fecha_otorgamiento, estado, url_fuente, scraped_at
+             fecha_otorgamiento, estado, url_fuente, scraped_at,
+             fecha_publicacion, tipo_acto, denominacion_acto
       FROM permisos_dom
       ORDER BY fecha_otorgamiento DESC NULLS LAST
       LIMIT @limit OFFSET @offset
@@ -172,6 +179,9 @@ Future<Response> _listPermisos(DatabaseService db, Map<String, String> q) async 
         'estado': r[6],
         'url': r[7],
         'scraped_at': _isoString(r[8]),
+        'fecha_publicacion': _isoString(r[9]),
+        'tipo_acto': r[10],
+        'denominacion_acto': r[11],
       }).toList();
 
   return Response.ok(
@@ -217,8 +227,10 @@ Future<Response> _listOrganizaciones(DatabaseService db, Map<String, String> q) 
     Sql.named(r'''
       SELECT numero_personalidad, tipo, nombre, direccion,
              ST_Y(geom::geometry) AS lat, ST_X(geom::geometry) AS lng,
-             representante, rut_representante, vigencia_hasta, sector,
-             url_fuente, scraped_at
+             representante, vigencia_hasta, sector,
+             url_fuente, scraped_at,
+             rol_municipalidad, n_inscripcion_registro_civil,
+             directiva, fecha_concesion, fecha_modificaciones
       FROM organizaciones_sociales
       ORDER BY scraped_at DESC NULLS LAST
       LIMIT @limit OFFSET @offset
@@ -234,11 +246,15 @@ Future<Response> _listOrganizaciones(DatabaseService db, Map<String, String> q) 
         'lat': r[4],
         'lng': r[5],
         'representante': r[6],
-        'rut_rep': r[7],
-        'vigencia': _isoString(r[8]),
-        'sector': r[9],
-        'url': r[10],
-        'scraped_at': _isoString(r[11]),
+        'vigencia': _isoString(r[7]),
+        'sector': r[8],
+        'url': r[9],
+        'scraped_at': _isoString(r[10]),
+        'rol_municipalidad': r[11],
+        'n_inscripcion_registro_civil': r[12],
+        'directiva': r[13],
+        'fecha_concesion': _isoString(r[14]),
+        'fecha_modificaciones': _isoString(r[15]),
       }).toList();
 
   return Response.ok(

@@ -309,54 +309,70 @@ class _KanbanColumn extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          // Header
+          // Header — ADR-008: IntrinsicHeight pattern to avoid
+          // "A borderRadius can only be given on borders with uniform colors"
           Container(
-            padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.5),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-              border: Border(left: BorderSide(color: accent, width: 3)),
+              border: Border.all(color: Colors.transparent, width: 0),
             ),
-            child: Row(
-              children: [
-                Text(
-                  label.toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF292524),
-                    letterSpacing: 0.06,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0xFFE7E5E4)),
-                  ),
-                  child: Text(
-                    '${items.length}',
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF57534E),
-                      fontFeatures: [FontFeature.tabularFigures()],
+            clipBehavior: Clip.antiAlias,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Accent bar (left)
+                  Container(width: 3, color: accent),
+                  // Header content
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(11, 12, 10, 10),
+                      child: Row(
+                        children: [
+                          Text(
+                            label.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF292524),
+                              letterSpacing: 0.06,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: const Color(0xFFE7E5E4)),
+                            ),
+                            child: Text(
+                              '${items.length}',
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF57534E),
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          _IconBtn(Icons.add, onTap: onNuevaActividad),
+                          const SizedBox(width: 2),
+                          if (estado == EstadoActividad.archivado && items.isNotEmpty)
+                            _IconBtn(
+                              Icons.delete_sweep_outlined,
+                              onTap: () => _confirmarLimpiarArchivados(context, ref, items.length),
+                            )
+                          else
+                            _IconBtn(Icons.more_horiz, onTap: () {}),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const Spacer(),
-                _IconBtn(Icons.add, onTap: onNuevaActividad),
-                const SizedBox(width: 2),
-                if (estado == EstadoActividad.archivado && items.isNotEmpty)
-                  _IconBtn(
-                    Icons.delete_sweep_outlined,
-                    onTap: () => _confirmarLimpiarArchivados(context, ref, items.length),
-                  )
-                else
-                  _IconBtn(Icons.more_horiz, onTap: () {}),
-              ],
+                ],
+              ),
             ),
           ),
 

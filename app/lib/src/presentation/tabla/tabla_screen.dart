@@ -33,6 +33,17 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
   ElementoMapa? _selected;
   final _datePopupCtrl = DateRangePopupController(LayerLink());
 
+  /// Cache de la última lista filtrada+ordenada. Se invalida explícitamente
+  /// en los setters de filtro para evitar recomputar en rebuilds de hover.
+  List<ElementoMapa>? _filteredCache;
+
+  @override
+  void initState() {
+    super.initState();
+    // Sincronizar el provider de PDF export con el estado inicial de filtros.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncProvider());
+  }
+
   @override
   void dispose() {
     _datePopupCtrl.dismiss();
@@ -40,6 +51,9 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
   }
 
   List<ElementoMapa> get _filtered {
+    if (_filteredCache != null) return _filteredCache!;
+    // TODO(sprint-3): reemplazar kElementosSeed por ref.read(allElementsProvider)
+    // cuando los endpoints GET /api/elementos y GET /api/zonas estén disponibles.
     final list = kElementosSeed.where((e) {
       if (_filterCat == 'zonas' && e.layerKey != 'zona_peligro') return false;
       if (_filterCat == 'patente' && e.layerKey != 'patente') return false;
@@ -98,7 +112,15 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
       return _sortAsc ? cmp : -cmp;
     });
 
+    _filteredCache = list;
     return list;
+  }
+
+  /// Invalida el cache de filtros y devuelve la lista recalculada.
+  /// Llamar siempre que cambie cualquier filtro, orden o búsqueda.
+  List<ElementoMapa> _invalidateAndFilter() {
+    _filteredCache = null;
+    return _filtered;
   }
 
   void _sort(String col) {
@@ -109,11 +131,25 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
         _sortCol = col;
         _sortAsc = false;
       }
+      // Invalida el cache dentro del setState para que el build() subsiguiente
+      // llame a _filtered con la lista ya recalculada y la almacene en cache.
+      _filteredCache = null;
     });
-    _syncProvider();
+    // _filtered ya fue recomputado en build(); reutilizamos el cache.
+    ref.read(tablaFilteredProvider.notifier).state = _filtered;
   }
 
   void _syncProvider() {
+    ref.read(tablaFilteredProvider.notifier).state = _invalidateAndFilter();
+  }
+
+  /// Aplica un cambio de filtro de forma atómica: invalida el cache, actualiza
+  /// el estado local y sincroniza el provider del PDF export en un solo ciclo.
+  void _applyFilter(VoidCallback mutate) {
+    setState(() {
+      mutate();
+      _filteredCache = null;
+    });
     ref.read(tablaFilteredProvider.notifier).state = _filtered;
   }
 
@@ -148,6 +184,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // TODO(sprint-3): pasar total real desde allElementsProvider.
               _TablaBanner(total: kElementosSeed.length),
               const SizedBox(height: 16),
 
@@ -162,24 +199,20 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
                   dateFrom: _filterDateFrom,
                   dateTo: _filterDateTo,
                   datePopupLink: _datePopupCtrl.link,
-                  onTipo: (v) { setState(() => _filterTipo = v); _syncProvider(); },
-                  onSector: (v) { setState(() => _filterSector = v); _syncProvider(); },
-                  onEstado: (v) { setState(() => _filterEstado = v); _syncProvider(); },
-                  onBy: (v) { setState(() => _filterBy = v); _syncProvider(); },
-                  onSearch: (v) { setState(() => _search = v); _syncProvider(); },
+                  onTipo: (v) => _applyFilter(() => _filterTipo = v),
+                  onSector: (v) => _applyFilter(() => _filterSector = v),
+                  onEstado: (v) => _applyFilter(() => _filterEstado = v),
+                  onBy: (v) => _applyFilter(() => _filterBy = v),
+                  onSearch: (v) => _applyFilter(() => _search = v),
                   onDateTap: () => _datePopupCtrl.show(
                     context,
                     initialFrom: _filterDateFrom,
                     initialTo: _filterDateTo,
-                    onApply: (f, t) {
-                      setState(() { _filterDateFrom = f; _filterDateTo = t; });
-                      _syncProvider();
-                    },
+                    onApply: (f, t) =>
+                        _applyFilter(() { _filterDateFrom = f; _filterDateTo = t; }),
                   ),
-                  onDateClear: () {
-                    setState(() { _filterDateFrom = null; _filterDateTo = null; });
-                    _syncProvider();
-                  },
+                  onDateClear: () =>
+                      _applyFilter(() { _filterDateFrom = null; _filterDateTo = null; }),
                 )
               else
                 _MobileFilters(
@@ -194,34 +227,27 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
                     dateFrom: _filterDateFrom,
                     dateTo: _filterDateTo,
                     datePopupLink: _datePopupCtrl.link,
-                    onTipo: (v) { setState(() => _filterTipo = v); _syncProvider(); },
-                    onSector: (v) { setState(() => _filterSector = v); _syncProvider(); },
-                    onEstado: (v) { setState(() => _filterEstado = v); _syncProvider(); },
-                    onBy: (v) { setState(() => _filterBy = v); _syncProvider(); },
-                    onSearch: (v) { setState(() => _search = v); _syncProvider(); },
+                    onTipo: (v) => _applyFilter(() => _filterTipo = v),
+                    onSector: (v) => _applyFilter(() => _filterSector = v),
+                    onEstado: (v) => _applyFilter(() => _filterEstado = v),
+                    onBy: (v) => _applyFilter(() => _filterBy = v),
+                    onSearch: (v) => _applyFilter(() => _search = v),
                     onDateTap: () => _datePopupCtrl.show(
                       context,
                       initialFrom: _filterDateFrom,
                       initialTo: _filterDateTo,
-                      onApply: (f, t) {
-                        setState(() { _filterDateFrom = f; _filterDateTo = t; });
-                        _syncProvider();
-                      },
+                      onApply: (f, t) =>
+                          _applyFilter(() { _filterDateFrom = f; _filterDateTo = t; }),
                     ),
-                    onDateClear: () {
-                      setState(() { _filterDateFrom = null; _filterDateTo = null; });
-                      _syncProvider();
-                    },
+                    onDateClear: () =>
+                        _applyFilter(() { _filterDateFrom = null; _filterDateTo = null; }),
                   ),
                 ),
               const SizedBox(height: 12),
 
               _CategoryChips(
                 active: _filterCat,
-                onChanged: (cat) {
-                  setState(() => _filterCat = cat);
-                  _syncProvider();
-                },
+                onChanged: (cat) => _applyFilter(() => _filterCat = cat),
               ),
               const SizedBox(height: 12),
 
@@ -913,6 +939,7 @@ class _MiniMapa extends StatelessWidget {
               urlTemplate: AppConstants.mapTileUrl,
               subdomains: AppConstants.mapSubdomains,
               userAgentPackageName: 'cl.lota.sigespu',
+              retinaMode: MediaQuery.devicePixelRatioOf(context) > 1,
               tileProvider: CancellableNetworkTileProvider(),
             ),
             MarkerLayer(
@@ -1207,14 +1234,14 @@ class _MobileFilters extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF78716C),
+                  color: AppTheme.stone500,
                 ),
               ),
               const Spacer(),
               Icon(
                 expanded ? Icons.expand_less : Icons.expand_more,
                 size: 16,
-                color: const Color(0xFF78716C),
+                color: AppTheme.stone500,
               ),
             ]),
           ),
@@ -1241,17 +1268,25 @@ class _TablaBanner extends StatelessWidget {
   final int total;
   const _TablaBanner({required this.total});
 
-  @override
-  Widget build(BuildContext context) {
-    const seed = kElementosSeed;
-    final sectors = seed.map((e) => e.sector).toSet().length;
-    final activos = seed.where((e) => e.estado == 'activo').length;
-    final now = DateTime.now();
-    final sevenDaysAgo = now.subtract(const Duration(days: 7));
-    final estaSemana = seed.where((e) {
+  // Estos valores se calculan una sola vez porque kElementosSeed es constante.
+  // Evita recomputar en cada rebuild del padre (hover de fila, cambio de filtro, etc.)
+  static final int _sectors = kElementosSeed.map((e) => e.sector).toSet().length;
+  static final int _activos = kElementosSeed.where((e) => e.estado == 'activo').length;
+  // "Esta semana" depende de DateTime.now() — se recalcula en cada build() pero
+  // solo llega aquí cuando el padre se reconstruye, que es infrecuente.
+  static int _estaSemana() {
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+    return kElementosSeed.where((e) {
       final d = DateTime.tryParse(e.fecha);
       return d != null && d.isAfter(sevenDaysAgo);
     }).length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sectors = _sectors;
+    final activos = _activos;
+    final estaSemana = _estaSemana();
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -1375,44 +1410,52 @@ class _TablaStat extends StatelessWidget {
 }
 
 class _TableDecoPainter extends CustomPainter {
+  // Paint objects creados una sola vez — shouldRepaint devuelve false por lo que
+  // paint() solo se invoca en el primer layout, pero aun así vale la pena
+  // no asignar en el heap en cada llamada.
+  static final _p1 = Paint()..color = Colors.white;
+  static final _p2 = Paint()..color = Colors.white.withValues(alpha: 0.6);
+  static final _p3 = Paint()..color = Colors.white.withValues(alpha: 0.4);
+  static final _p4 = Paint()..color = Colors.white.withValues(alpha: 0.3);
+  static final _p5 = Paint()..color = Colors.white.withValues(alpha: 0.2);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = Colors.white;
     final s = size.width / 120;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(5 * s, 15 * s, 110 * s, 10 * s),
         Radius.circular(2 * s),
       ),
-      p,
+      _p1,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(5 * s, 33 * s, 110 * s, 8 * s),
         Radius.circular(2 * s),
       ),
-      Paint()..color = Colors.white.withValues(alpha: 0.6),
+      _p2,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(5 * s, 49 * s, 110 * s, 8 * s),
         Radius.circular(2 * s),
       ),
-      Paint()..color = Colors.white.withValues(alpha: 0.4),
+      _p3,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(5 * s, 65 * s, 110 * s, 8 * s),
         Radius.circular(2 * s),
       ),
-      Paint()..color = Colors.white.withValues(alpha: 0.3),
+      _p4,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(5 * s, 81 * s, 70 * s, 8 * s),
         Radius.circular(2 * s),
       ),
-      Paint()..color = Colors.white.withValues(alpha: 0.2),
+      _p5,
     );
   }
 
@@ -1428,53 +1471,55 @@ class _CategoryChips extends StatelessWidget {
 
   const _CategoryChips({required this.active, required this.onChanged});
 
+  // Conteos calculados una sola vez desde la lista constante.
+  // Evita repetir 5 iteraciones sobre kElementosSeed en cada rebuild
+  // (hover, cambio de filtro, selección de fila, etc.)
+  static final _countZonas =
+      kElementosSeed.where((e) => e.layerKey == 'zona_peligro').length;
+  static final _countPatentes =
+      kElementosSeed.where((e) => e.layerKey == 'patente').length;
+  static const _infraKeys = {'centro_acopio', 'sede_comunitaria', 'infraestructura'};
+  static final _countInfra =
+      kElementosSeed.where((e) => _infraKeys.contains(e.layerKey)).length;
+  static final _countOtros =
+      kElementosSeed.where((e) => !_infraKeys.contains(e.layerKey) &&
+          e.layerKey != 'zona_peligro' && e.layerKey != 'patente').length;
+
   @override
   Widget build(BuildContext context) {
-    const seed = kElementosSeed;
     final chips = [
       (
         id: 'todos',
         label: 'Total',
-        count: seed.length,
+        count: kElementosSeed.length,
         fg: AppTheme.stone600,
         bg: AppTheme.stone100,
       ),
       (
         id: 'zonas',
         label: 'Zonas peligro',
-        count: seed.where((e) => e.layerKey == 'zona_peligro').length,
+        count: _countZonas,
         fg: AppTheme.redDanger,
         bg: const Color(0xFFFEE2E2),
       ),
       (
         id: 'patente',
         label: 'Patentes',
-        count: seed.where((e) => e.layerKey == 'patente').length,
+        count: _countPatentes,
         fg: AppTheme.amberWarning,
         bg: const Color(0xFFFEF3C7),
       ),
       (
         id: 'infra',
         label: 'Infraestructura',
-        count: seed
-            .where((e) => const ['centro_acopio', 'sede_comunitaria', 'infraestructura']
-                .contains(e.layerKey))
-            .length,
+        count: _countInfra,
         fg: AppTheme.greenSuccess,
         bg: const Color(0xFFDCFCE7),
       ),
       (
         id: 'otros',
         label: 'Otros',
-        count: seed
-            .where((e) => !const [
-                  'zona_peligro',
-                  'patente',
-                  'centro_acopio',
-                  'sede_comunitaria',
-                  'infraestructura'
-                ].contains(e.layerKey))
-            .length,
+        count: _countOtros,
         fg: AppTheme.stone500,
         bg: AppTheme.stone100,
       ),

@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../config/theme.dart';
 import '../../data/seed_data.dart';
 
@@ -13,6 +14,12 @@ class ResumenScreen extends StatelessWidget {
     final fechaStr =
         '${now.day.toString().padLeft(2, '0')} de ${_mes(now.month)} de ${now.year}, '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    // TODO(sprint-3): reemplazar kElementosSeed/kPatentes con datos reales.
+    // KPIs: GET /api/resumen/kpis → { reportes, zonas, patentes, acopios, sedes }
+    // Reportes por tipo: GET /api/resumen/reportes-por-tipo?dias=30
+    // Tendencia semanal: GET /api/resumen/tendencia-semanal?semanas=8
+    // Últimos reportes:  GET /api/reportes?order=fecha_evento.desc&limit=5
 
     // KPIs calculados desde seed
     final reportes = kElementosSeed.where((e) => e.tipo.startsWith('reporte_')).length;
@@ -128,7 +135,7 @@ class ResumenScreen extends StatelessWidget {
     );
   }
 
-  String _mes(int m) => const [
+  static String _mes(int m) => const [
     '', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
   ][m];
@@ -138,17 +145,10 @@ class ResumenScreen extends StatelessWidget {
     return List.generate(8, (i) {
       // i=0 es la semana más antigua (7 semanas atrás), i=7 la más reciente
       final daysAgo = (7 - i) * 7;
-      final weekStart = DateTime(
-        ref.subtract(Duration(days: daysAgo + 6)).year,
-        ref.subtract(Duration(days: daysAgo + 6)).month,
-        ref.subtract(Duration(days: daysAgo + 6)).day,
-      );
-      final weekEnd = DateTime(
-        ref.subtract(Duration(days: daysAgo)).year,
-        ref.subtract(Duration(days: daysAgo)).month,
-        ref.subtract(Duration(days: daysAgo)).day,
-        23, 59, 59,
-      );
+      final startRaw = ref.subtract(Duration(days: daysAgo + 6));
+      final endRaw   = ref.subtract(Duration(days: daysAgo));
+      final weekStart = DateTime(startRaw.year, startRaw.month, startRaw.day);
+      final weekEnd   = DateTime(endRaw.year, endRaw.month, endRaw.day, 23, 59, 59);
       return kElementosSeed.where((e) {
         if (!e.tipo.startsWith('reporte_')) return false;
         final d = DateTime.tryParse(e.fecha);
@@ -220,7 +220,7 @@ class _ResumenBanner extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: Colors.white70,
-                        letterSpacing: 0.09 * 10,
+                        letterSpacing: 0.9,
                       ),
                       overflow: TextOverflow.ellipsis,
                     )),
@@ -317,6 +317,8 @@ class _KpiGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // TODO(sprint-3): los textos de trend y el bool trendUp deben venir de la API.
+    // GET /api/resumen/kpis devuelve { trend_pct, trend_dir, scraping_lag_min } por KPI.
     final cards = [
       _KpiCard(label: 'Reportes este mes', value: '$reportes', accent: AppTheme.orange600,
           icon: Icons.location_on_outlined, trend: '+12% vs mes anterior', trendUp: false),
@@ -584,6 +586,9 @@ class _LineChartTendencia extends StatelessWidget {
 
 // ── Sector list ───────────────────────────────────────────────────────────────
 
+// TODO(sprint-3): reemplazar _sectores y _barsMax con datos reales.
+// GET /api/resumen/sectores → [{ codigo, nombre, zonas, reportes }]
+// El máximo para la barra relativa debe calcularse sobre los datos recibidos.
 class _SectorList extends StatelessWidget {
   static const _sectores = [
     ('S-2', 'Residencial Los Aromos', Color(0xFF86EFAC), '2 zonas · 3 reportes'),
@@ -593,6 +598,7 @@ class _SectorList extends StatelessWidget {
     ('Centro', 'Centro Histórico Lota', Color(0xFFFED7AA), '2 zonas · 5 reportes'),
   ];
 
+  // Counts matching the 'reportes' field in _sectores; index 4 (Centro=5) is the max.
   static const _barsMax = [3, 2, 0, 2, 5];
 
   @override
@@ -601,7 +607,7 @@ class _SectorList extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(_sectores.length, (i) {
         final (code, name, color, stats) = _sectores[i];
-        final fraction = _barsMax[4] > 0 ? _barsMax[i] / _barsMax[4] : 0.0;
+        final fraction = _barsMax[4] > 0 ? _barsMax[i] / _barsMax[4] : 0.0; // already double
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Container(
@@ -624,7 +630,7 @@ class _SectorList extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(3),
                   child: LinearProgressIndicator(
-                    value: fraction.toDouble(),
+                    value: fraction,
                     backgroundColor: AppTheme.stone200,
                     valueColor: const AlwaysStoppedAnimation(AppTheme.orange600),
                   ),
@@ -643,6 +649,15 @@ class _SectorList extends StatelessWidget {
 class _RecentList extends StatelessWidget {
   final List<ElementoMapa> items;
   const _RecentList({required this.items});
+
+  static IconData _iconParaTipo(String tipo) {
+    switch (tipo) {
+      case 'reporte_robo':       return Icons.person_off_outlined;
+      case 'reporte_vandalismo': return Icons.format_paint_outlined;
+      case 'reporte_accidente':  return Icons.car_crash_outlined;
+      default:                   return Icons.warning_amber_outlined;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -664,7 +679,7 @@ class _RecentList extends StatelessWidget {
               Container(
                 width: 32, height: 32,
                 decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                child: Icon(Icons.warning_amber_outlined, size: 16, color: color),
+                child: Icon(_iconParaTipo(e.tipo), size: 16, color: color),
               ),
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

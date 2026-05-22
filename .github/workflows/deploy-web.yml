@@ -31,6 +31,15 @@ jobs:
           flutter-version: '3.27.0'
           channel: stable
 
+      - name: Validar BACKEND_URL
+        run: |
+          if [ -z "${{ vars.BACKEND_URL }}" ]; then
+            echo "ERROR: BACKEND_URL no está configurado."
+            echo "Ve a tu repo → Settings → Variables → Actions → New repository variable"
+            echo "Nombre: BACKEND_URL  Valor: https://TU-SERVICIO.up.railway.app"
+            exit 1
+          fi
+
       - name: Build Flutter Web
         working-directory: app
         run: |

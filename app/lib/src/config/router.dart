@@ -45,19 +45,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/map',
-            builder: (context, state) => const MapScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: MapScreen()),
           ),
           GoRoute(
             path: '/resumen',
-            builder: (context, state) => const ResumenScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ResumenScreen()),
           ),
           GoRoute(
             path: '/tabla',
-            builder: (context, state) => const TablaScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: TablaScreen()),
           ),
           GoRoute(
             path: '/scraping',
-            builder: (context, state) => const ScrapingScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ScrapingScreen()),
           ),
           GoRoute(
             path: '/users',
@@ -66,7 +70,8 @@ final routerProvider = Provider<GoRouter>((ref) {
               if (role != 'director') return '/map';
               return null;
             },
-            builder: (context, state) => const UsersScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: UsersScreen()),
           ),
           GoRoute(
             path: '/actividades',
@@ -75,11 +80,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               if (role == 'visitante' || role.isEmpty) return '/map';
               return null;
             },
-            builder: (context, state) => const ActividadesScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ActividadesScreen()),
           ),
           GoRoute(
             path: '/conflicts',
-            builder: (context, state) => const ConflictsScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ConflictsScreen()),
           ),
         ],
       ),

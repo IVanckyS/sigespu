@@ -20,9 +20,14 @@ enum MapaBase { cartoVoyager, osm, esriSatelite }
 final mapaBaseProvider = StateProvider<MapaBase>((ref) => MapaBase.cartoVoyager);
 
 const mapaBaseUrls = {
+  // {r} se resuelve como "@2x" en pantallas de alta densidad cuando
+  // TileLayer recibe retinaMode: RetinaMode.isHighDensity(context).
+  // En pantallas normales {r} queda vacío y la URL es idéntica a antes.
   MapaBase.cartoVoyager:
-      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  // OSM no soporta tiles @2x oficialmente; se omite {r}.
   MapaBase.osm: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  // Esri Satélite tampoco soporta tiles @2x; se omite {r}.
   MapaBase.esriSatelite:
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
 };

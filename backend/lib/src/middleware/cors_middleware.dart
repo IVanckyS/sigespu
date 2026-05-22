@@ -21,6 +21,8 @@ bool _isAllowedOrigin(String origin, Set<String> allowed) {
   if (origin.isEmpty) return false;
   final uri = Uri.tryParse(origin);
   if (uri == null) return false;
+  // Allow any localhost / 127.0.0.1 port (Flutter dev server uses a random port)
+  if (uri.host == 'localhost' || uri.host == '127.0.0.1') return true;
   return allowed.contains(origin);
 }
 

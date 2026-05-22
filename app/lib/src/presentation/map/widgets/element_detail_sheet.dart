@@ -32,7 +32,9 @@ class ElementDetailSheet extends ConsumerWidget {
     
     if (isDeleted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).pop();
+        if (context.mounted && Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        }
       });
       return const SizedBox.shrink();
     }
@@ -121,7 +123,7 @@ class ElementDetailSheet extends ConsumerWidget {
                   const SizedBox(height: 12),
                   Row(children: [
                     _InfoChip(
-                      label: 'Riesgo: ${el.nivel ?? '?'}',
+                      label: 'Riesgo: ${_nivelLabel(el.nivel)}',
                       bg: AppTheme.redDanger.withValues(alpha: 0.1),
                       fg: AppTheme.redDanger,
                     ),

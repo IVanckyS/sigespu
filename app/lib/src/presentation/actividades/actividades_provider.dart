@@ -504,11 +504,6 @@ final actividadesProvider =
 
 // ── Derived providers ─────────────────────────────────────────────────────────
 
-final actividadesByEstadoProvider =
-    Provider.family<List<ActividadMunicipal>, EstadoActividad>((ref, estado) {
-  return ref.watch(actividadesProvider).where((a) => a.estado == estado).toList();
-});
-
 // ── Usuarios del sistema (mock para pruebas) ──────────────────────────────────
 
 class UsuarioSistema {

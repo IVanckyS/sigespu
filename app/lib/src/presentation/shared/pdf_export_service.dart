@@ -242,12 +242,10 @@ class PdfExportService {
     String userName, {
     List<DatoPatente>? patentes,
     List<DatoPermiso>? permisos,
-    List<DatoTransito>? transito,
     List<DatoOrganizacion>? orgs,
   }) async {
     final p = patentes ?? kPatentes;
     final pe = permisos ?? kPermisos;
-    final t = transito ?? kTransito;
     final o = orgs ?? kOrganizaciones;
 
     final (fontR, fontB) = await _loadFonts();
@@ -271,7 +269,6 @@ class PdfExportService {
         pw.Row(children: [
           pw.Expanded(child: _kpiBox('Patentes comerciales', '${p.length}')),
           pw.Expanded(child: _kpiBox('Permisos DOM', '${pe.length}')),
-          pw.Expanded(child: _kpiBox('Decretos transito', '${t.length}')),
           pw.Expanded(child: _kpiBox('Organizaciones sociales', '${o.length}')),
         ]),
         pw.SizedBox(height: 20),
@@ -282,10 +279,6 @@ class PdfExportService {
 
         _sectionTitle('PERMISOS DIRECCION DE OBRAS  |  ${pe.length} registros'),
         _permisosTable(pe),
-        pw.SizedBox(height: 16),
-
-        _sectionTitle('DECRETOS DE TRANSITO  |  ${t.length} registros'),
-        _transitoTable(t),
         pw.SizedBox(height: 16),
 
         _sectionTitle('ORGANIZACIONES SOCIALES  |  ${o.length} registros'),
@@ -667,20 +660,6 @@ class PdfExportService {
       p.estado.toUpperCase(),
     ]).toList();
     return _table(headers, rows, widths: [1.2, 1.4, 2.2, 1.8, 1.0, 0.9]);
-  }
-
-  static pw.Widget _transitoTable(List<DatoTransito> transito) {
-    final headers = ['N.DECRETO', 'TIPO', 'DIRECCION', 'MOTIVO', 'INICIO', 'FIN', 'ESTADO'];
-    final rows = transito.map((t) => [
-      t.nDecreto,
-      t.tipo,
-      t.direccion,
-      t.motivo,
-      t.fechaInicio,
-      t.fechaFin,
-      t.estado.toUpperCase(),
-    ]).toList();
-    return _table(headers, rows, widths: [1.2, 1.5, 2.0, 1.8, 0.9, 0.9, 0.9]);
   }
 
   static pw.Widget _organizacionesTable(List<DatoOrganizacion> orgs) {

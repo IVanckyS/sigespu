@@ -28,7 +28,7 @@ class CustomMarkers {
               height: 32,
               decoration: BoxDecoration(
                 color: color,
-                shape: BoxShape.circle, // Simplified shape for mockup
+                shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
                 boxShadow: const [
                   BoxShadow(

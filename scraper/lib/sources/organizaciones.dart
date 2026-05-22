@@ -100,20 +100,36 @@ Future<void> _processCategoria(Session db, Command redis,
     final nombre = cells[2].text.trim();
     if (nombre.isEmpty || nombre == 'Nombre') continue;
 
-    final numeroPJ = cells[3].text.trim(); // Rol Municipalidad o P.J.
+    final rolMunicipalidad = cells[3].text.trim(); // Rol/PJ
+    final fechaConcesionStr = cells[4].text.trim(); // DD-MM-YYYY
     final numInscripcion = cells[5].text.trim();
     final sede = cells[6].text.trim();
     final directivaRaw = cells[7].text.trim();
+    final fechaModStr = cells[9].text.trim(); // DD-MM-YYYY
     final vencimientoStr = cells[10].text.trim(); // DD-MM-YYYY
 
     // numero_personalidad: usar Rol/PJ si disponible, si no N° inscripción
-    final numeroPers = numeroPJ.isNotEmpty ? numeroPJ : numInscripcion;
+    final numeroPers = rolMunicipalidad.isNotEmpty ? rolMunicipalidad : numInscripcion;
 
     // Representante: primer nombre de la lista de la directiva
     final representante = _extractRepresentante(directivaRaw);
 
+    final fechaConcesionDate = _parseDate(fechaConcesionStr);
+    final fechaConcesionIso = fechaConcesionDate != null ? _isoDate(fechaConcesionDate) : null;
+    final fechaModDate = _parseDate(fechaModStr);
+    final fechaModIso = fechaModDate != null ? _isoDate(fechaModDate) : null;
     final vencimientoDate = _parseDate(vencimientoStr);
     final vencimientoIso = vencimientoDate != null ? _isoDate(vencimientoDate) : null;
+
+    final rawData = jsonEncode({
+      'rol_municipalidad': rolMunicipalidad,
+      'n_inscripcion_registro_civil': numInscripcion,
+      'directiva': directivaRaw,
+      'fecha_concesion': fechaConcesionStr,
+      'fecha_modificaciones': fechaModStr,
+      'vencimiento': vencimientoStr,
+      'sede': sede,
+    });
 
     // Geocoding de sede con caché Redis
     double? lat, lng;
@@ -162,11 +178,15 @@ Future<void> _processCategoria(Session db, Command redis,
           Sql.named('''
             INSERT INTO organizaciones_sociales (
               id, numero_personalidad, tipo, nombre, direccion,
-              geom, representante, vigencia_hasta, sector, url_fuente, scraped_at
+              geom, representante, vigencia_hasta, sector, url_fuente, scraped_at,
+              rol_municipalidad, n_inscripcion_registro_civil, directiva,
+              fecha_concesion, fecha_modificaciones, geocoding_confianza, raw_data
             ) VALUES (
               gen_random_uuid(), @numeroPers, @tipo, @nombre, @sede,
               ST_SetSRID(ST_MakePoint(@lng, @lat), 4326),
-              @rep, @vig::date, @sector, @url, NOW()
+              @rep, @vig::date, @sector, @url, NOW(),
+              @rolMun, @numInscripcion, @directiva,
+              @fechaConcesion::date, @fechaMod::date, @confianza, @raw::jsonb
             )
           '''),
           parameters: {
@@ -180,6 +200,13 @@ Future<void> _processCategoria(Session db, Command redis,
             'vig': vencimientoIso,
             'sector': sector,
             'url': url,
+            'rolMun': rolMunicipalidad.isNotEmpty ? rolMunicipalidad : null,
+            'numInscripcion': numInscripcion.isNotEmpty ? numInscripcion : null,
+            'directiva': directivaRaw.isNotEmpty ? directivaRaw : null,
+            'fechaConcesion': fechaConcesionIso,
+            'fechaMod': fechaModIso,
+            'confianza': confianza,
+            'raw': rawData,
           },
         );
       } else {
@@ -187,10 +214,14 @@ Future<void> _processCategoria(Session db, Command redis,
           Sql.named('''
             INSERT INTO organizaciones_sociales (
               id, numero_personalidad, tipo, nombre, direccion,
-              representante, vigencia_hasta, sector, url_fuente, scraped_at
+              representante, vigencia_hasta, sector, url_fuente, scraped_at,
+              rol_municipalidad, n_inscripcion_registro_civil, directiva,
+              fecha_concesion, fecha_modificaciones, geocoding_confianza, raw_data
             ) VALUES (
               gen_random_uuid(), @numeroPers, @tipo, @nombre, @sede,
-              @rep, @vig::date, @sector, @url, NOW()
+              @rep, @vig::date, @sector, @url, NOW(),
+              @rolMun, @numInscripcion, @directiva,
+              @fechaConcesion::date, @fechaMod::date, @confianza, @raw::jsonb
             )
           '''),
           parameters: {
@@ -202,6 +233,13 @@ Future<void> _processCategoria(Session db, Command redis,
             'vig': vencimientoIso,
             'sector': sector,
             'url': url,
+            'rolMun': rolMunicipalidad.isNotEmpty ? rolMunicipalidad : null,
+            'numInscripcion': numInscripcion.isNotEmpty ? numInscripcion : null,
+            'directiva': directivaRaw.isNotEmpty ? directivaRaw : null,
+            'fechaConcesion': fechaConcesionIso,
+            'fechaMod': fechaModIso,
+            'confianza': confianza,
+            'raw': rawData,
           },
         );
       }

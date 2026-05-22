@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
@@ -57,6 +58,13 @@ class MapScreen extends ConsumerStatefulWidget {
 
 class _MapScreenState extends ConsumerState<MapScreen> {
   final _mapKey = GlobalKey();
+  Timer? _coordDebounce;
+
+  @override
+  void dispose() {
+    _coordDebounce?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +72,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final isDrawing = ref.watch(isDrawingModeProvider);
     final drawingPoints = ref.watch(drawingPointsProvider);
     final collapsed = ref.watch(sidebarCollapsedProvider);
-    final filteredUserPolygons = ref.watch(filteredUserPolygonsProvider);
     final mapCtrl = ref.watch(mapControllerProvider);
 
     return LayoutBuilder(
@@ -108,7 +115,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       // Hit-test: ¿el tap cayó dentro de una zona dibujada?
                       // Se busca el polígono más pequeño que contiene el punto
                       // (mejora UX cuando hay zonas anidadas).
-                      final candidates = filteredUserPolygons
+                      // ref.read es correcto aquí: solo necesitamos el valor actual
+                      // en el momento del tap, no suscribirnos a cambios.
+                      final polygons = ref.read(filteredUserPolygonsProvider);
+                      final candidates = polygons
                           .where((p) => _pointInPolygon(point, p.points))
                           .toList()
                         ..sort((a, b) =>
@@ -131,8 +141,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     onPositionChanged: (camera, hasGesture) {
                       final c = camera.center;
                       if (c != null) {
-                        ref.read(mapCenterCoordsProvider.notifier).state =
-                            (c.latitude, c.longitude);
+                        // Debounce coordinate display updates to ~4fps during
+                        // gestures — avoids rebuilding the info panel 60×/s.
+                        if (hasGesture) {
+                          _coordDebounce?.cancel();
+                          _coordDebounce = Timer(
+                            const Duration(milliseconds: 120),
+                            () => ref.read(mapCenterCoordsProvider.notifier).state =
+                                (c.latitude, c.longitude),
+                          );
+                        } else {
+                          ref.read(mapCenterCoordsProvider.notifier).state =
+                              (c.latitude, c.longitude);
+                        }
                       }
 
                       // Actualizar límites para filtrado espacial (lazy loading)
@@ -213,19 +234,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           isFilled: true,
                         ),
                       ]),
-                    if (filteredUserPolygons.isNotEmpty)
-                      PolygonLayer(
-                        polygons: filteredUserPolygons.map((p) {
-                          final color = CustomMarkers.getColorForTipo(p.zona.tipo);
-                          return Polygon(
-                            points: p.points,
-                            color: color.withValues(alpha: 0.2),
-                            borderColor: color,
-                            borderStrokeWidth: 2,
-                            isFilled: true,
-                          );
-                        }).toList(),
-                      ),
+                    const _UserPolygonsLayer(),
                     const _ElementMarkersLayer(),
                     const _ActividadesMarkersLayer(),
                     const _ReportesMarkersLayer(),
@@ -304,7 +313,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 Positioned(
                   top: isMobile ? 12 : 16,
                   left: isMobile ? 58 : 16,
-                  child: Consumer(
+                  child: RepaintBoundary(child: Consumer(
                     builder: (ctx, r, _) {
                       final coords = r.watch(mapCenterCoordsProvider);
                       final count = r.watch(filteredElementsProvider).length;
@@ -377,7 +386,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         ]),
                       );
                     },
-                  ),
+                  )),  // Consumer + RepaintBoundary
                 ),
 
               // Visor panels
@@ -385,24 +394,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 builder: (ctx, r, _) {
                   final panel = r.watch(activePanelProvider);
                   if (panel == VisorPanel.none) return const SizedBox.shrink();
+                  final panelWidget = switch (panel) {
+                    VisorPanel.capas => PanelCapas(
+                        isDirector: r.watch(authProvider).user?['nivel_acceso'] == 'director',
+                        onSubirCapa: () => showModalBottomSheet(
+                          context: ctx,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => const SubirCapaScreen(),
+                        ),
+                      ),
+                    VisorPanel.mapaBase  => const PanelMapaBase(),
+                    VisorPanel.leyenda   => const PanelLeyenda(),
+                    VisorPanel.imprimir  => PanelImprimir(mapKey: _mapKey),
+                    VisorPanel.none      => const SizedBox.shrink(),
+                  };
                   return Positioned(
                     bottom: isMobile ? 80 : 150,
                     left: 16,
-                    child: switch (panel) {
-                      VisorPanel.capas => PanelCapas(
-                          isDirector: r.watch(authProvider).user?['nivel_acceso'] == 'director',
-                          onSubirCapa: () => showModalBottomSheet(
-                            context: ctx,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (_) => const SubirCapaScreen(),
-                          ),
-                        ),
-                      VisorPanel.mapaBase => const PanelMapaBase(),
-                      VisorPanel.leyenda => const PanelLeyenda(),
-                      VisorPanel.imprimir => PanelImprimir(mapKey: _mapKey),
-                      VisorPanel.none => const SizedBox.shrink(),
-                    },
+                    child: _PanelWithClose(
+                      onClose: () => r.read(activePanelProvider.notifier).state = VisorPanel.none,
+                      child: panelWidget,
+                    ),
                   );
                 },
               ),
@@ -455,6 +468,41 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
 }
 
+// ── Panel close wrapper ───────────────────────────────────────────────────────
+
+class _PanelWithClose extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onClose;
+  const _PanelWithClose({required this.child, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        Positioned(
+          top: -10,
+          right: -10,
+          child: GestureDetector(
+            onTap: onClose,
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E2327),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white24),
+              ),
+              child: const Icon(Icons.close, size: 14, color: Colors.white70),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Capas extraídas (const widgets) ──────────────────────────────────────────
 // Estos widgets se construyen como `const` desde el árbol del mapa. Flutter
 // short-circuit-ea el rebuild cuando el parent se reconstruye: solo se
@@ -480,6 +528,31 @@ class _HeatmapMapLayer extends ConsumerWidget {
           1.0: Colors.deepOrange,
         },
       ),
+    );
+  }
+}
+
+/// Polígonos dibujados por el usuario (zonas personalizadas).
+/// Extraído como ConsumerWidget para que cambios en [filteredUserPolygonsProvider]
+/// (por filtro de fecha, categoría, etc.) no hagan rebuild de [_MapScreenState].
+class _UserPolygonsLayer extends ConsumerWidget {
+  const _UserPolygonsLayer();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final polygons = ref.watch(filteredUserPolygonsProvider);
+    if (polygons.isEmpty) return const SizedBox.shrink();
+    return PolygonLayer(
+      polygons: polygons.map((p) {
+        final color = CustomMarkers.getColorForTipo(p.zona.tipo);
+        return Polygon(
+          points: p.points,
+          color: color.withValues(alpha: 0.2),
+          borderColor: color,
+          borderStrokeWidth: 2,
+          isFilled: true,
+        );
+      }).toList(),
     );
   }
 }

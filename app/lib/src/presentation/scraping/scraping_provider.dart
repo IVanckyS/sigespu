@@ -91,7 +91,7 @@ Future<List<T>> _fetchList<T>(
   T Function(Map<String, dynamic>) parser,
 ) async {
   final authed = ref.read(authedHttpProvider);
-  final resp = await authed.get(Uri.parse('$_scrapingBase/$path?limit=500'));
+  final resp = await authed.get(Uri.parse('$_scrapingBase/$path?limit=5000'));
   if (resp.statusCode == 401) {
     // El refresh ya se intentó dentro de authed.get y falló — sesión muerta.
     // Devolvemos lista vacía en vez de tirar excepción para no crashear la UI;
@@ -111,9 +111,6 @@ final scrapingPatentesProvider = FutureProvider.autoDispose<List<DatoPatente>>(
 
 final scrapingPermisosProvider = FutureProvider.autoDispose<List<DatoPermiso>>(
     (ref) => _fetchList(ref, 'permisos', DatoPermiso.fromJson));
-
-final scrapingTransitoProvider = FutureProvider.autoDispose<List<DatoTransito>>(
-    (ref) => _fetchList(ref, 'transito', DatoTransito.fromJson));
 
 final scrapingOrganizacionesProvider =
     FutureProvider.autoDispose<List<DatoOrganizacion>>(
@@ -148,7 +145,6 @@ class ScrapingController {
   void refreshAll() {
     ref.invalidate(scrapingPatentesProvider);
     ref.invalidate(scrapingPermisosProvider);
-    ref.invalidate(scrapingTransitoProvider);
     ref.invalidate(scrapingOrganizacionesProvider);
   }
 }

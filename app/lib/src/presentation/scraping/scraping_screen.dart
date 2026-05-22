@@ -1,13 +1,18 @@
-// ignore_for_file: unused_field
-
 import 'dart:async';
+import 'package:excel/excel.dart' as xl;
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../data/seed_data.dart';
 import '../map/providers/map_providers.dart';
+import '../map/widgets/location_picker.dart';
+import '../shared/excel_saver.dart';
 import 'scraping_provider.dart';
 
 // ── Design tokens ────────────────────────────────────────────────────────────
@@ -59,11 +64,30 @@ class _SourceMeta {
 }
 
 const _sources = [
-  _SourceMeta(id: 'patentes',       label: 'Patentes comerciales',  short: 'Patentes', ig: '164', lastTime: '03:02'),
-  _SourceMeta(id: 'permisos',       label: 'Permisos DOM',          short: 'DOM',      ig: '172', lastTime: '03:10'),
-  _SourceMeta(id: 'transito',       label: 'Decretos de tránsito',  short: 'Decretos', ig: '269', lastTime: '03:20'),
-  _SourceMeta(id: 'organizaciones', label: 'Organizaciones sociales', short: 'Org.',   ig: '351', lastTime: '04:00'),
+  _SourceMeta(id: 'patentes',       label: 'Patentes comerciales',   short: 'Patentes', ig: '164', lastTime: '03:02'),
+  _SourceMeta(id: 'permisos',       label: 'Permisos DOM',           short: 'DOM',      ig: '172', lastTime: '03:10'),
+  _SourceMeta(id: 'organizaciones', label: 'Organizaciones sociales', short: 'Org.',    ig: '351', lastTime: '04:00'),
 ];
+
+/// Normaliza el tipo de permiso DOM para filtros y badges.
+/// "RESOLUCIÓN — Resolución" → "RESOLUCIÓN", "RECEPCIÓN - algo" → "RECEPCIÓN"
+String _shortTipoPermiso(String tipo) {
+  final dash = tipo.indexOf('—');
+  if (dash > 0) return tipo.substring(0, dash).trim();
+  final hyphen = tipo.indexOf('-');
+  if (hyphen > 0) return tipo.substring(0, hyphen).trim();
+  return tipo;
+}
+
+/// Abrevia el tipo de patente para mostrar en badges.
+/// Detecta montos monetarios guardados como tipo por error de columna en el scraper.
+String _shortTipo(String tipo) {
+  if (tipo.isEmpty) return 'S/T';
+  if (RegExp(r'^[\d.,]+$').hasMatch(tipo.trim())) return 'S/T';
+  final up = tipo.toUpperCase();
+  if (up.length <= 8) return up;
+  return up.substring(0, 5);
+}
 
 class ScrapingScreen extends ConsumerStatefulWidget {
   const ScrapingScreen({super.key});
@@ -77,18 +101,22 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
   String _year = 'all';
   String _month = 'all';
   String _geo = 'all';
+  String _tipoFilter = 'all';
   String _search = '';
   bool _last30Days = false;
+  String _sortColumn = '';
+  bool _sortAsc = true;
   int _page = 0;
   static const int _pageSize = 20;
 
   // Fila seleccionada — habilita el panel de mapa lateral en desktop.
   DatoPatente? _focusedPatente;
+  DatoPermiso? _focusedPermiso;
+  DatoOrganizacion? _focusedOrg;
 
   // Cache de listas por frame.
   List<DatoPatente> _srcPatentes = const [];
   List<DatoPermiso> _srcPermisos = const [];
-  List<DatoTransito> _srcTransito = const [];
   List<DatoOrganizacion> _srcOrgs = const [];
 
   String get _cutoffDate {
@@ -106,8 +134,15 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
     return items.sublist(start, end);
   }
 
+  static int _numCmp(String a, String b) {
+    final na = int.tryParse(a.replaceAll(RegExp(r'[^\d]'), ''));
+    final nb = int.tryParse(b.replaceAll(RegExp(r'[^\d]'), ''));
+    if (na != null && nb != null) return na.compareTo(nb);
+    return a.compareTo(b);
+  }
+
   List<DatoPatente> _filteredPatentes() {
-    return _srcPatentes.where((p) {
+    var list = _srcPatentes.where((p) {
       if (_last30Days && p.fechaDecreto.compareTo(_cutoffDate) < 0) return false;
       if (_year != 'all' && !p.fechaDecreto.startsWith(_year)) return false;
       if (_month != 'all') {
@@ -115,88 +150,157 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
         if (parts.length >= 2 && parts[1] != _month.padLeft(2, '0')) return false;
       }
       if (_geo != 'all' && p.confianza != _geo) return false;
+      if (_tipoFilter != 'all' && _shortTipo(p.tipoEfectivo) != _tipoFilter) return false;
       if (_search.isNotEmpty) {
         final q = _search.toLowerCase();
         if (!p.razonSocial.toLowerCase().contains(q) &&
             !p.rut.toLowerCase().contains(q) &&
-            !p.direccion.toLowerCase().contains(q)) return false;
+            !p.direccion.toLowerCase().contains(q) &&
+            !p.nDecreto.toString().contains(q)) return false;
       }
       return true;
     }).toList();
+    if (_sortColumn.isNotEmpty) {
+      list.sort((a, b) {
+        final cmp = switch (_sortColumn) {
+          'nDecreto'    => a.nDecreto.compareTo(b.nDecreto),
+          'fecha'       => a.fechaDecreto.compareTo(b.fechaDecreto),
+          'razonSocial' => a.razonSocial.compareTo(b.razonSocial),
+          'tipo'        => a.tipoEfectivo.compareTo(b.tipoEfectivo),
+          _ => 0,
+        };
+        return _sortAsc ? cmp : -cmp;
+      });
+    }
+    return list;
   }
 
   List<DatoPermiso> _filteredPermisos() {
-    return _srcPermisos.where((p) {
+    var list = _srcPermisos.where((p) {
       if (_last30Days && p.fecha.compareTo(_cutoffDate) < 0) return false;
+      if (_tipoFilter != 'all' && _shortTipoPermiso(p.tipo) != _tipoFilter) return false;
       if (_search.isNotEmpty) {
         final q = _search.toLowerCase();
-        if (!p.nPermiso.toLowerCase().contains(q) && !p.direccion.toLowerCase().contains(q)) return false;
+        if (!p.nPermiso.toLowerCase().contains(q) &&
+            !p.direccion.toLowerCase().contains(q) &&
+            !p.descripcion.toLowerCase().contains(q)) return false;
       }
       return true;
     }).toList();
-  }
-
-  List<DatoTransito> _filteredTransito() {
-    return _srcTransito.where((t) {
-      if (_last30Days && t.fechaInicio.compareTo(_cutoffDate) < 0) return false;
-      if (_search.isNotEmpty) {
-        final q = _search.toLowerCase();
-        if (!t.nDecreto.toLowerCase().contains(q) && !t.direccion.toLowerCase().contains(q)) return false;
-      }
-      return true;
-    }).toList();
+    if (_sortColumn.isNotEmpty) {
+      list.sort((a, b) {
+        final cmp = switch (_sortColumn) {
+          'nPermiso' => _numCmp(a.nPermiso, b.nPermiso),
+          'fecha'    => a.fecha.compareTo(b.fecha),
+          'tipo'     => a.tipo.compareTo(b.tipo),
+          'estado'   => a.estado.compareTo(b.estado),
+          _ => 0,
+        };
+        return _sortAsc ? cmp : -cmp;
+      });
+    }
+    return list;
   }
 
   List<DatoOrganizacion> _filteredOrgs() {
-    return _srcOrgs.where((o) {
+    var list = _srcOrgs.where((o) {
+      if (_tipoFilter != 'all' && o.sector != _tipoFilter) return false;
       if (_search.isNotEmpty) {
         final q = _search.toLowerCase();
-        if (!o.nombre.toLowerCase().contains(q) && !o.representante.toLowerCase().contains(q)) return false;
+        if (!o.nombre.toLowerCase().contains(q) &&
+            !o.representante.toLowerCase().contains(q) &&
+            !o.nPersonalidad.toLowerCase().contains(q)) return false;
       }
       return true;
     }).toList();
+    if (_sortColumn.isNotEmpty) {
+      list.sort((a, b) {
+        final cmp = switch (_sortColumn) {
+          'nPersonalidad' => _numCmp(a.nPersonalidad, b.nPersonalidad),
+          'tipo'          => a.tipo.compareTo(b.tipo),
+          'nombre'        => a.nombre.compareTo(b.nombre),
+          'vigencia'      => a.vigencia.compareTo(b.vigencia),
+          _ => 0,
+        };
+        return _sortAsc ? cmp : -cmp;
+      });
+    }
+    return list;
   }
 
   void _syncProviders(List<DatoPatente> p, List<DatoPermiso> pe,
-      List<DatoTransito> t, List<DatoOrganizacion> o) {
+      List<DatoOrganizacion> o) {
     final tabIdx = switch (_activeSource) {
       'patentes' => 0,
       'permisos' => 1,
-      'transito' => 2,
-      _ => 3,
+      _ => 2,
     };
     ref.read(scrapingTabIndexProvider.notifier).state = tabIdx;
     ref.read(scrapingFilteredPatenteProvider.notifier).state = p;
     ref.read(scrapingFilteredPermisoProvider.notifier).state = pe;
-    ref.read(scrapingFilteredTransitoProvider.notifier).state = t;
     ref.read(scrapingFilteredOrgProvider.notifier).state = o;
+    ref.read(scrapingPagedPatenteProvider.notifier).state = _paginate(p);
+    ref.read(scrapingPagedPermisoProvider.notifier).state = _paginate(pe);
+    ref.read(scrapingPagedOrgProvider.notifier).state = _paginate(o);
   }
 
   void _setSource(String id) {
     setState(() {
       _activeSource = id;
       _search = '';
+      _tipoFilter = 'all';
+      _sortColumn = '';
+      _sortAsc = true;
       _focusedPatente = null;
+      _focusedPermiso = null;
+      _focusedOrg = null;
       _resetPage();
     });
   }
 
   // ── Mutadores públicos (invocados desde child widgets) ─────────────────────
-  void setFocusedPatente(DatoPatente? p) => setState(() => _focusedPatente = p);
+  void setFocusedPatente(DatoPatente? p) => setState(() {
+    _focusedPatente = p;
+    _focusedPermiso = null;
+    _focusedOrg = null;
+  });
+  void setFocusedPermiso(DatoPermiso? p) => setState(() {
+    _focusedPermiso = p;
+    _focusedPatente = null;
+    _focusedOrg = null;
+  });
+  void setFocusedOrg(DatoOrganizacion? o) => setState(() {
+    _focusedOrg = o;
+    _focusedPatente = null;
+    _focusedPermiso = null;
+  });
   void setPage(int p) => setState(() => _page = p);
   void toggleLast30Days() => setState(() {
         _last30Days = !_last30Days;
+        _resetPage();
+      });
+  void setLast30Days(bool v) => setState(() {
+        _last30Days = v;
         _resetPage();
       });
   void setYear(String v) => setState(() { _year = v; _resetPage(); });
   void setMonth(String v) => setState(() { _month = v; _resetPage(); });
   void setGeo(String v) => setState(() { _geo = v; _resetPage(); });
   void setSearch(String v) => setState(() { _search = v; _resetPage(); });
+  void setTipoFilter(String v) => setState(() { _tipoFilter = v; _resetPage(); });
+  void setSortColumn(String col) => setState(() {
+    if (_sortColumn == col) {
+      _sortAsc = !_sortAsc;
+    } else {
+      _sortColumn = col;
+      _sortAsc = true;
+    }
+    _resetPage();
+  });
 
   int get _activeCount => switch (_activeSource) {
         'patentes' => _srcPatentes.length,
         'permisos' => _srcPermisos.length,
-        'transito' => _srcTransito.length,
         _ => _srcOrgs.length,
       };
 
@@ -204,22 +308,19 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
   Widget build(BuildContext context) {
     final patentesAsync = ref.watch(scrapingPatentesProvider);
     final permisosAsync = ref.watch(scrapingPermisosProvider);
-    final transitoAsync = ref.watch(scrapingTransitoProvider);
     final orgsAsync = ref.watch(scrapingOrganizacionesProvider);
     final statusAsync = ref.watch(scrapingStatusProvider);
 
     _srcPatentes = patentesAsync.value ?? const [];
     _srcPermisos = permisosAsync.value ?? const [];
-    _srcTransito = transitoAsync.value ?? const [];
     _srcOrgs = orgsAsync.value ?? const [];
 
     final patentes = _filteredPatentes();
     final permisos = _filteredPermisos();
-    final transito = _filteredTransito();
     final orgs = _filteredOrgs();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncProviders(patentes, permisos, transito, orgs);
+      if (mounted) _syncProviders(patentes, permisos, orgs);
     });
 
     ref.listen<AsyncValue<ScrapingStatus>>(scrapingStatusProvider, (prev, next) {
@@ -236,19 +337,17 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
     });
 
     final status = statusAsync.value ?? ScrapingStatus.idle();
-    final loading = patentesAsync.isLoading || permisosAsync.isLoading ||
-        transitoAsync.isLoading || orgsAsync.isLoading;
-    final hasError = patentesAsync.hasError || permisosAsync.hasError ||
-        transitoAsync.hasError || orgsAsync.hasError;
+    final loading = patentesAsync.isLoading || permisosAsync.isLoading || orgsAsync.isLoading;
+    final hasError = patentesAsync.hasError || permisosAsync.hasError || orgsAsync.hasError;
 
     return LayoutBuilder(builder: (context, c) {
       final isMobile = c.maxWidth < 768;
       return isMobile
           ? _MobileLayout(state: this, status: status, patentes: patentes,
-              permisos: permisos, transito: transito, orgs: orgs,
+              permisos: permisos, orgs: orgs,
               loading: loading, hasError: hasError)
           : _DesktopLayout(state: this, status: status, patentes: patentes,
-              permisos: permisos, transito: transito, orgs: orgs,
+              permisos: permisos, orgs: orgs,
               loading: loading, hasError: hasError);
     });
   }
@@ -302,6 +401,63 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
     );
   }
 
+  static void _xlHeader(xl.Sheet sheet, List<String> headers) {
+    for (var c = 0; c < headers.length; c++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: 0));
+      cell.value = xl.TextCellValue(headers[c]);
+      cell.cellStyle = xl.CellStyle(bold: true);
+    }
+  }
+
+  static void _xlRow(xl.Sheet sheet, int row, List<String> values) {
+    for (var c = 0; c < values.length; c++) {
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row))
+          .value = xl.TextCellValue(values[c]);
+    }
+  }
+
+  Future<void> _exportExcel(BuildContext context) async {
+    final wb = xl.Excel.createExcel();
+    if (wb.sheets.containsKey('Sheet1')) wb.delete('Sheet1');
+
+    switch (_activeSource) {
+      case 'patentes':
+        final items = ref.read(scrapingPagedPatenteProvider);
+        final sheet = wb['Patentes'];
+        _xlHeader(sheet, ['N° Decreto', 'Fecha', 'Tipo', 'Monto CLP', 'Razón Social', 'Giro', 'Dirección', 'RUT', 'Geocoding']);
+        for (var r = 0; r < items.length; r++) {
+          final p = items[r];
+          _xlRow(sheet, r + 1, [p.nDecreto.toString(), p.fechaDecreto, p.tipoEfectivo, p.montoEfectivo, p.razonSocial, p.giro, p.direccion, p.rut, p.confianza]);
+        }
+      case 'permisos':
+        final items = ref.read(scrapingPagedPermisoProvider);
+        final sheet = wb['Permisos DOM'];
+        _xlHeader(sheet, ['N° Permiso', 'Tipo', 'Descripción', 'Fecha', 'Estado', 'Dirección', 'Geocoding']);
+        for (var r = 0; r < items.length; r++) {
+          final p = items[r];
+          _xlRow(sheet, r + 1, [p.nPermiso, p.tipo, p.descripcion, p.fecha, p.estado, p.direccion, p.confianza]);
+        }
+      default:
+        final items = ref.read(scrapingPagedOrgProvider);
+        final sheet = wb['Organizaciones'];
+        _xlHeader(sheet, ['N° Personalidad', 'Tipo', 'Nombre', 'Representante', 'Vigencia', 'Sector']);
+        for (var r = 0; r < items.length; r++) {
+          final o = items[r];
+          _xlRow(sheet, r + 1, [o.nPersonalidad, o.tipo, o.nombre, o.representante, o.vigencia, o.sector]);
+        }
+    }
+
+    final bytes = wb.encode() ?? [];
+    final fname = '${_activeSource}_sigespu_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+    final path = await platformSaveExcel(bytes, fname);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(path == fname ? '↓ Excel descargado' : 'Excel guardado en $path'),
+        duration: const Duration(seconds: 3),
+      ));
+    }
+  }
+
   Future<bool?> _confirmDialog({required String title, required String message}) {
     return showDialog<bool>(
       context: context,
@@ -334,7 +490,6 @@ class _DesktopLayout extends StatelessWidget {
   final ScrapingStatus status;
   final List<DatoPatente> patentes;
   final List<DatoPermiso> permisos;
-  final List<DatoTransito> transito;
   final List<DatoOrganizacion> orgs;
   final bool loading;
   final bool hasError;
@@ -342,7 +497,7 @@ class _DesktopLayout extends StatelessWidget {
   const _DesktopLayout({
     required this.state, required this.status,
     required this.patentes, required this.permisos,
-    required this.transito, required this.orgs,
+    required this.orgs,
     required this.loading, required this.hasError,
   });
 
@@ -362,7 +517,7 @@ class _DesktopLayout extends StatelessWidget {
               child: _MainPane(
                 state: state, activeMeta: activeMeta,
                 patentes: patentes, permisos: permisos,
-                transito: transito, orgs: orgs,
+                orgs: orgs,
                 loading: loading, hasError: hasError,
               ),
             ),
@@ -370,6 +525,16 @@ class _DesktopLayout extends StatelessWidget {
               _MapDetailPanel(
                 rec: state._focusedPatente!,
                 onClose: () => state.setFocusedPatente(null),
+              )
+            else if (state._focusedPermiso != null)
+              _MapDetailPanelPermiso(
+                rec: state._focusedPermiso!,
+                onClose: () => state.setFocusedPermiso(null),
+              )
+            else if (state._focusedOrg != null)
+              _MapDetailPanelOrg(
+                rec: state._focusedOrg!,
+                onClose: () => state.setFocusedOrg(null),
               ),
           ]),
         ),
@@ -388,9 +553,9 @@ class _SubHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
       decoration: const BoxDecoration(
+        color: Colors.white,
         border: Border(bottom: BorderSide(color: _T.s200)),
       ),
       child: Row(children: [
@@ -519,9 +684,9 @@ class _ProgressStripState extends State<_ProgressStrip>
     final pct = (widget.status.progress * 100).clamp(0, 100).toStringAsFixed(0);
     final label = widget.status.fuenteLabel.isEmpty ? 'Iniciando…' : widget.status.fuenteLabel;
     return Container(
-      color: Colors.white,
       padding: const EdgeInsets.fromLTRB(28, 9, 28, 9),
       decoration: const BoxDecoration(
+        color: Colors.white,
         border: Border(bottom: BorderSide(color: _T.s200)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -534,7 +699,7 @@ class _ProgressStripState extends State<_ProgressStrip>
                 shape: BoxShape.circle,
                 border: Border.all(color: _T.or2, width: 2),
               ),
-              child: CustomPaint(painter: _SpinnerArcPainter()),
+              child: CustomPaint(painter: _SpinnerArcPainter.instance),
             ),
           ),
           const SizedBox(width: 10),
@@ -594,6 +759,11 @@ class _ProgressStripState extends State<_ProgressStrip>
 }
 
 class _SpinnerArcPainter extends CustomPainter {
+  const _SpinnerArcPainter();
+
+  // Singleton: no state, never needs repaint — reuse the same instance.
+  static const _SpinnerArcPainter instance = _SpinnerArcPainter();
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -620,9 +790,9 @@ class _Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 248,
-      color: _T.s50,
       padding: const EdgeInsets.fromLTRB(14, 18, 14, 18),
       decoration: const BoxDecoration(
+        color: _T.s50,
         border: Border(right: BorderSide(color: _T.s200)),
       ),
       child: SingleChildScrollView(
@@ -633,7 +803,6 @@ class _Sidebar extends StatelessWidget {
             final count = switch (s.id) {
               'patentes' => state._srcPatentes.length,
               'permisos' => state._srcPermisos.length,
-              'transito' => state._srcTransito.length,
               _ => state._srcOrgs.length,
             };
             return Padding(
@@ -661,31 +830,40 @@ class _Sidebar extends StatelessWidget {
                 label: 'Rango temporal',
                 value: state._last30Days ? 'Últimos 30 días' : 'Todos',
                 active: state._last30Days,
-                onTap: state.toggleLast30Days,
+                items: const [('all', 'Todos'), ('30d', 'Últimos 30 días')],
+                onSelected: (v) => state.setLast30Days(v == '30d'),
               ),
               const SizedBox(height: 8),
               _SidebarFilterRow(
                 label: 'Año',
                 value: state._year == 'all' ? 'Todos' : state._year,
-                onTap: () => _pickFromList(context, state, 'year',
-                    const [('all','Todos'),('2026','2026'),('2025','2025'),('2024','2024')]),
+                items: const [('all','Todos'),('2026','2026'),('2025','2025'),('2024','2024')],
+                onSelected: state.setYear,
               ),
               const SizedBox(height: 8),
               _SidebarFilterRow(
                 label: 'Mes',
                 value: _monthLabel(state._month),
-                onTap: () => _pickFromList(context, state, 'month',
-                    const [('all','Todos'),('1','Enero'),('2','Febrero'),('3','Marzo'),('4','Abril'),
-                           ('5','Mayo'),('6','Junio'),('7','Julio'),('8','Agosto'),
-                           ('9','Septiembre'),('10','Octubre'),('11','Noviembre'),('12','Diciembre')]),
+                items: const [('all','Todos'),('1','Enero'),('2','Febrero'),('3','Marzo'),('4','Abril'),
+                       ('5','Mayo'),('6','Junio'),('7','Julio'),('8','Agosto'),
+                       ('9','Septiembre'),('10','Octubre'),('11','Noviembre'),('12','Diciembre')],
+                onSelected: state.setMonth,
               ),
               const SizedBox(height: 8),
               _SidebarFilterRow(
                 label: 'Geocoding',
                 value: _geoLabel(state._geo),
-                onTap: () => _pickFromList(context, state, 'geo',
-                    const [('all','Todos'),('high','Confianza alta'),('med','Confianza media'),
-                           ('low','Confianza baja'),('failed','Fallo')]),
+                items: const [('all','Todos'),('high','Confianza alta'),('med','Confianza media'),
+                       ('low','Confianza baja'),('failed','Fallo')],
+                onSelected: state.setGeo,
+              ),
+              const SizedBox(height: 8),
+              _SidebarFilterRow(
+                label: state._activeSource == 'organizaciones' ? 'Sector' : 'Tipo',
+                value: state._tipoFilter == 'all' ? 'Todos' : state._tipoFilter,
+                active: state._tipoFilter != 'all',
+                items: _buildTipoItems(state),
+                onSelected: state.setTipoFilter,
               ),
             ]),
           ),
@@ -693,10 +871,6 @@ class _Sidebar extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _T.s300, style: BorderStyle.solid),
-            ),
-            foregroundDecoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: _T.s300),
             ),
@@ -733,18 +907,41 @@ class _Sidebar extends StatelessWidget {
     return labels[g] ?? 'Todos';
   }
 
-  void _pickFromList(BuildContext context, _ScrapingScreenState state,
-      String field, List<(String, String)> items) async {
-    final picked = await showMenu<String>(
-      context: context,
-      position: const RelativeRect.fromLTRB(280, 200, 0, 0),
-      items: items.map((e) => PopupMenuItem(value: e.$1, child: Text(e.$2, style: const TextStyle(fontSize: 13)))).toList(),
-    );
-    if (picked == null) return;
-    if (field == 'year') state.setYear(picked);
-    if (field == 'month') state.setMonth(picked);
-    if (field == 'geo') state.setGeo(picked);
+  static List<(String, String)> _buildTipoItems(_ScrapingScreenState state) {
+    final items = <(String, String)>[('all', 'Todos')];
+    if (state._activeSource == 'patentes') {
+      // Contar ocurrencias del tipo normalizado; solo mostrar los que aparecen >= 2 veces
+      final counts = <String, int>{};
+      for (final p in state._srcPatentes) {
+        final t = _shortTipo(p.tipoEfectivo);
+        if (t != 'S/T' && t.isNotEmpty) counts[t] = (counts[t] ?? 0) + 1;
+      }
+      final tipos = counts.entries
+          .where((e) => e.value >= 2)
+          .map((e) => e.key)
+          .toList()
+        ..sort();
+      for (final t in tipos) { items.add((t, t)); }
+    } else if (state._activeSource == 'permisos') {
+      final Set<String> seen = {};
+      for (final p in state._srcPermisos) {
+        final short = _shortTipoPermiso(p.tipo);
+        if (short.isNotEmpty && seen.add(short)) items.add((short, short));
+      }
+      final sorted = items.sublist(1)..sort((a, b) => a.$2.compareTo(b.$2));
+      return [items.first, ...sorted];
+    } else {
+      // Organizaciones: filtrar por sector (categoría canónica), no por tipo específico
+      final Set<String> seen = {};
+      for (final o in state._srcOrgs) {
+        if (o.sector.isNotEmpty && seen.add(o.sector)) items.add((o.sector, o.sector));
+      }
+      final sorted = items.sublist(1)..sort((a, b) => a.$2.compareTo(b.$2));
+      return [items.first, ...sorted];
+    }
+    return items;
   }
+
 }
 
 class _SidebarCaption extends StatelessWidget {
@@ -766,44 +963,52 @@ class _SidebarSourceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: active ? _T.or1 : Colors.white,
       borderRadius: BorderRadius.circular(10),
-      child: Container(
-        decoration: BoxDecoration(
-          color: active ? _T.or1 : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border(
-            top: BorderSide(color: active ? _T.or3 : _T.s200),
-            right: BorderSide(color: active ? _T.or3 : _T.s200),
-            bottom: BorderSide(color: active ? _T.or3 : _T.s200),
-            left: BorderSide(color: active ? _T.or6 : _T.s300, width: 3),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: active ? _T.or3 : _T.s200),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Container(width: 3, color: active ? _T.or6 : _T.s300),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 11, 13, 11),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                    Row(children: [
+                      Expanded(child: Text(meta.label,
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600,
+                              color: active ? _T.or7 : _T.s800))),
+                      Text('$count', style: GoogleFonts.spaceGrotesk(
+                          fontSize: 17, fontWeight: FontWeight.w700,
+                          color: active ? _T.or7 : _T.s400)),
+                    ]),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Container(width: 5, height: 5, decoration: BoxDecoration(
+                          color: active ? _T.successDot : _T.s400, shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      Text('ig ${meta.ig}',
+                          style: GoogleFonts.jetBrainsMono(fontSize: 10.5, color: _T.s500)),
+                      const SizedBox(width: 4),
+                      const Text('·', style: TextStyle(color: _T.s300, fontSize: 11)),
+                      const SizedBox(width: 4),
+                      Text(meta.lastTime,
+                          style: GoogleFonts.jetBrainsMono(fontSize: 10.5, color: _T.s500)),
+                    ]),
+                  ]),
+                ),
+              ),
+            ]),
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-          Row(children: [
-            Expanded(child: Text(meta.label,
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600,
-                    color: active ? _T.or7 : _T.s800))),
-            Text('$count', style: GoogleFonts.spaceGrotesk(
-                fontSize: 17, fontWeight: FontWeight.w700,
-                color: active ? _T.or7 : _T.s400)),
-          ]),
-          const SizedBox(height: 6),
-          Row(children: [
-            Container(width: 5, height: 5, decoration: BoxDecoration(
-                color: active ? _T.successDot : _T.s400, shape: BoxShape.circle)),
-            const SizedBox(width: 6),
-            Text('ig ${meta.ig}',
-                style: GoogleFonts.jetBrainsMono(fontSize: 10.5, color: _T.s500)),
-            const SizedBox(width: 4),
-            const Text('·', style: TextStyle(color: _T.s300, fontSize: 11)),
-            const SizedBox(width: 4),
-            Text(meta.lastTime,
-                style: GoogleFonts.jetBrainsMono(fontSize: 10.5, color: _T.s500)),
-          ]),
-        ]),
       ),
     );
   }
@@ -813,13 +1018,44 @@ class _SidebarFilterRow extends StatelessWidget {
   final String label;
   final String value;
   final bool active;
-  final VoidCallback onTap;
-  const _SidebarFilterRow({required this.label, required this.value, this.active = false, required this.onTap});
+  final List<(String, String)> items;
+  final ValueChanged<String> onSelected;
+  const _SidebarFilterRow({
+    required this.label,
+    required this.value,
+    this.active = false,
+    required this.items,
+    required this.onSelected,
+  });
+
+  Future<void> _openMenu(BuildContext context) async {
+    final RenderBox row = context.findRenderObject() as RenderBox;
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+    final pos = row.localToGlobal(Offset.zero, ancestor: overlay);
+    final size = row.size;
+    final picked = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        pos.dx,
+        pos.dy + size.height + 4,
+        overlay.size.width - pos.dx - size.width,
+        overlay.size.height - pos.dy - size.height,
+      ),
+      items: items
+          .map((e) => PopupMenuItem<String>(
+                value: e.$1,
+                child: Text(e.$2, style: const TextStyle(fontSize: 13)),
+              ))
+          .toList(),
+    );
+    if (picked != null) onSelected(picked);
+  }
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap,
+      onTap: () => _openMenu(context),
       borderRadius: BorderRadius.circular(7),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -847,13 +1083,12 @@ class _MainPane extends StatelessWidget {
   final _SourceMeta activeMeta;
   final List<DatoPatente> patentes;
   final List<DatoPermiso> permisos;
-  final List<DatoTransito> transito;
   final List<DatoOrganizacion> orgs;
   final bool loading;
   final bool hasError;
   const _MainPane({required this.state, required this.activeMeta,
     required this.patentes, required this.permisos,
-    required this.transito, required this.orgs,
+    required this.orgs,
     required this.loading, required this.hasError});
 
   @override
@@ -861,7 +1096,6 @@ class _MainPane extends StatelessWidget {
     final filteredCount = switch (state._activeSource) {
       'patentes' => patentes.length,
       'permisos' => permisos.length,
-      'transito' => transito.length,
       _ => orgs.length,
     };
     final totalCount = state._activeCount;
@@ -902,7 +1136,6 @@ class _MainPane extends StatelessWidget {
             loading: loading, hasError: hasError,
             activeSource: state._activeSource,
             permisos: state._activeSource == 'permisos' ? state._paginate(permisos) : const [],
-            transito: state._activeSource == 'transito' ? state._paginate(transito) : const [],
             orgs: state._activeSource == 'organizaciones' ? state._paginate(orgs) : const [],
           ),
           const SizedBox(height: 14),
@@ -969,9 +1202,11 @@ class _MainHeaderInline extends StatelessWidget {
         child: TextField(
           onChanged: state.setSearch,
           decoration: InputDecoration(
-            hintText: state._activeSource == 'patentes'
-                ? 'Buscar razón social, RUT…'
-                : 'Buscar...',
+            hintText: switch (state._activeSource) {
+              'patentes'      => 'Buscar razón social, RUT, N° decreto…',
+              'permisos'      => 'Buscar N° permiso, tipo, descripción…',
+              _               => 'Buscar nombre, representante, N°…',
+            },
             hintStyle: const TextStyle(fontSize: 12, color: _T.s400),
             prefixIcon: const Icon(LucideIcons.search, size: 13, color: _T.s400),
             prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 0),
@@ -987,7 +1222,7 @@ class _MainHeaderInline extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 8),
-      _SubHeaderBtn(icon: LucideIcons.download, label: 'CSV', onTap: () {}),
+      _SubHeaderBtn(icon: LucideIcons.download, label: 'Excel', onTap: () => state._exportExcel(context)),
     ]);
   }
 }
@@ -1026,20 +1261,19 @@ class _PatentesTable extends StatelessWidget {
   final _ScrapingScreenState state;
   final List<DatoPatente> items;
   final List<DatoPermiso> permisos;
-  final List<DatoTransito> transito;
   final List<DatoOrganizacion> orgs;
   final bool loading;
   final bool hasError;
   final String activeSource;
   const _PatentesTable({
     required this.state, required this.items,
-    required this.permisos, required this.transito, required this.orgs,
+    required this.permisos, required this.orgs,
     required this.loading, required this.hasError, required this.activeSource,
   });
 
   @override
   Widget build(BuildContext context) {
-    final hasMapPanel = state._focusedPatente != null;
+    final hasMapPanel = state._focusedPatente != null || state._focusedPermiso != null || state._focusedOrg != null;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1055,7 +1289,6 @@ class _PatentesTable extends StatelessWidget {
               : switch (activeSource) {
                   'patentes' => _patentesTable(hasMapPanel: hasMapPanel),
                   'permisos' => _permisosTable(),
-                  'transito' => _transitoTable(),
                   _ => _orgsTable(),
                 },
     );
@@ -1066,17 +1299,20 @@ class _PatentesTable extends StatelessWidget {
     return Column(children: [
       // Header
       Container(
-        color: _T.s50,
         padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s200))),
-        child: const Row(children: [
-          Expanded(flex: 75, child: _ThText('N° decreto')),
-          Expanded(flex: 90, child: _ThText('Fecha')),
-          Expanded(flex: 110, child: _ThText('Tipo')),
-          Expanded(flex: 185, child: _ThText('Razón social')),
-          Expanded(flex: 140, child: _ThText('Dirección')),
-          Expanded(flex: 70, child: _ThText('Geocoding')),
-          SizedBox(width: 40),
+        decoration: const BoxDecoration(
+          color: _T.s50,
+          border: Border(bottom: BorderSide(color: _T.s200)),
+        ),
+        child: Row(children: [
+          Expanded(flex: 75,  child: _SortableThText(text: 'N° decreto',   column: 'nDecreto',    state: state)),
+          Expanded(flex: 90,  child: _SortableThText(text: 'Fecha',         column: 'fecha',        state: state)),
+          Expanded(flex: 100, child: _SortableThText(text: 'Tipo',          column: 'tipo',         state: state)),
+          Expanded(flex: 90,  child: const _ThText('Monto CLP')),
+          Expanded(flex: 175, child: _SortableThText(text: 'Razón social',  column: 'razonSocial',  state: state)),
+          Expanded(flex: 130, child: const _ThText('Dirección')),
+          Expanded(flex: 60,  child: const _ThText('Geocoding')),
+          const SizedBox(width: 40),
         ]),
       ),
       // Rows
@@ -1087,9 +1323,9 @@ class _PatentesTable extends StatelessWidget {
           onTap: () => state.setFocusedPatente(on ? null : p),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
-            color: on ? _T.or1 : Colors.transparent,
             padding: EdgeInsets.fromLTRB(on ? 13 : 16, 12, 16, 12),
             decoration: BoxDecoration(
+              color: on ? _T.or1 : Colors.transparent,
               border: Border(
                 bottom: e.key < items.length - 1 ? const BorderSide(color: _T.s100) : BorderSide.none,
                 left: BorderSide(color: on ? _T.or6 : Colors.transparent, width: 3),
@@ -1100,19 +1336,24 @@ class _PatentesTable extends StatelessWidget {
                   style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w600, color: _T.or7))),
               Expanded(flex: 90, child: Text(p.fechaDecreto,
                   style: GoogleFonts.jetBrainsMono(fontSize: 11.5, color: _T.s700))),
-              Expanded(flex: 110, child: _TipoBadge(tipo: _shortTipo(p.tipo), cls: 'Datos sensibles')),
-              Expanded(flex: 185, child: Text(p.razonSocial,
+              Expanded(flex: 100, child: _TipoBadge(tipo: _shortTipo(p.tipoEfectivo), cls: 'Datos sensibles')),
+              Expanded(flex: 90, child: Text(
+                  p.montoEfectivo.isEmpty ? '—' : '\$${p.montoEfectivo}',
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.jetBrainsMono(fontSize: 11.5,
+                      color: p.montoEfectivo.isEmpty ? _T.s400 : _T.s800))),
+              Expanded(flex: 175, child: Text(p.razonSocial,
                   overflow: TextOverflow.ellipsis, maxLines: 1,
                   style: TextStyle(fontSize: 12, color: _T.s900,
                       fontWeight: on ? FontWeight.w600 : FontWeight.w500))),
-              Expanded(flex: 140, child: Row(children: [
+              Expanded(flex: 130, child: Row(children: [
                 const Icon(LucideIcons.mapPin, size: 11, color: _T.s400),
                 const SizedBox(width: 5),
                 Expanded(child: Text(p.direccion,
                     overflow: TextOverflow.ellipsis, maxLines: 1,
                     style: const TextStyle(fontSize: 11.5, color: _T.s800))),
               ])),
-              Expanded(flex: 70, child: _GeoBadge(confianza: p.confianza)),
+              Expanded(flex: 60, child: _GeoBadge(confianza: p.confianza)),
               SizedBox(width: 40, child: Center(child: on
                   ? const Icon(LucideIcons.chevronRight, size: 14, color: _T.or6)
                   : const Icon(LucideIcons.moreHorizontal, size: 13, color: _T.s500))),
@@ -1123,132 +1364,120 @@ class _PatentesTable extends StatelessWidget {
     ]);
   }
 
-  String _shortTipo(String tipo) {
-    if (tipo.isEmpty) return 'COMER';
-    final up = tipo.toUpperCase();
-    if (up.length <= 8) return up;
-    return up.substring(0, 5);
-  }
-
   Widget _permisosTable() {
     if (permisos.isEmpty) return const _EmptyState();
     return Column(children: [
       Container(
-        color: _T.s50,
         padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s200))),
-        child: const Row(children: [
-          Expanded(flex: 100, child: _ThText('N° Permiso')),
-          Expanded(flex: 110, child: _ThText('Tipo')),
-          Expanded(flex: 200, child: _ThText('Descripción')),
-          Expanded(flex: 160, child: _ThText('Dirección')),
-          Expanded(flex: 90, child: _ThText('Fecha')),
-          Expanded(flex: 80, child: _ThText('Estado')),
+        decoration: const BoxDecoration(
+          color: _T.s50,
+          border: Border(bottom: BorderSide(color: _T.s200)),
+        ),
+        child: Row(children: [
+          Expanded(flex: 80,  child: _SortableThText(text: 'N°',          column: 'nPermiso', state: state)),
+          Expanded(flex: 110, child: _SortableThText(text: 'Tipo',        column: 'tipo',     state: state)),
+          Expanded(flex: 300, child: const _ThText('Descripción')),
+          Expanded(flex: 90,  child: _SortableThText(text: 'Fecha',       column: 'fecha',    state: state)),
+          Expanded(flex: 80,  child: const _ThText('Geocoding')),
+          Expanded(flex: 80,  child: _SortableThText(text: 'Estado',      column: 'estado',   state: state)),
+          const SizedBox(width: 40),
         ]),
       ),
       ...permisos.asMap().entries.map((e) {
         final p = e.value;
-        return Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          decoration: BoxDecoration(border: Border(
-            bottom: e.key < permisos.length - 1 ? const BorderSide(color: _T.s100) : BorderSide.none,
-          )),
-          child: Row(children: [
-            Expanded(flex: 100, child: Text(p.nPermiso,
-                style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w600, color: _T.or7))),
-            Expanded(flex: 110, child: Text(p.tipo, style: const TextStyle(fontSize: 12, color: _T.s800))),
-            Expanded(flex: 200, child: Text(p.descripcion, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11.5, color: _T.s700))),
-            Expanded(flex: 160, child: Text(p.direccion, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11.5, color: _T.s700))),
-            Expanded(flex: 90, child: Text(p.fecha,
-                style: GoogleFonts.jetBrainsMono(fontSize: 11.5, color: _T.s700))),
-            Expanded(flex: 80, child: _EstadoBadge(estado: p.estado)),
-          ]),
+        final on = state._focusedPermiso?.nPermiso == p.nPermiso;
+        return InkWell(
+          onTap: () => state.setFocusedPermiso(on ? null : p),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: EdgeInsets.fromLTRB(on ? 13 : 16, 10, 16, 10),
+            decoration: BoxDecoration(
+              color: on ? _T.or1 : Colors.transparent,
+              border: Border(
+                bottom: e.key < permisos.length - 1 ? const BorderSide(color: _T.s100) : BorderSide.none,
+                left: BorderSide(color: on ? _T.or6 : Colors.transparent, width: 3),
+              ),
+            ),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(flex: 80, child: Text(p.nPermiso,
+                  style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w600, color: _T.or7))),
+              Expanded(flex: 110, child: Text(_shortTipoPermiso(p.tipo), overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11.5, color: _T.s800))),
+              Expanded(flex: 300, child: Text(p.descripcion, overflow: TextOverflow.ellipsis, maxLines: 2,
+                  style: const TextStyle(fontSize: 11.5, color: _T.s700, height: 1.35))),
+              Expanded(flex: 90, child: Text(p.fecha,
+                  style: GoogleFonts.jetBrainsMono(fontSize: 11.5, color: _T.s700))),
+              Expanded(flex: 80, child: _GeoBadge(confianza: p.confianza)),
+              Expanded(flex: 80, child: _EstadoBadge(estado: p.estado)),
+              SizedBox(width: 40, child: Center(child: on
+                  ? const Icon(LucideIcons.chevronRight, size: 14, color: _T.or6)
+                  : const Icon(LucideIcons.moreHorizontal, size: 13, color: _T.s500))),
+            ]),
+          ),
         );
       }),
     ]);
   }
 
-  Widget _transitoTable() {
-    if (transito.isEmpty) return const _EmptyState();
-    return Column(children: [
-      Container(
-        color: _T.s50,
-        padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s200))),
-        child: const Row(children: [
-          Expanded(flex: 100, child: _ThText('N° Decreto')),
-          Expanded(flex: 100, child: _ThText('Tipo')),
-          Expanded(flex: 200, child: _ThText('Dirección')),
-          Expanded(flex: 200, child: _ThText('Motivo')),
-          Expanded(flex: 90, child: _ThText('Desde')),
-          Expanded(flex: 90, child: _ThText('Hasta')),
-        ]),
-      ),
-      ...transito.asMap().entries.map((e) {
-        final t = e.value;
-        return Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          decoration: BoxDecoration(border: Border(
-            bottom: e.key < transito.length - 1 ? const BorderSide(color: _T.s100) : BorderSide.none,
-          )),
-          child: Row(children: [
-            Expanded(flex: 100, child: Text(t.nDecreto,
-                style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w600, color: _T.or7))),
-            Expanded(flex: 100, child: Text(t.tipo, style: const TextStyle(fontSize: 12, color: _T.s800))),
-            Expanded(flex: 200, child: Text(t.direccion, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11.5, color: _T.s800))),
-            Expanded(flex: 200, child: Text(t.motivo, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11.5, color: _T.s700))),
-            Expanded(flex: 90, child: Text(t.fechaInicio,
-                style: GoogleFonts.jetBrainsMono(fontSize: 11.5, color: _T.s700))),
-            Expanded(flex: 90, child: Text(t.fechaFin,
-                style: GoogleFonts.jetBrainsMono(fontSize: 11.5, color: _T.s700))),
-          ]),
-        );
-      }),
-    ]);
-  }
 
   Widget _orgsTable() {
     if (orgs.isEmpty) return const _EmptyState();
     return Column(children: [
       Container(
-        color: _T.s50,
         padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s200))),
-        child: const Row(children: [
-          Expanded(flex: 100, child: _ThText('N°')),
-          Expanded(flex: 100, child: _ThText('Tipo')),
-          Expanded(flex: 200, child: _ThText('Nombre')),
-          Expanded(flex: 160, child: _ThText('Representante')),
-          Expanded(flex: 100, child: _ThText('RUT Rep.')),
-          Expanded(flex: 100, child: _ThText('Sector')),
+        decoration: const BoxDecoration(
+          color: _T.s50,
+          border: Border(bottom: BorderSide(color: _T.s200)),
+        ),
+        child: Row(children: [
+          Expanded(flex: 80,  child: _SortableThText(text: 'N°',            column: 'nPersonalidad', state: state)),
+          Expanded(flex: 120, child: _SortableThText(text: 'Tipo',          column: 'tipo',          state: state)),
+          Expanded(flex: 220, child: _SortableThText(text: 'Nombre',        column: 'nombre',        state: state)),
+          Expanded(flex: 180, child: const _ThText('Representante')),
+          Expanded(flex: 110, child: _SortableThText(text: 'Vigencia',      column: 'vigencia',      state: state)),
+          const SizedBox(width: 40),
         ]),
       ),
       ...orgs.asMap().entries.map((e) {
         final o = e.value;
-        return Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          decoration: BoxDecoration(border: Border(
-            bottom: e.key < orgs.length - 1 ? const BorderSide(color: _T.s100) : BorderSide.none,
-          )),
-          child: Row(children: [
-            Expanded(flex: 100, child: Text(o.nPersonalidad,
-                style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w600, color: _T.or7))),
-            Expanded(flex: 100, child: Text(o.tipo, style: const TextStyle(fontSize: 12, color: _T.s800))),
-            Expanded(flex: 200, child: Text(o.nombre, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _T.s900))),
-            Expanded(flex: 160, child: Text(o.representante, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11.5, color: _T.s700))),
-            Expanded(flex: 100, child: Text(o.rutRep,
-                style: GoogleFonts.jetBrainsMono(fontSize: 11.5, color: _T.s800))),
-            Expanded(flex: 100, child: Text(o.sector, style: const TextStyle(fontSize: 11.5, color: _T.s700))),
-          ]),
+        final on = state._focusedOrg?.nPersonalidad == o.nPersonalidad;
+        return InkWell(
+          onTap: () => state.setFocusedOrg(on ? null : o),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: EdgeInsets.fromLTRB(on ? 13 : 16, 12, 16, 12),
+            decoration: BoxDecoration(
+              color: on ? _T.or1 : Colors.transparent,
+              border: Border(
+                bottom: e.key < orgs.length - 1 ? const BorderSide(color: _T.s100) : BorderSide.none,
+                left: BorderSide(color: on ? _T.or6 : Colors.transparent, width: 3),
+              ),
+            ),
+            child: Row(children: [
+              Expanded(flex: 80, child: Text(_shortNPersonalidad(o.nPersonalidad),
+                  style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w600, color: _T.or7))),
+              Expanded(flex: 120, child: Text(o.tipo, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11.5, color: _T.s800))),
+              Expanded(flex: 220, child: Text(o.nombre, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _T.s900))),
+              Expanded(flex: 180, child: Text(o.representante.split(' - ').first, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11.5, color: _T.s700))),
+              Expanded(flex: 110, child: Text(o.vigencia, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: _T.s600))),
+              SizedBox(width: 40, child: Center(child: on
+                  ? const Icon(LucideIcons.chevronRight, size: 14, color: _T.or6)
+                  : const Icon(LucideIcons.moreHorizontal, size: 13, color: _T.s500))),
+            ]),
+          ),
         );
       }),
     ]);
+  }
+
+  // Strips "N° P. J. " prefix variants that arrive from lotatransparente.cl
+  static String _shortNPersonalidad(String n) {
+    final stripped = n.replaceAll(RegExp(r'^N[°º]?\s*P\.?\s*J\.?\s*N?[°º]?\s*', caseSensitive: false), '');
+    return stripped.isEmpty ? n : stripped;
   }
 }
 
@@ -1260,6 +1489,40 @@ class _ThText extends StatelessWidget {
         text.toUpperCase(),
         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: _T.s500),
       );
+}
+
+class _SortableThText extends StatelessWidget {
+  final String text;
+  final String column;
+  final _ScrapingScreenState state;
+  const _SortableThText({required this.text, required this.column, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final active = state._sortColumn == column;
+    return InkWell(
+      onTap: () => state.setSortColumn(column),
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(
+            text.toUpperCase(),
+            style: TextStyle(
+              fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8,
+              color: active ? _T.or7 : _T.s500,
+            ),
+          ),
+          const SizedBox(width: 3),
+          Icon(
+            active && !state._sortAsc ? LucideIcons.chevronDown : LucideIcons.chevronUp,
+            size: 9,
+            color: active ? _T.or7 : _T.s300,
+          ),
+        ]),
+      ),
+    );
+  }
 }
 
 class _TipoBadge extends StatelessWidget {
@@ -1435,18 +1698,70 @@ class _PageNumBtn extends StatelessWidget {
   }
 }
 
-class _MapDetailPanel extends StatelessWidget {
+class _MapDetailPanel extends StatefulWidget {
   final DatoPatente rec;
   final VoidCallback onClose;
-  const _MapDetailPanel({required this.rec, required this.onClose});
+  final double? width;
+  const _MapDetailPanel({required this.rec, required this.onClose, this.width = 340});
+
+  @override
+  State<_MapDetailPanel> createState() => _MapDetailPanelState();
+}
+
+class _MapDetailPanelState extends State<_MapDetailPanel> {
+  late double _lat;
+  late double _lng;
+  bool _edited = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lat = widget.rec.lat;
+    _lng = widget.rec.lng;
+  }
+
+  @override
+  void didUpdateWidget(covariant _MapDetailPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.rec.nDecreto != widget.rec.nDecreto) {
+      _lat = widget.rec.lat;
+      _lng = widget.rec.lng;
+      _edited = false;
+    }
+  }
+
+  Future<void> _editLocation() async {
+    final res = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) => PickLocationPage(initialLocation: LatLng(_lat, _lng)),
+      ),
+    );
+    if (res == null || !mounted) return;
+    setState(() {
+      _lat = res.latitude;
+      _lng = res.longitude;
+      _edited = true;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(
+        'Ubicación actualizada: ${_lat.toStringAsFixed(4)}, ${_lng.toStringAsFixed(4)}. '
+        'La persistencia se aplicará cuando esté disponible el endpoint de verificación en terreno.',
+      )),
+    );
+  }
+
+  void _openInMap() => context.go('/map');
 
   @override
   Widget build(BuildContext context) {
+    final rec = widget.rec;
     return Container(
-      width: 340,
-      color: Colors.white,
-      decoration: const BoxDecoration(
-        border: Border(left: BorderSide(color: _T.s200)),
+      width: widget.width,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: widget.width == null
+            ? null
+            : const Border(left: BorderSide(color: _T.s200)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         // Header
@@ -1464,7 +1779,7 @@ class _MapDetailPanel extends StatelessWidget {
                   style: GoogleFonts.jetBrainsMono(fontSize: 10.5, color: _T.s500)),
             ])),
             InkWell(
-              onTap: onClose,
+              onTap: widget.onClose,
               borderRadius: BorderRadius.circular(6),
               child: Container(
                 width: 24, height: 24,
@@ -1475,14 +1790,13 @@ class _MapDetailPanel extends StatelessWidget {
           ]),
         ),
         Expanded(child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          // Mini-map placeholder
-          _MiniMap(lat: rec.lat, lng: rec.lng, confianza: rec.confianza),
+          _MiniMap(lat: _lat, lng: _lng, confianza: rec.confianza),
           // Detail card
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                _TipoBadge(tipo: 'COMER', cls: ''),
+                _TipoBadge(tipo: _shortTipo(rec.tipoEfectivo), cls: ''),
                 const SizedBox(width: 8),
                 _GeoBadge(confianza: rec.confianza),
                 const Spacer(),
@@ -1498,13 +1812,26 @@ class _MapDetailPanel extends StatelessWidget {
               const SizedBox(height: 12),
               Container(height: 1, color: _T.s200),
               const SizedBox(height: 12),
+              _MetaRow(label: 'Tipo', value: rec.tipoEfectivo.isEmpty ? '—' : rec.tipoEfectivo),
+              const SizedBox(height: 7),
+              _MetaRow(label: 'Monto', value: rec.montoEfectivo.isEmpty ? '—' : 'CLP \$${rec.montoEfectivo}'),
+              const SizedBox(height: 7),
               _MetaRow(label: 'RUT', value: rec.rut, mono: true, bold: true),
               const SizedBox(height: 7),
               _MetaRow(label: 'Giro', value: rec.giro.isEmpty ? '—' : rec.giro),
               const SizedBox(height: 7),
               _MetaRow(label: 'Dirección', value: rec.direccion),
               const SizedBox(height: 7),
-              _MetaRow(label: 'Coords.', value: '${rec.lat.toStringAsFixed(4)}, ${rec.lng.toStringAsFixed(4)}', mono: true),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const SizedBox(width: 70, child: Text('Coords.',
+                    style: TextStyle(fontSize: 11.5, color: _T.s500, fontWeight: FontWeight.w600))),
+                Expanded(child: Text(
+                    '${_lat.toStringAsFixed(4)}, ${_lng.toStringAsFixed(4)}${_edited ? '  ·  editado' : ''}',
+                    style: GoogleFonts.jetBrainsMono(
+                        fontSize: 11.5,
+                        color: _edited ? _T.or7 : _T.s900,
+                        fontWeight: _edited ? FontWeight.w700 : FontWeight.w500))),
+              ]),
               const SizedBox(height: 7),
               _MetaRow(label: 'Fecha', value: rec.fechaDecreto, mono: true),
               const SizedBox(height: 7),
@@ -1521,7 +1848,7 @@ class _MapDetailPanel extends StatelessWidget {
               const SizedBox(height: 14),
               Row(children: [
                 Expanded(child: InkWell(
-                  onTap: () {},
+                  onTap: _openInMap,
                   borderRadius: BorderRadius.circular(7),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1540,7 +1867,7 @@ class _MapDetailPanel extends StatelessWidget {
                 )),
                 const SizedBox(width: 6),
                 InkWell(
-                  onTap: () {},
+                  onTap: _editLocation,
                   borderRadius: BorderRadius.circular(7),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1549,14 +1876,321 @@ class _MapDetailPanel extends StatelessWidget {
                       borderRadius: BorderRadius.circular(7),
                       border: Border.all(color: _T.s200),
                     ),
-                    child: const Text('Decreto PDF',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _T.s700)),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(LucideIcons.mapPin, size: 12, color: _T.s700),
+                      SizedBox(width: 6),
+                      Text('Editar ubicación',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _T.s700)),
+                    ]),
                   ),
                 ),
               ]),
             ]),
           ),
         ]))),
+      ]),
+    );
+  }
+}
+
+// ── Detail panel: Permiso DOM ─────────────────────────────────────────────────
+
+class _MapDetailPanelPermiso extends StatefulWidget {
+  final DatoPermiso rec;
+  final VoidCallback onClose;
+  final double? width;
+  const _MapDetailPanelPermiso({required this.rec, required this.onClose, this.width = 340});
+
+  @override
+  State<_MapDetailPanelPermiso> createState() => _MapDetailPanelPermisoState();
+}
+
+class _MapDetailPanelPermisoState extends State<_MapDetailPanelPermiso> {
+  late double _lat;
+  late double _lng;
+  bool _edited = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lat = widget.rec.lat;
+    _lng = widget.rec.lng;
+  }
+
+  @override
+  void didUpdateWidget(covariant _MapDetailPanelPermiso oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.rec.nPermiso != widget.rec.nPermiso) {
+      _lat = widget.rec.lat;
+      _lng = widget.rec.lng;
+      _edited = false;
+    }
+  }
+
+  Future<void> _editLocation() async {
+    final res = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) => PickLocationPage(initialLocation: LatLng(_lat, _lng)),
+      ),
+    );
+    if (res == null || !mounted) return;
+    setState(() {
+      _lat = res.latitude;
+      _lng = res.longitude;
+      _edited = true;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+      'Ubicación actualizada: ${_lat.toStringAsFixed(4)}, ${_lng.toStringAsFixed(4)}. '
+      'La persistencia se aplicará cuando esté disponible el endpoint de verificación en terreno.',
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rec = widget.rec;
+    final hasCoords = rec.lat != 0 || rec.lng != 0;
+    return Container(
+      width: widget.width,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: widget.width == null ? null : const Border(left: BorderSide(color: _T.s200)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s200))),
+          child: Row(children: [
+            const Icon(LucideIcons.building2, size: 15, color: _T.or6),
+            const SizedBox(width: 8),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Permiso DOM',
+                  style: GoogleFonts.spaceGrotesk(fontSize: 13.5, fontWeight: FontWeight.w700, height: 1, color: _T.s900)),
+              const SizedBox(height: 3),
+              Text('${rec.nPermiso} · click otra fila para cambiar',
+                  style: GoogleFonts.jetBrainsMono(fontSize: 10.5, color: _T.s500)),
+            ])),
+            InkWell(
+              onTap: widget.onClose,
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                width: 24, height: 24,
+                decoration: BoxDecoration(color: _T.s100, borderRadius: BorderRadius.circular(6)),
+                child: const Icon(LucideIcons.x, size: 12, color: _T.s600),
+              ),
+            ),
+          ]),
+        ),
+        Expanded(child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (hasCoords) _MiniMap(lat: _lat, lng: _lng, confianza: rec.confianza),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                _GeoBadge(confianza: rec.confianza),
+                const SizedBox(width: 8),
+                _EstadoBadge(estado: rec.estado),
+                const Spacer(),
+                Text(rec.nPermiso, style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.w700, color: _T.or7)),
+              ]),
+              const SizedBox(height: 8),
+              Text(_shortTipoPermiso(rec.tipo),
+                  style: GoogleFonts.spaceGrotesk(fontSize: 14.5, fontWeight: FontWeight.w700, height: 1.2, color: _T.s900)),
+              const SizedBox(height: 12),
+              Container(height: 1, color: _T.s200),
+              const SizedBox(height: 12),
+              _MetaRow(label: 'Descripción', value: rec.descripcion),
+              const SizedBox(height: 7),
+              _MetaRow(label: 'Fecha', value: rec.fecha, mono: true),
+              const SizedBox(height: 7),
+              if (rec.direccion.isNotEmpty) ...[
+                _MetaRow(label: 'Dirección', value: rec.direccion),
+                const SizedBox(height: 7),
+              ],
+              if (rec.sector.isNotEmpty) ...[
+                _MetaRow(label: 'Sector', value: rec.sector),
+                const SizedBox(height: 7),
+              ],
+              if (rec.tipoActo.isNotEmpty) ...[
+                _MetaRow(label: 'Tipo acto', value: rec.tipoActo),
+                const SizedBox(height: 7),
+              ],
+              if (rec.denominacionActo.isNotEmpty) ...[
+                _MetaRow(label: 'Denominación', value: rec.denominacionActo),
+                const SizedBox(height: 7),
+              ],
+              if (rec.fechaPublicacion.isNotEmpty) ...[
+                _MetaRow(label: 'Publicación', value: rec.fechaPublicacion, mono: true),
+                const SizedBox(height: 7),
+              ],
+              if (hasCoords) ...[
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const SizedBox(width: 80, child: Text('Coords.',
+                      style: TextStyle(fontSize: 11.5, color: _T.s500, fontWeight: FontWeight.w600))),
+                  Expanded(child: Text(
+                      '${_lat.toStringAsFixed(4)}, ${_lng.toStringAsFixed(4)}${_edited ? '  ·  editado' : ''}',
+                      style: GoogleFonts.jetBrainsMono(
+                          fontSize: 11.5,
+                          color: _edited ? _T.or7 : _T.s900,
+                          fontWeight: _edited ? FontWeight.w700 : FontWeight.w500))),
+                ]),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(child: InkWell(
+                    onTap: () => context.go('/map'),
+                    borderRadius: BorderRadius.circular(7),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _T.or6,
+                        borderRadius: BorderRadius.circular(7),
+                        boxShadow: [BoxShadow(color: _T.or7.withValues(alpha: 0.3), blurRadius: 2, offset: const Offset(0, 1))],
+                      ),
+                      child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(LucideIcons.map, size: 12, color: Colors.white),
+                        SizedBox(width: 6),
+                        Text('Abrir en mapa', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                      ]),
+                    ),
+                  )),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: _editLocation,
+                    borderRadius: BorderRadius.circular(7),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white, borderRadius: BorderRadius.circular(7), border: Border.all(color: _T.s200),
+                      ),
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(LucideIcons.mapPin, size: 12, color: _T.s700),
+                        SizedBox(width: 6),
+                        Text('Editar ubicación', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _T.s700)),
+                      ]),
+                    ),
+                  ),
+                ]),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(color: _T.s100, borderRadius: BorderRadius.circular(7), border: Border.all(color: _T.s200)),
+                  child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(LucideIcons.mapPinOff, size: 12, color: _T.s500),
+                    SizedBox(width: 6),
+                    Text('Sin coordenadas', style: TextStyle(fontSize: 12, color: _T.s500)),
+                  ]),
+                ),
+              ],
+            ]),
+          ),
+        ]))),
+      ]),
+    );
+  }
+}
+
+// ── Detail panel: Organización social ────────────────────────────────────────
+
+class _MapDetailPanelOrg extends StatelessWidget {
+  final DatoOrganizacion rec;
+  final VoidCallback onClose;
+  final double? width;
+  const _MapDetailPanelOrg({required this.rec, required this.onClose, this.width = 340});
+
+  @override
+  Widget build(BuildContext context) {
+    final o = rec;
+    final shortN = _PatentesTable._shortNPersonalidad(o.nPersonalidad);
+    return Container(
+      width: width,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: width == null ? null : const Border(left: BorderSide(color: _T.s200)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s200))),
+          child: Row(children: [
+            const Icon(LucideIcons.users, size: 15, color: _T.or6),
+            const SizedBox(width: 8),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Organización social',
+                  style: GoogleFonts.spaceGrotesk(fontSize: 13.5, fontWeight: FontWeight.w700, height: 1, color: _T.s900)),
+              const SizedBox(height: 3),
+              Text('$shortN · click otra fila para cambiar',
+                  style: GoogleFonts.jetBrainsMono(fontSize: 10.5, color: _T.s500)),
+            ])),
+            InkWell(
+              onTap: onClose,
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                width: 24, height: 24,
+                decoration: BoxDecoration(color: _T.s100, borderRadius: BorderRadius.circular(6)),
+                child: const Icon(LucideIcons.x, size: 12, color: _T.s600),
+              ),
+            ),
+          ]),
+        ),
+        Expanded(child: SingleChildScrollView(child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(o.tipo, style: const TextStyle(fontSize: 11, color: _T.s500)),
+            const SizedBox(height: 4),
+            Text(o.nombre,
+                style: GoogleFonts.spaceGrotesk(fontSize: 14.5, fontWeight: FontWeight.w700, height: 1.2, color: _T.s900)),
+            const SizedBox(height: 12),
+            Container(height: 1, color: _T.s200),
+            const SizedBox(height: 12),
+            _MetaRow(label: 'N°', value: shortN, mono: true, bold: true),
+            const SizedBox(height: 7),
+            _MetaRow(label: 'Tipo', value: o.tipo),
+            const SizedBox(height: 7),
+            _MetaRow(label: 'Represent.', value: o.representante.split(' - ').first),
+            const SizedBox(height: 7),
+            _MetaRow(label: 'Vigencia', value: o.vigencia.isNotEmpty ? o.vigencia : '—'),
+            const SizedBox(height: 7),
+            if (o.sector.isNotEmpty) ...[
+              _MetaRow(label: 'Sector', value: o.sector),
+              const SizedBox(height: 7),
+            ],
+            if (o.direccion.isNotEmpty) ...[
+              _MetaRow(label: 'Dirección', value: o.direccion),
+              const SizedBox(height: 7),
+            ],
+            if (o.directiva.isNotEmpty) ...[
+              _MetaRow(label: 'Directiva', value: o.directiva),
+              const SizedBox(height: 7),
+            ],
+            if (o.fechaConcesion.isNotEmpty) ...[
+              _MetaRow(label: 'Concesión PJ', value: o.fechaConcesion, mono: true),
+              const SizedBox(height: 7),
+            ],
+            if (o.fechaModificaciones.isNotEmpty) ...[
+              _MetaRow(label: 'Ult. modif.', value: o.fechaModificaciones, mono: true),
+              const SizedBox(height: 7),
+            ],
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const SizedBox(width: 80, child: Text('Fuente',
+                  style: TextStyle(fontSize: 11.5, color: _T.s500, fontWeight: FontWeight.w600))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                decoration: BoxDecoration(color: _T.or1, borderRadius: BorderRadius.circular(5)),
+                child: const Text('lotatransparente.cl ↗',
+                    style: TextStyle(fontSize: 10.5, color: _T.or7, fontWeight: FontWeight.w600)),
+              ),
+            ]),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(color: _T.s100, borderRadius: BorderRadius.circular(7), border: Border.all(color: _T.s200)),
+              child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(LucideIcons.mapPinOff, size: 12, color: _T.s500),
+                SizedBox(width: 6),
+                Text('Sin coordenadas disponibles', style: TextStyle(fontSize: 12, color: _T.s500)),
+              ]),
+            ),
+          ]),
+        ))),
       ]),
     );
   }
@@ -1581,47 +2215,73 @@ class _MetaRow extends StatelessWidget {
   }
 }
 
-class _MiniMap extends StatelessWidget {
+class _MiniMap extends StatefulWidget {
   final double lat;
   final double lng;
   final String confianza;
   const _MiniMap({required this.lat, required this.lng, required this.confianza});
 
   @override
+  State<_MiniMap> createState() => _MiniMapState();
+}
+
+class _MiniMapState extends State<_MiniMap> {
+  final MapController _controller = MapController();
+  double _zoom = 16;
+
+  @override
+  void didUpdateWidget(covariant _MiniMap old) {
+    super.didUpdateWidget(old);
+    if (old.lat != widget.lat || old.lng != widget.lng) {
+      _controller.move(LatLng(widget.lat, widget.lng), _zoom);
+    }
+  }
+
+  void _zoomIn() {
+    setState(() => _zoom = (_zoom + 1).clamp(3, 19));
+    _controller.move(LatLng(widget.lat, widget.lng), _zoom);
+  }
+
+  void _zoomOut() {
+    setState(() => _zoom = (_zoom - 1).clamp(3, 19));
+    _controller.move(LatLng(widget.lat, widget.lng), _zoom);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
+    final center = LatLng(widget.lat, widget.lng);
+    return SizedBox(
       height: 220,
-      color: const Color(0xFFE8EDF2),
       child: Stack(children: [
-        // Grid placeholder background
-        CustomPaint(painter: _MapGridPainter(), size: Size.infinite),
-        // Halo
-        Align(
-          alignment: const Alignment(0, -0.16),
-          child: Container(
-            width: 84, height: 84,
-            decoration: BoxDecoration(
-              color: _T.or6.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: _T.or6, width: 1.5, style: BorderStyle.solid),
+        FlutterMap(
+          mapController: _controller,
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: _zoom,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom,
             ),
           ),
-        ),
-        // Pin
-        Align(
-          alignment: const Alignment(0, -0.40),
-          child: Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(
-              color: _T.or6,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
-              boxShadow: [BoxShadow(color: _T.s900.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))],
+          children: [
+            TileLayer(
+              urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+              subdomains: const ['a', 'b', 'c', 'd'],
+              userAgentPackageName: 'cl.lota.sigespu',
+              tileProvider: CancellableNetworkTileProvider(),
+              maxZoom: 19,
+              retinaMode: RetinaMode.isHighDensity(context),
             ),
-            child: const Icon(LucideIcons.mapPin, size: 14, color: Colors.white),
-          ),
+            MarkerLayer(markers: [
+              Marker(
+                point: center,
+                width: 36,
+                height: 36,
+                alignment: Alignment.topCenter,
+                child: const Icon(Icons.location_on, color: _T.or6, size: 36),
+              ),
+            ]),
+          ],
         ),
-        // Zoom controls
         Positioned(
           top: 10, right: 10,
           child: Container(
@@ -1632,8 +2292,8 @@ class _MiniMap extends StatelessWidget {
               boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 3, offset: Offset(0, 1))],
             ),
             child: Column(children: [
-              _ZoomBtn(symbol: '+', divider: true),
-              _ZoomBtn(symbol: '−'),
+              _ZoomBtn(symbol: '+', divider: true, onTap: _zoomIn),
+              _ZoomBtn(symbol: '−', onTap: _zoomOut),
             ]),
           ),
         ),
@@ -1645,35 +2305,23 @@ class _MiniMap extends StatelessWidget {
 class _ZoomBtn extends StatelessWidget {
   final String symbol;
   final bool divider;
-  const _ZoomBtn({required this.symbol, this.divider = false});
+  final VoidCallback onTap;
+  const _ZoomBtn({required this.symbol, required this.onTap, this.divider = false});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 26, height: 26,
-      decoration: BoxDecoration(
-        border: divider ? const Border(bottom: BorderSide(color: _T.s200)) : null,
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: 26, height: 26,
+        decoration: BoxDecoration(
+          border: divider ? const Border(bottom: BorderSide(color: _T.s200)) : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(symbol, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _T.s700)),
       ),
-      alignment: Alignment.center,
-      child: Text(symbol, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _T.s700)),
     );
   }
-}
-
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = const Color(0x0A000000)..strokeWidth = 1;
-    for (var y = 0.0; y < size.height; y += 32) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
-    }
-    for (var x = 0.0; x < size.width; x += 32) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1685,14 +2333,13 @@ class _MobileLayout extends StatelessWidget {
   final ScrapingStatus status;
   final List<DatoPatente> patentes;
   final List<DatoPermiso> permisos;
-  final List<DatoTransito> transito;
   final List<DatoOrganizacion> orgs;
   final bool loading;
   final bool hasError;
   const _MobileLayout({
     required this.state, required this.status,
     required this.patentes, required this.permisos,
-    required this.transito, required this.orgs,
+    required this.orgs,
     required this.loading, required this.hasError,
   });
 
@@ -1701,7 +2348,6 @@ class _MobileLayout extends StatelessWidget {
     final filteredCount = switch (state._activeSource) {
       'patentes' => patentes.length,
       'permisos' => permisos.length,
-      'transito' => transito.length,
       _ => orgs.length,
     };
 
@@ -1725,7 +2371,6 @@ class _MobileLayout extends StatelessWidget {
                         state: state,
                         patentes: state._activeSource == 'patentes' ? state._paginate(patentes) : const [],
                         permisos: state._activeSource == 'permisos' ? state._paginate(permisos) : const [],
-                        transito: state._activeSource == 'transito' ? state._paginate(transito) : const [],
                         orgs: state._activeSource == 'organizaciones' ? state._paginate(orgs) : const [],
                         totalFiltered: filteredCount,
                       ),
@@ -1744,9 +2389,11 @@ class _MobileAppHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s200))),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: _T.s200)),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           const Icon(LucideIcons.briefcase, size: 18, color: _T.or6),
@@ -1853,14 +2500,15 @@ class _MobileKpiStrip extends StatelessWidget {
     final counts = {
       'patentes': state._srcPatentes.length,
       'permisos': state._srcPermisos.length,
-      'transito': state._srcTransito.length,
       'organizaciones': state._srcOrgs.length,
     };
     return Container(
-      height: 64,
-      color: Colors.white,
+      height: 86,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s200))),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: _T.s200)),
+      ),
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: _sources.map((s) {
@@ -1899,8 +2547,7 @@ class _MobileKpiStrip extends StatelessWidget {
 
   String _subFor(String id) => switch (id) {
         'patentes' => 'comerciales',
-        'permisos' => 'permisos',
-        'transito' => 'tránsito',
+        'permisos' => 'DOM',
         _ => 'sociales',
       };
 }
@@ -1912,9 +2559,11 @@ class _MobileSegmented extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s200))),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: _T.s200)),
+      ),
       child: Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(color: _T.s100, borderRadius: BorderRadius.circular(8)),
@@ -1923,7 +2572,6 @@ class _MobileSegmented extends StatelessWidget {
           final count = switch (s.id) {
             'patentes' => state._srcPatentes.length,
             'permisos' => state._srcPermisos.length,
-            'transito' => state._srcTransito.length,
             _ => state._srcOrgs.length,
           };
           return Expanded(child: GestureDetector(
@@ -1969,27 +2617,99 @@ class _MobileFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 42,
-      color: _T.s50,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s200))),
+      decoration: const BoxDecoration(
+        color: _T.s50,
+        border: Border(bottom: BorderSide(color: _T.s200)),
+      ),
       child: Row(children: [
+        const SizedBox(width: 14),
         const Icon(LucideIcons.filter, size: 11, color: _T.s500),
         const SizedBox(width: 6),
-        _Chip(
-          label: '30 días',
-          active: state._last30Days,
-          onTap: state.toggleLast30Days,
+        Expanded(
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              _Chip(
+                label: '30 días',
+                active: state._last30Days,
+                onTap: state.toggleLast30Days,
+              ),
+              const SizedBox(width: 6),
+              _Chip(label: 'Año ${state._year == 'all' ? 'Todos' : state._year}', onTap: () {}),
+              const SizedBox(width: 6),
+              _Chip(label: 'Mes ${state._month == 'all' ? 'Todos' : state._month}', onTap: () {}),
+              const SizedBox(width: 6),
+              _Chip(label: 'Geo ${state._geo == 'all' ? 'Todos' : state._geo}', onTap: () {}),
+              const SizedBox(width: 6),
+              _MenuChip(
+                label: 'Tipo ${state._tipoFilter == 'all' ? 'Todos' : state._tipoFilter}',
+                active: state._tipoFilter != 'all',
+                items: _Sidebar._buildTipoItems(state),
+                onSelected: state.setTipoFilter,
+              ),
+            ],
+          ),
         ),
-        const SizedBox(width: 6),
-        _Chip(label: 'Año ${state._year == 'all' ? 'Todos' : state._year}', onTap: () {}),
-        const SizedBox(width: 6),
-        _Chip(label: 'Mes ${state._month == 'all' ? 'Todos' : state._month}', onTap: () {}),
-        const SizedBox(width: 6),
-        _Chip(label: 'Geo ${state._geo == 'all' ? 'Todos' : state._geo}', onTap: () {}),
-        const Spacer(),
+        const SizedBox(width: 8),
         Text('$filteredCount/$totalCount',
             style: GoogleFonts.jetBrainsMono(fontSize: 10, color: _T.s500)),
+        const SizedBox(width: 14),
       ]),
+    );
+  }
+}
+
+/// Chip con menú desplegable (tipo filtro seleccionable en la barra mobile).
+class _MenuChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final List<(String, String)> items;
+  final ValueChanged<String> onSelected;
+  const _MenuChip({required this.label, this.active = false, required this.items, required this.onSelected});
+
+  Future<void> _open(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final pos = box.localToGlobal(Offset.zero, ancestor: overlay);
+    final picked = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        pos.dx,
+        pos.dy + box.size.height + 4,
+        overlay.size.width - pos.dx - box.size.width,
+        overlay.size.height - pos.dy - box.size.height,
+      ),
+      items: items.map((e) => PopupMenuItem<String>(
+        value: e.$1,
+        child: Text(e.$2, style: const TextStyle(fontSize: 13)),
+      )).toList(),
+    );
+    if (picked != null) onSelected(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _open(context),
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: active ? _T.or6 : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: active ? _T.or6 : _T.s200),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(label,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                  color: active ? Colors.white : _T.s700)),
+          if (!active) ...[
+            const SizedBox(width: 3),
+            const Icon(LucideIcons.chevronDown, size: 9, color: _T.s400),
+          ],
+        ]),
+      ),
     );
   }
 }
@@ -2028,13 +2748,12 @@ class _MobileDataList extends StatelessWidget {
   final _ScrapingScreenState state;
   final List<DatoPatente> patentes;
   final List<DatoPermiso> permisos;
-  final List<DatoTransito> transito;
   final List<DatoOrganizacion> orgs;
   final int totalFiltered;
   const _MobileDataList({
     required this.state,
     required this.patentes, required this.permisos,
-    required this.transito, required this.orgs,
+    required this.orgs,
     required this.totalFiltered,
   });
 
@@ -2050,9 +2769,6 @@ class _MobileDataList extends StatelessWidget {
             case 'permisos':
               if (i >= permisos.length) return null;
               return _MobilePermisoRow(p: permisos[i]);
-            case 'transito':
-              if (i >= transito.length) return null;
-              return _MobileTransitoRow(t: transito[i]);
             default:
               if (i >= orgs.length) return null;
               return _MobileOrgRow(o: orgs[i]);
@@ -2061,7 +2777,6 @@ class _MobileDataList extends StatelessWidget {
         childCount: switch (state._activeSource) {
           'patentes' => patentes.length,
           'permisos' => permisos.length,
-          'transito' => transito.length,
           _ => orgs.length,
         },
       )),
@@ -2081,43 +2796,65 @@ class _MobilePatenteRow extends StatelessWidget {
   final DatoPatente p;
   const _MobilePatenteRow({required this.p});
 
+  void _openDetail(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => FractionallySizedBox(
+        heightFactor: 0.9,
+        child: _MapDetailPanel(
+          rec: p,
+          width: null,
+          onClose: () => Navigator.of(sheetCtx).pop(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s100))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Text('#${p.nDecreto}',
-              style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.w700, color: _T.or7)),
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            decoration: BoxDecoration(color: _T.or2, borderRadius: BorderRadius.circular(4)),
-            child: const Text('COMER',
-                style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: _T.or7)),
-          ),
-          const SizedBox(width: 6),
-          Text(p.fechaDecreto,
-              style: GoogleFonts.jetBrainsMono(fontSize: 9.5, color: _T.s500)),
-          const Spacer(),
-          _GeoBadge(confianza: p.confianza),
+    return InkWell(
+      onTap: () => _openDetail(context),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s100))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text('#${p.nDecreto}',
+                style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.w700, color: _T.or7)),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(color: _T.or2, borderRadius: BorderRadius.circular(4)),
+              child: Text(_shortTipo(p.tipoEfectivo),
+                  style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: _T.or7)),
+            ),
+            const SizedBox(width: 6),
+            Text(p.fechaDecreto,
+                style: GoogleFonts.jetBrainsMono(fontSize: 9.5, color: _T.s500)),
+            const Spacer(),
+            _GeoBadge(confianza: p.confianza),
+          ]),
+          const SizedBox(height: 5),
+          Text(p.razonSocial, overflow: TextOverflow.ellipsis, maxLines: 1,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, height: 1.25, color: _T.s900)),
+          const SizedBox(height: 5),
+          Row(children: [
+            Text(p.rut, style: GoogleFonts.jetBrainsMono(fontSize: 10, color: _T.s500)),
+            const SizedBox(width: 6),
+            const Text('·', style: TextStyle(color: _T.s300, fontSize: 10)),
+            const SizedBox(width: 6),
+            const Icon(LucideIcons.mapPin, size: 9, color: _T.s400),
+            const SizedBox(width: 4),
+            Expanded(child: Text(p.direccion, overflow: TextOverflow.ellipsis, maxLines: 1,
+                style: const TextStyle(fontSize: 10, color: _T.s700))),
+          ]),
         ]),
-        const SizedBox(height: 5),
-        Text(p.razonSocial, overflow: TextOverflow.ellipsis, maxLines: 1,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, height: 1.25, color: _T.s900)),
-        const SizedBox(height: 5),
-        Row(children: [
-          Text(p.rut, style: GoogleFonts.jetBrainsMono(fontSize: 10, color: _T.s500)),
-          const SizedBox(width: 6),
-          const Text('·', style: TextStyle(color: _T.s300, fontSize: 10)),
-          const SizedBox(width: 6),
-          const Icon(LucideIcons.mapPin, size: 9, color: _T.s400),
-          const SizedBox(width: 4),
-          Expanded(child: Text(p.direccion, overflow: TextOverflow.ellipsis, maxLines: 1,
-              style: const TextStyle(fontSize: 10, color: _T.s700))),
-        ]),
-      ]),
+      ),
     );
   }
 }
@@ -2126,58 +2863,56 @@ class _MobilePermisoRow extends StatelessWidget {
   final DatoPermiso p;
   const _MobilePermisoRow({required this.p});
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s100))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Text(p.nPermiso,
-              style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.w700, color: _T.or7)),
-          const SizedBox(width: 6),
-          Text(p.fecha,
-              style: GoogleFonts.jetBrainsMono(fontSize: 9.5, color: _T.s500)),
-          const Spacer(),
-          _EstadoBadge(estado: p.estado),
-        ]),
-        const SizedBox(height: 5),
-        Text(p.descripcion, overflow: TextOverflow.ellipsis, maxLines: 1,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _T.s900)),
-        const SizedBox(height: 5),
-        Text(p.direccion, overflow: TextOverflow.ellipsis, maxLines: 1,
-            style: const TextStyle(fontSize: 10, color: _T.s700)),
-      ]),
+  void _openDetail(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => FractionallySizedBox(
+        heightFactor: 0.9,
+        child: _MapDetailPanelPermiso(
+          rec: p,
+          width: null,
+          onClose: () => Navigator.of(sheetCtx).pop(),
+        ),
+      ),
     );
   }
-}
-
-class _MobileTransitoRow extends StatelessWidget {
-  final DatoTransito t;
-  const _MobileTransitoRow({required this.t});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s100))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Text(t.nDecreto,
-              style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.w700, color: _T.or7)),
-          const SizedBox(width: 6),
-          Text('${t.fechaInicio} → ${t.fechaFin}',
-              style: GoogleFonts.jetBrainsMono(fontSize: 9.5, color: _T.s500)),
-          const Spacer(),
-          _EstadoBadge(estado: t.estado),
+    return InkWell(
+      onTap: () => _openDetail(context),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s100))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text(p.nPermiso,
+                style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.w700, color: _T.or7)),
+            const SizedBox(width: 6),
+            Text(p.fecha,
+                style: GoogleFonts.jetBrainsMono(fontSize: 9.5, color: _T.s500)),
+            const Spacer(),
+            _EstadoBadge(estado: p.estado),
+          ]),
+          const SizedBox(height: 5),
+          Text(p.descripcion, overflow: TextOverflow.ellipsis, maxLines: 2,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _T.s900, height: 1.3)),
+          const SizedBox(height: 5),
+          Row(children: [
+            _GeoBadge(confianza: p.confianza),
+            if (p.direccion.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Expanded(child: Text(p.direccion, overflow: TextOverflow.ellipsis, maxLines: 1,
+                  style: const TextStyle(fontSize: 10, color: _T.s600))),
+            ],
+          ]),
         ]),
-        const SizedBox(height: 5),
-        Text(t.motivo, overflow: TextOverflow.ellipsis, maxLines: 1,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _T.s900)),
-        const SizedBox(height: 5),
-        Text(t.direccion, overflow: TextOverflow.ellipsis, maxLines: 1,
-            style: const TextStyle(fontSize: 10, color: _T.s700)),
-      ]),
+      ),
     );
   }
 }
@@ -2186,28 +2921,50 @@ class _MobileOrgRow extends StatelessWidget {
   final DatoOrganizacion o;
   const _MobileOrgRow({required this.o});
 
+  void _openDetail(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => FractionallySizedBox(
+        heightFactor: 0.85,
+        child: _MapDetailPanelOrg(
+          rec: o,
+          width: null,
+          onClose: () => Navigator.of(sheetCtx).pop(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s100))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Text(o.nPersonalidad,
-              style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.w700, color: _T.or7)),
-          const SizedBox(width: 6),
-          Text(o.tipo,
-              style: const TextStyle(fontSize: 9.5, color: _T.s500)),
-          const Spacer(),
-          Text(o.sector, style: const TextStyle(fontSize: 10, color: _T.s600)),
+    return InkWell(
+      onTap: () => _openDetail(context),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _T.s100))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text(_PatentesTable._shortNPersonalidad(o.nPersonalidad),
+                style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.w700, color: _T.or7)),
+            const SizedBox(width: 6),
+            Text(o.tipo, style: const TextStyle(fontSize: 9.5, color: _T.s500)),
+            const Spacer(),
+            Text(o.vigencia, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 9.5, color: _T.s600)),
+          ]),
+          const SizedBox(height: 5),
+          Text(o.nombre, overflow: TextOverflow.ellipsis, maxLines: 1,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _T.s900)),
+          const SizedBox(height: 5),
+          Text(o.representante.split(' - ').first, overflow: TextOverflow.ellipsis, maxLines: 1,
+              style: const TextStyle(fontSize: 10, color: _T.s700)),
         ]),
-        const SizedBox(height: 5),
-        Text(o.nombre, overflow: TextOverflow.ellipsis, maxLines: 1,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _T.s900)),
-        const SizedBox(height: 5),
-        Text('Representante: ${o.representante}', overflow: TextOverflow.ellipsis, maxLines: 1,
-            style: const TextStyle(fontSize: 10, color: _T.s700)),
-      ]),
+      ),
     );
   }
 }

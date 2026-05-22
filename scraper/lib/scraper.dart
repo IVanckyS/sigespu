@@ -12,6 +12,7 @@ import 'geocoder/nominatim_client.dart';
 import 'progress.dart';
 import 'sources/decretos_transito.dart';
 import 'sources/organizaciones.dart';
+import 'sources/patentes_ig164.dart';
 import 'sources/patentes_mensuales.dart';
 import 'sources/permisos_dom.dart';
 
@@ -29,13 +30,15 @@ Future<void> runScrapingActual({
   // Limpia cualquier flag de cancel previo para no abortar al instante.
   await ProgressTracker.clearCancel(redis);
 
-  // 4 pasos: patentes, permisos, transito, organizaciones
-  final tracker = ProgressTracker(redis, modo: 'actual', totalSteps: 4);
+  // 5 pasos: patentes ig=103, patentes ig=164, permisos, transito, organizaciones
+  final tracker = ProgressTracker(redis, modo: 'actual', totalSteps: 5);
   await tracker.start();
   final geocoder = NominatimClient();
 
   try {
     await scrapePatentes(db, redis, geocoder, tracker: tracker);
+    await ProgressTracker.throwIfCancelled(redis);
+    await scrapePatentesIg164(db, redis, tracker: tracker);
     await ProgressTracker.throwIfCancelled(redis);
     await scrapePermisosDom(db, redis, geocoder, tracker: tracker);
     await ProgressTracker.throwIfCancelled(redis);
@@ -77,8 +80,9 @@ Future<void> runScrapingHistorico({
 
   // Calcular pasos totales para que la barra de progreso sea precisa
   final patentesSteps = ((yearTo - patentesYearFrom) * 2) + lastSem;
+  final patentesIg164Steps = yearTo - patentesYearFrom + 1;
   final orgsSteps = yearTo - organizacionesYearFrom + 1;
-  final totalSteps = patentesSteps + 1 /*permisos*/ + 1 /*transito*/ + orgsSteps;
+  final totalSteps = patentesSteps + patentesIg164Steps + 1 /*permisos*/ + 1 /*transito*/ + orgsSteps;
 
   final tracker = ProgressTracker(redis, modo: 'historico', totalSteps: totalSteps);
   await tracker.start();
@@ -86,6 +90,9 @@ Future<void> runScrapingHistorico({
 
   try {
     await scrapePatentesHistorico(db, redis, geocoder,
+        yearFrom: patentesYearFrom, tracker: tracker);
+    await ProgressTracker.throwIfCancelled(redis);
+    await scrapePatentesIg164Historico(db, redis,
         yearFrom: patentesYearFrom, tracker: tracker);
     await ProgressTracker.throwIfCancelled(redis);
     await scrapePermisosDom(db, redis, geocoder,

@@ -23,7 +23,7 @@ class DatabaseService {
   /// Inicializa Postgres. Llamar antes de runMigrations().
   Future<void> initPostgres() async {
     final databaseUrl = Platform.environment['DATABASE_URL'];
-    final sslMode = _isProduction() ? SslMode.require : SslMode.disable;
+    final sslMode = _resolveSslMode();
     final maxConn = int.tryParse(Platform.environment['DB_POOL_SIZE'] ?? '') ?? 15;
 
     final Endpoint endpoint;
@@ -146,6 +146,13 @@ class DatabaseService {
   }
 
   // ── Helpers privados ────────────────────────────────────────────────────────
+
+  static SslMode _resolveSslMode() {
+    final explicit = Platform.environment['DB_SSL']?.toLowerCase();
+    if (explicit == 'disable') return SslMode.disable;
+    if (explicit == 'require') return SslMode.require;
+    return _isProduction() ? SslMode.require : SslMode.disable;
+  }
 
   static bool _isProduction() =>
       Platform.environment['APP_ENV']?.toLowerCase() == 'production' ||

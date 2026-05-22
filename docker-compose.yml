@@ -69,7 +69,7 @@ services:
       - DB_PORT=5432
       - DB_NAME=sigespu
       - DB_USER=sigespu_user
-      - DB_PASSWORD=secret_password
+      - DB_PASSWORD=${DB_PASSWORD:-secret_password}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import '../../config/constants.dart';
 import '../auth/auth_provider.dart';
 import 'users_provider.dart';
 
@@ -35,7 +36,7 @@ class Solicitud {
 }
 
 class SolicitudesNotifier extends AsyncNotifier<List<Solicitud>> {
-  static const _baseUrl = 'http://localhost:8080/auth';
+  static String get _baseUrl => '${AppConstants.apiBaseUrl}/auth';
 
   @override
   Future<List<Solicitud>> build() => _fetch();
@@ -43,10 +44,12 @@ class SolicitudesNotifier extends AsyncNotifier<List<Solicitud>> {
   Future<List<Solicitud>> _fetch() async {
     final storage = ref.read(secureStorageProvider);
     final token = await storage.read(key: 'access_token');
-    final response = await http.get(
-      Uri.parse('$_baseUrl/solicitudes'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/solicitudes'),
+          headers: {'Authorization': 'Bearer $token'},
+        )
+        .timeout(const Duration(seconds: 6));
     if (response.statusCode != 200) {
       throw Exception('Error al cargar solicitudes: ${response.statusCode}');
     }
@@ -59,14 +62,16 @@ class SolicitudesNotifier extends AsyncNotifier<List<Solicitud>> {
   Future<void> resolver(String id, String accion) async {
     final storage = ref.read(secureStorageProvider);
     final token = await storage.read(key: 'access_token');
-    final response = await http.put(
-      Uri.parse('$_baseUrl/solicitudes/$id'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'accion': accion}),
-    );
+    final response = await http
+        .put(
+          Uri.parse('$_baseUrl/solicitudes/$id'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'accion': accion}),
+        )
+        .timeout(const Duration(seconds: 6));
     if (response.statusCode != 200) {
       throw Exception('Error al resolver solicitud: ${response.statusCode}');
     }

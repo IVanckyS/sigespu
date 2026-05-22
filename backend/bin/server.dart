@@ -126,6 +126,20 @@ void main(List<String> args) async {
 
   final server = await serve(handler, ip, port);
   _log.info('Server listening on port ${server.port}');
+
+  // Graceful shutdown: Docker/K8s send SIGTERM before SIGKILL
+  Future<void> shutdown(String signal) async {
+    _log.info('$signal recibido — cerrando servidor...');
+    await server.close(force: false);
+    await dbService.close();
+    _log.info('Servidor cerrado limpiamente.');
+  }
+
+  ProcessSignal.sigterm.watch().listen((_) => shutdown('SIGTERM'));
+  // SIGINT is only reliably available on non-Windows; wrap in try-catch
+  try {
+    ProcessSignal.sigint.watch().listen((_) => shutdown('SIGINT'));
+  } catch (_) {}
 }
 
 /// Permite GET a cualquier usuario autenticado, exige rol director en POST.

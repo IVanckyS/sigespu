@@ -39,6 +39,7 @@ class AuthHandler {
     final directorRouter = Router();
     directorRouter.get('/solicitudes', _listarSolicitudes);
     directorRouter.put('/solicitudes/<id>', _resolverSolicitud);
+    directorRouter.get('/usuarios', _listarUsuarios);
 
     // Mount protected routers
     router.mount('/', Pipeline()
@@ -55,7 +56,12 @@ class AuthHandler {
 
   Future<Response> _register(Request req) async {
     final body = await req.readAsString();
-    final data = jsonDecode(body);
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final emailRaw = data['email'] as String?;
     final nombre = data['nombre'] as String?;
     final password = data['password'] as String?;
@@ -101,7 +107,12 @@ class AuthHandler {
 
   Future<Response> _verificar(Request req) async {
     final body = await req.readAsString();
-    final data = jsonDecode(body);
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final emailRaw = data['email'] as String?;
     final codigo = data['codigo'] as String?;
 
@@ -157,7 +168,12 @@ class AuthHandler {
 
   Future<Response> _reenviarCodigo(Request req) async {
     final body = await req.readAsString();
-    final data = jsonDecode(body);
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final emailRaw = data['email'] as String?;
 
     if (emailRaw == null) {
@@ -198,7 +214,12 @@ class AuthHandler {
 
   Future<Response> _login(Request req) async {
     final body = await req.readAsString();
-    final data = jsonDecode(body);
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final emailRaw = data['email'] as String?;
     final password = data['password'] as String?;
 
@@ -251,7 +272,12 @@ class AuthHandler {
 
   Future<Response> _refresh(Request req) async {
     final body = await req.readAsString();
-    final data = jsonDecode(body);
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final token = data['refresh_token'] as String?;
 
     if (token == null) return Response.badRequest(body: jsonEncode({'error': 'Se requiere refresh_token'}));
@@ -344,8 +370,12 @@ class AuthHandler {
   Future<Response> _solicitarAcceso(Request req) async {
     final userId = req.context['user_id'] as String;
     final body = await req.readAsString();
-    final data = jsonDecode(body);
-    
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final cargo = data['cargo'] as String?;
     final direccion = data['direccion_municipal'] as String?;
 
@@ -385,6 +415,50 @@ class AuthHandler {
     return Response.ok(jsonEncode({'message': 'Solicitud enviada correctamente'}));
   }
 
+  Future<Response> _listarUsuarios(Request req) async {
+    try {
+      final rows = await _dbService.db.execute('''
+        SELECT id, email, nombre, nivel_acceso, activo, created_at,
+               solicitud_cargo, solicitud_direccion_municipal
+        FROM usuarios
+        ORDER BY
+          CASE nivel_acceso WHEN 'director' THEN 0 WHEN 'operativo' THEN 1 ELSE 2 END,
+          nombre
+      ''');
+
+      String _unidad(String nivel, String? direccion) {
+        if (direccion != null && direccion.isNotEmpty) return direccion;
+        return switch (nivel) {
+          'director' => 'Dir. Seguridad Pública',
+          'operativo' => 'Inspección',
+          _ => 'Municipal',
+        };
+      }
+
+      final items = rows.map((r) {
+        final nivel = r[3] as String? ?? 'visitante';
+        return {
+          'id': (r[0] as Object).toString(),
+          'email': r[1] as String,
+          'nombre': r[2] as String,
+          'nivel_acceso': nivel,
+          'activo': r[4] as bool? ?? true,
+          'ultima_sesion': (r[5] as DateTime?)?.toIso8601String(),
+          'cargo': r[6] as String?,
+          'unidad': _unidad(nivel, r[7] as String?),
+        };
+      }).toList();
+
+      return Response.ok(
+        jsonEncode(items),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      print('[auth] Error en /usuarios: $e');
+      return Response.internalServerError(body: jsonEncode({'error': 'Error de servidor'}));
+    }
+  }
+
   Future<Response> _listarSolicitudes(Request req) async {
     final result = await _dbService.db.execute('''
       SELECT id, email, nombre, solicitud_fecha, solicitud_cargo, solicitud_direccion_municipal, solicitud_operativo 
@@ -409,8 +483,12 @@ class AuthHandler {
   Future<Response> _resolverSolicitud(Request req, String id) async {
     final directorId = req.context['user_id'] as String;
     final body = await req.readAsString();
-    final data = jsonDecode(body);
-    
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final accion = data['accion'] as String?;
 
     if (accion != 'aprobar' && accion != 'rechazar') {
@@ -440,6 +518,6 @@ class AuthHandler {
       return Response.notFound(jsonEncode({'error': 'Solicitud no encontrada o ya procesada'}));
     }
 
-    return Response.ok(jsonEncode({'message': 'Solicitud \$estado correctamente'}));
+    return Response.ok(jsonEncode({'message': 'Solicitud $estado correctamente'}));
   }
 }

@@ -61,12 +61,17 @@ Future<void> runMigrations(Pool db) async {
       final sql = await file.readAsString();
 
       await db.runTx((tx) async {
-        // Split on semicolons so multi-statement files work with the
-        // extended query protocol (which rejects multiple commands per call).
-        final stmts = sql
+        // Strip comment lines first, then split on semicolons.
+        // Filtering whole blocks by leading '--' would silently skip
+        // CREATE statements that appear after a file-header comment.
+        final stripped = sql
+            .split('\n')
+            .where((line) => !line.trimLeft().startsWith('--'))
+            .join('\n');
+        final stmts = stripped
             .split(';')
             .map((s) => s.trim())
-            .where((s) => s.isNotEmpty && !RegExp(r'^--').hasMatch(s))
+            .where((s) => s.isNotEmpty)
             .toList();
         for (final stmt in stmts) {
           await tx.execute(stmt);

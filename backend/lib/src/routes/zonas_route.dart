@@ -16,12 +16,21 @@ Router buildZonasRouter(DatabaseService db) {
 
   // ── GET / ── Listar todas las zonas
   router.get('/', (Request req) => guard('listZonas', () async {
-    final rows = await db.db.execute(r'''
-      SELECT id, nombre, ST_AsGeoJSON(geom), nivel_riesgo, tipo_riesgo,
-             descripcion, created_at
-      FROM zonas_peligro
-      ORDER BY created_at DESC
-    ''');
+    final limit = int.tryParse(req.url.queryParameters['limit'] ?? '') ?? 100;
+    final offset = int.tryParse(req.url.queryParameters['offset'] ?? '') ?? 0;
+    final safeLimit = limit.clamp(1, 500);
+    final safeOffset = offset.clamp(0, 1000000);
+
+    final rows = await db.db.execute(
+      Sql.named(r'''
+        SELECT id, nombre, ST_AsGeoJSON(geom), nivel_riesgo, tipo_riesgo,
+               descripcion, created_at
+        FROM zonas_peligro
+        ORDER BY created_at DESC
+        LIMIT @limit OFFSET @offset
+      '''),
+      parameters: {'limit': safeLimit, 'offset': safeOffset},
+    );
 
     final items = rows.map((r) => {
       'id': r[0].toString(),

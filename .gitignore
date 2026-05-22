@@ -2,6 +2,7 @@
 .packages
 build/
 .env
+.env.production
 *.iml
 .idea/
 .vscode/

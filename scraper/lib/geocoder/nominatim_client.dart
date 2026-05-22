@@ -36,7 +36,7 @@ class NominatimClient {
         }
       }
     } catch (e) {
-      print('Nominatim Error: \$e');
+      print('Nominatim Error: $e');
     }
     return null;
   }

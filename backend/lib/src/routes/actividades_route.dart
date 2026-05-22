@@ -14,14 +14,23 @@ Router buildActividadesRouter(DatabaseService db) {
 
   // ── GET / ── Listar todas las actividades
   router.get('/', (Request req) => guard('listActividades', () async {
-    final rows = await db.db.execute(r'''
-      SELECT id, tipo, estado, titulo, descripcion,
-             fecha_inicio, fecha_fin, participante_ids,
-             lat, lng, direccion, sector, direccion_municipal,
-             presupuesto_estimado, acta, creado_por, creado_en, actualizado_en
-      FROM actividades_municipales
-      ORDER BY fecha_inicio DESC
-    ''');
+    final limit = int.tryParse(req.url.queryParameters['limit'] ?? '') ?? 100;
+    final offset = int.tryParse(req.url.queryParameters['offset'] ?? '') ?? 0;
+    final safeLimit = limit.clamp(1, 500);
+    final safeOffset = offset.clamp(0, 1000000);
+
+    final rows = await db.db.execute(
+      Sql.named(r'''
+        SELECT id, tipo, estado, titulo, descripcion,
+               fecha_inicio, fecha_fin, participante_ids,
+               lat, lng, direccion, sector, direccion_municipal,
+               presupuesto_estimado, acta, creado_por, creado_en, actualizado_en
+        FROM actividades_municipales
+        ORDER BY fecha_inicio DESC
+        LIMIT @limit OFFSET @offset
+      '''),
+      parameters: {'limit': safeLimit, 'offset': safeOffset},
+    );
 
     final items = rows.map((r) => {
       'id': r[0].toString(),

@@ -22,13 +22,22 @@ Router buildElementosRouter(DatabaseService db) {
 
   // ── GET / ── Listar todos los puntos de interés
   router.get('/', (Request req) => guard('listElementos', () async {
-    final rows = await db.db.execute(r'''
-      SELECT id, tipo, nombre, descripcion, direccion,
-             ST_X(geom) as lng, ST_Y(geom) as lat,
-             metadata, estado, origen, fuente_origen, created_by, created_at
-      FROM puntos_interes
-      ORDER BY created_at DESC
-    ''');
+    final limit = int.tryParse(req.url.queryParameters['limit'] ?? '') ?? 100;
+    final offset = int.tryParse(req.url.queryParameters['offset'] ?? '') ?? 0;
+    final safeLimit = limit.clamp(1, 500);
+    final safeOffset = offset.clamp(0, 1000000);
+
+    final rows = await db.db.execute(
+      Sql.named(r'''
+        SELECT id, tipo, nombre, descripcion, direccion,
+               ST_X(geom) as lng, ST_Y(geom) as lat,
+               metadata, estado, origen, fuente_origen, created_by, created_at
+        FROM puntos_interes
+        ORDER BY created_at DESC
+        LIMIT @limit OFFSET @offset
+      '''),
+      parameters: {'limit': safeLimit, 'offset': safeOffset},
+    );
 
     final items = rows.map((r) => {
       'id': r[0].toString(),

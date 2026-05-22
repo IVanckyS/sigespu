@@ -221,6 +221,7 @@ class _EditElementSheetState extends ConsumerState<EditElementSheet> {
               const SizedBox(height: 16),
 
               DropdownButtonFormField<String>(
+                // ignore: deprecated_member_use
                 value: _estado == 'vigente' ? 'activo' : (_estado == 'vencido' ? 'cerrado' : _estado),
                 decoration: const InputDecoration(
                   labelText: 'Estado',
@@ -239,6 +240,7 @@ class _EditElementSheetState extends ConsumerState<EditElementSheet> {
               // Type specific fields
               if (widget.elemento.tipo == 'zona_peligro') ...[
                 DropdownButtonFormField<String>(
+                  // ignore: deprecated_member_use
                   value: _tipoPeligro,
                   decoration: const InputDecoration(
                     labelText: 'Tipo de Peligro',
@@ -261,6 +263,7 @@ class _EditElementSheetState extends ConsumerState<EditElementSheet> {
                   onChanged: (v) => setState(() => _nivel = v.round()),
                 ),
                 DropdownButtonFormField<String>(
+                  // ignore: deprecated_member_use
                   value: _horario,
                   decoration: const InputDecoration(
                     labelText: 'Horario crítico',

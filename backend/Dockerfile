@@ -2,6 +2,7 @@ FROM dart:stable AS build
 
 WORKDIR /app
 COPY shared/pubspec.* shared/
+COPY scraper/pubspec.* scraper/
 COPY backend/pubspec.* backend/
 COPY scraper/pubspec.* scraper/
 

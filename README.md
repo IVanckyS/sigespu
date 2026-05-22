@@ -1,129 +1,94 @@
-# SIGESPU Lota - Sistema de Información Geoespacial de Seguridad Pública
+# SIGESPU Lota
 
-SIGESPU es la plataforma integral de seguridad pública desarrollada para la **Ilustre Municipalidad de Lota**. Su objetivo es centralizar, analizar y gestionar información territorial y de seguridad, permitiendo una coordinación efectiva entre los funcionarios municipales, directores y operarios en terreno.
+Sistema de Información Geoespacial de Seguridad Pública desarrollado para la Dirección de Seguridad Pública de la Municipalidad de Lota. Es una herramienta interna de uso exclusivo para funcionarios municipales.
 
----
-
-## 🏗 Arquitectura del Sistema
-
-El proyecto está estructurado como un **Monorepo Dart/Flutter**, dividiendo responsabilidades en cuatro módulos principales:
-
-1. **`app/` (Frontend Flutter):** Aplicación multiplataforma (Móvil y Web) utilizada por los funcionarios. Construida con **Flutter**, **Riverpod** (estado) y **GoRouter** (navegación).
-2. **`backend/` (API REST Dart):** Servidor HTTP construido con **Shelf**. Gestiona la autenticación, la base de datos central y sirve como puente seguro para la aplicación.
-3. **`scraper/` (Worker Dart):** Proceso en segundo plano que extrae automáticamente datos públicos (Patentes, Permisos DOM) desde portales de transparencia, los geocodifica usando **Nominatim** y los inyecta en la base de datos.
-4. **`shared/` (Paquete Dart):** Contiene los **Modelos de Datos** (DTOs) compartidos entre el frontend, el backend y el scraper, garantizando consistencia y tipado fuerte (usando `freezed` y `json_serializable`).
+La idea central es simple: un mapa donde se concentra todo lo relevante para el trabajo diario de la dirección. Desde ese mapa se pueden ver zonas de peligro, puntos de infraestructura, patentes comerciales scrapeadas desde el portal de transparencia, permisos de obras y reportes de incidentes. Todo en un solo lugar, con la posibilidad de agregar elementos en terreno desde el celular aunque no haya señal.
 
 ---
 
-## 🔌 Infraestructura y Base de Datos
+## Qué hace cada pantalla
 
-La infraestructura está completamente dockerizada para garantizar consistencia entre desarrollo y producción.
+**Mapa** — Es la pantalla principal. Muestra las capas activadas sobre un mapa de la comuna (CartoDB Voyager sobre OpenStreetMap). Desde el panel lateral se activan o desactivan capas: Plan Regulador, zonas de peligro, patentes comerciales, centros de acopio, cámaras, etc. El botón flotante permite agregar un nuevo elemento en la posición actual o en un punto elegido manualmente.
 
-*   **PostgreSQL + PostGIS:** Base de datos principal. Utilizamos PostGIS para el almacenamiento y consulta eficiente de datos geoespaciales (puntos, polígonos, líneas).
-*   **Redis:** Utilizado para caché rápido, *Rate Limiting* (protección contra abusos en la API) y almacenamiento de *Refresh Tokens* revocados (Blacklist).
-*   **Nginx:** Proxy inverso configurado con estrictas políticas de seguridad (Headers de seguridad, protección Slowloris, límites de body).
+**Resumen** — Dashboard con indicadores: cantidad de reportes por tipo, zonas activas, actividades del mes. Pensado para el director, para tener una vista rápida del estado de la comuna sin necesidad de navegar por el mapa.
 
-### Esquema Geoespacial
-El sistema maneica múltiples capas de información, almacenadas con el tipo de dato `GEOMETRY` de PostGIS:
-*   `sectores_plan_regulador` (Polígonos)
-*   `puntos_interes` (Puntos: Cámaras, Sedes, Luminarias)
-*   `reportes_seguridad` (Puntos: Robos, Vandalismo)
-*   `zonas_peligro` (Polígonos: Áreas de riesgo)
-*   `patentes_comerciales` (Puntos extraídos vía Scraper)
+**Tabla** — Vista de listado con filtros para consultar registros específicos. Permite buscar por tipo, fecha o sector, y ver el detalle de cualquier elemento con su ubicación en un minimapa.
+
+**Scraping** — Muestra los datos extraídos automáticamente desde lotatransparente.cl: patentes comerciales mensuales, permisos de la Dirección de Obras, decretos de tránsito y organizaciones sociales. Cada registro tiene su ubicación en el mapa. Los usuarios con rol operativo pueden corregir la ubicación si el geocoding automático fue impreciso.
+
+**Actividades** — Tablero kanban con las actividades municipales organizadas por estado (Planificado, En curso, Completado, Archivado). Cada tarjeta tiene el tipo de actividad, fechas y participantes.
+
+**Usuarios** — Solo visible para el director. Muestra la lista de funcionarios registrados y las solicitudes de acceso operativo pendientes de aprobación.
 
 ---
 
-## 🔐 Autenticación y Seguridad
+## Acceso y roles
 
-El sistema utiliza autenticación basada en **JWT (JSON Web Tokens)** con rotación de *Refresh Tokens*:
+El registro está restringido a correos con dominio `@lota.cl` o `@munilota.cl`. Cualquier otro dominio es rechazado en el registro.
 
-1.  **Registro Restringido:** Solo se permiten correos con dominios `@lota.cl` o `@munilota.cl`. Todo nuevo usuario entra con nivel `visitante`.
-2.  **Jerarquía de Roles:** 
-    *   `visitante`: Acceso de solo lectura a datos públicos.
-    *   `operativo`: Puede crear reportes, zonas de peligro y actualizar patentes. (Requiere aprobación del Director).
-    *   `director`: Acceso total, aprueba solicitudes de nivel operativo.
-3.  **Protección:** Las contraseñas se hashean con **Bcrypt** (costo 12). La API cuenta con *Rate Limiting* (20 req/min para Auth, 100 req/min general) gestionado en memoria por Redis.
+Todo nuevo usuario entra con nivel **visitante**: puede ver el mapa y consultar datos, pero no puede agregar ni modificar nada. Para solicitar acceso operativo, hay un botón en el perfil que abre un formulario donde el funcionario indica su cargo y dependencia. El director recibe la solicitud en la pantalla de Usuarios y puede aprobarla o rechazarla.
 
----
+Los niveles son:
 
-## 📱 Frontend (App) y Modo Offline (Drift)
-
-La aplicación está diseñada para funcionar en **terreno**, donde la conectividad a internet (4G/3G) puede ser inestable. Para resolver esto, implementamos una robusta arquitectura **Offline-First**.
-
-### ¿Cómo funciona el Modo Offline?
-
-1.  **Drift (SQLite):** Utilizamos Drift para mantener una réplica local de las tablas principales (`PuntosInteresLocal`, `ZonasPeligroLocal`, `ReportesSeguridadLocal`, `PatentesComercialesLocal`).
-2.  **DAOs (Data Access Objects):** 
-    *   Los DAOs (ej. `ReportesDao`, `ZonasDao`) son clases que abstraen la interacción con la base de datos local.
-    *   Cuando un operario crea un "Nuevo Reporte" en el mapa, la interfaz llama al método `crearReporte()` del DAO.
-3.  **Cola de Sincronización (`SyncQueueTable`):**
-    *   El DAO guarda el registro en la tabla local de reportes para que el usuario lo vea inmediatamente en su mapa.
-    *   Al mismo tiempo, dentro de una *transacción segura*, el DAO inserta un registro en la `SyncQueueTable` indicando la entidad, la acción (`create`) y el payload en JSON.
-4.  **SyncService (Sincronización en Background):**
-    *   Un servicio en segundo plano escucha los cambios de conectividad usando `connectivity_plus`.
-    *   En cuanto el dispositivo detecta conexión a Internet, el servicio lee la `SyncQueueTable` y procesa la cola FIFO, enviando los datos al Backend.
-    *   Implementa reintentos y *backoff* en caso de fallos.
+- **Visitante** — lectura completa, sin escritura
+- **Operativo** — puede agregar elementos al mapa, crear reportes, dibujar zonas, corregir ubicaciones del scraping
+- **Director** — todo lo anterior más gestión de usuarios y acceso a estadísticas completas
 
 ---
 
-## 🗺️ Mapa y Capas Dinámicas
+## Modo offline
 
-El núcleo visual de la aplicación es un mapa interactivo construido con `flutter_map` y mapas base de *CartoDB Voyager*.
+La aplicación está pensada para funcionar en terreno, donde la señal de celular puede ser inestable. Las capas críticas (centros de acopio, sedes comunitarias, zonas de peligro, Plan Regulador, patentes del último año) se guardan localmente usando SQLite a través de Drift.
 
-*   **Capas (Layers):** A través del panel lateral, los usuarios pueden encender y apagar capas en tiempo real (Plan Regulador, Centros de Acopio, Patentes). El estado global es manejado ágilmente por **Riverpod**.
-*   **Modo Dibujo:** Los operarios pueden presionar el ícono del "lápiz" para agregar vértices tocando el mapa. Al juntar 3 o más puntos, se forma un polígono que puede guardarse como una nueva **Zona de Peligro**, usando directamente los DAOs y el flujo offline.
-
----
-
-## 🤖 Scraper y Geocoding
-
-El componente `scraper/` es un proceso autónomo (`Worker`) que actualiza la base de datos municipal sin intervención humana.
-
-*   **Fuentes:** Extrae datos de *lotatransparente.cl* (Patentes Mensuales, Permisos DOM, Decretos de Tránsito).
-*   **Normalización:** Aplica reglas específicas de la comuna (ej. cambiar "P.A. Cerda" a "Pedro Aguirre Cerda", ignorar direcciones de pabellones antiguos).
-*   **Geocoding Responsable:** Convierte las direcciones de texto en coordenadas (Lat/Lng) usando **Nominatim (OpenStreetMap)**. Implementa un estricto *Rate Limit* de **1 petición por segundo** para cumplir con los términos de uso del proveedor y evitar bloqueos.
-*   **Scheduler:** Utiliza `cron` para ejecutarse automáticamente durante la madrugada (03:00 AM).
+Cuando un operativo crea un reporte sin conexión, el registro se guarda localmente y aparece en el mapa inmediatamente. En cuanto el dispositivo recupera conexión, el servicio de sincronización lo sube al servidor automáticamente. Si falla el primer intento, reintenta con backoff exponencial (1s, 5s, 30s, 5 min). Si falla tres veces, el registro queda marcado como error de sync y se le notifica al usuario.
 
 ---
 
-## 🚀 Despliegue Local y Desarrollo
+## Scraper
 
-### Requisitos Previos
-*   [Docker](https://www.docker.com/) y Docker Compose.
-*   [Flutter SDK](https://flutter.dev/docs/get-started/install) (Versión >=3.19.0).
-*   [Dart SDK](https://dart.dev/get-dart) (Incluido con Flutter).
+El scraper es un proceso separado que corre en segundo plano y actualiza la base de datos cada noche a las 03:00. Extrae datos de lotatransparente.cl (el portal de transparencia municipal), los normaliza y los geocodifica usando Nominatim de OpenStreetMap.
 
-### 1. Levantar la Infraestructura (Backend, BD, Redis, Scraper)
-Desde la raíz del proyecto, ejecuta:
+La normalización de direcciones tiene reglas específicas para Lota porque la nomenclatura local es atípica: "P.A. Cerda" se expande a "Pedro Aguirre Cerda", las referencias a pabellones históricos mineros se descartan porque no tienen coordenadas válidas, etc. Los registros que no se pueden geocodificar van a una bandeja de revisión manual.
+
+El geocoding respeta el límite de 1 petición por segundo que exige Nominatim, y cachea los resultados en Redis por 30 días para no repetir consultas.
+
+---
+
+## Levantar el proyecto en desarrollo
+
+Requisitos: Docker, Docker Compose, Flutter SDK 3.27+.
+
 ```bash
-docker-compose up -d --build
-```
-Esto iniciará:
-*   PostgreSQL (PostGIS) en el puerto `5432`.
-*   Redis en el puerto `6379`.
-*   API Backend en el puerto `8080`.
-*   Scraper (Worker en segundo plano).
-*   Nginx (Proxy inverso) en el puerto `80`.
+# Levantar base de datos, Redis, backend y scraper
+docker compose up -d --build
 
-### 2. Ejecutar la Aplicación (Frontend)
-Abre una nueva terminal, entra al directorio de la app y ejecuta:
-```bash
+# En otra terminal, correr la app Flutter
 cd app
 flutter pub get
-flutter run
+flutter run -d chrome   # web
+flutter run             # emulador o dispositivo conectado
 ```
-*(Puedes correrlo en el navegador con `flutter run -d chrome` o en un emulador Android/iOS).*
 
-### 3. Generación de Código (Opcional/Desarrollo)
-Si realizas cambios en los Modelos (`shared/`) o en la Base de Datos Local (`app/lib/src/data/local/`), debes regenerar los archivos autogenerados (`.g.dart`, `.freezed.dart`):
+El backend queda disponible en `http://localhost:8080`. La app Flutter toma esa URL por defecto en desarrollo, configurada en `app/lib/src/config/constants.dart`.
 
-**Para Shared:**
+Si modificas modelos en `shared/` o tablas de la base de datos local en `app/lib/src/data/local/`, hay que regenerar los archivos generados por `build_runner`:
+
 ```bash
-cd shared
+# En shared/
+dart run build_runner build -d
+
+# En app/
 dart run build_runner build -d
 ```
-**Para App:**
-```bash
-cd app
-dart run build_runner build -d
-```
+
+---
+
+## Deploy
+
+El sistema usa tres servicios para producción:
+
+- **Railway** — backend Dart + PostgreSQL + Redis. El archivo `railway.json` en la raíz configura el build automáticamente desde el Dockerfile del backend.
+- **Cloudflare Pages** — app Flutter compilada para web. El workflow `.github/workflows/deploy-web.yml` la construye y despliega en cada push a `main`.
+- **Firebase App Distribution** — APK Android para distribución a testers. El workflow `.github/workflows/android.yml` lo construye y lo distribuye automáticamente.
+
+Las variables de entorno necesarias están documentadas en `.env.example`. Para producción, crea un archivo `.env.production` basándote en ese template (nunca se commitea).

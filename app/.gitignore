@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Drift web assets (generated — run `dart compile js -O2 -o web/drift_worker.js web/drift_worker.dart`)
+/web/drift_worker.js
+/web/sqlite3.wasm
+
+# Firebase — contiene claves del proyecto. No commitear.
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist

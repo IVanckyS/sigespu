@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared/shared.dart';
 
+// ── Cached TextStyles (evita lookup de GoogleFonts en cada build) ─────────────
+
+final TextStyle _kDateStyle = GoogleFonts.jetBrainsMono(
+  fontSize: 10.5,
+  color: const Color(0xFF57534E),
+);
+final TextStyle _kSectorChipStyle = GoogleFonts.jetBrainsMono(
+  fontSize: 10,
+  fontWeight: FontWeight.w600,
+  color: const Color(0xFF44403C),
+);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 Color colorParaTipo(TipoActividad t) => switch (t) {
@@ -72,28 +84,29 @@ class ActividadCard extends StatelessWidget {
     final vencidos = _acuerdosVencidos(a);
     final sinUbicacion = a.direccion == null || a.direccion == 'Sin ubicación';
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Opacity(
-        opacity: muted ? 0.72 : 1.0,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: highlighted ? const Color(0xFFEA580C) : const Color(0xFFE7E5E4),
-              width: highlighted ? 1.5 : 1,
-            ),
-            boxShadow: [
-              if (highlighted)
-                const BoxShadow(color: Color(0xFFFFEDD5), blurRadius: 0, spreadRadius: 3),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.07),
-                blurRadius: 3,
-                offset: const Offset(0, 1),
+    return RepaintBoundary(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Opacity(
+          opacity: muted ? 0.72 : 1.0,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: highlighted ? const Color(0xFFEA580C) : const Color(0xFFE7E5E4),
+                width: highlighted ? 1.5 : 1,
               ),
-            ],
-          ),
+              boxShadow: [
+                if (highlighted)
+                  const BoxShadow(color: Color(0xFFFFEDD5), blurRadius: 0, spreadRadius: 3),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.07),
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
           padding: const EdgeInsets.fromLTRB(11, 10, 11, 11),
           child: Stack(
             children: [
@@ -133,10 +146,7 @@ class ActividadCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         _fmtDate(a.fechaInicio),
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 10.5,
-                          color: const Color(0xFF57534E),
-                        ),
+                        style: _kDateStyle,
                       ),
                       const SizedBox(width: 6),
                       const Text('·', style: TextStyle(color: Color(0xFFD6D3D1))),
@@ -212,6 +222,7 @@ class ActividadCard extends StatelessWidget {
               ),
             ],
           ),
+          ),
         ),
       ),
     );
@@ -262,11 +273,7 @@ class _SectorChip extends StatelessWidget {
       ),
       child: Text(
         sector,
-        style: GoogleFonts.jetBrainsMono(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: const Color(0xFF44403C),
-        ),
+        style: _kSectorChipStyle,
       ),
     );
   }

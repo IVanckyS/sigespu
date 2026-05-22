@@ -184,6 +184,67 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(pendingEmail: null, error: null);
   }
 
+  /// Paso 1 del flujo de recuperación: pide un código por correo.
+  /// El backend responde 200 genérico sin importar si el email existe
+  /// (anti-enumeración OWASP).
+  Future<bool> solicitarReset(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/solicitar-reset'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': normalizeEmail(email)}),
+      );
+      if (response.statusCode == 200) {
+        state = state.copyWith(isLoading: false, error: null);
+        return true;
+      } else {
+        final data = jsonDecode(response.body);
+        state = state.copyWith(
+            isLoading: false,
+            error: data['error'] ?? 'Error solicitando código de recuperación');
+        return false;
+      }
+    } catch (_) {
+      state = state.copyWith(
+          isLoading: false, error: 'Error de conexión con el servidor');
+      return false;
+    }
+  }
+
+  /// Paso 3: valida código + actualiza contraseña.
+  /// Si el código es incorrecto, el state.error refleja el mensaje del backend
+  /// (incluye intentos restantes).
+  Future<bool> resetPassword(
+      String email, String codigo, String nuevaPassword) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/reset-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': normalizeEmail(email),
+          'codigo': codigo,
+          'password': nuevaPassword,
+        }),
+      );
+      if (response.statusCode == 200) {
+        state = state.copyWith(isLoading: false, error: null);
+        return true;
+      } else {
+        final data = jsonDecode(response.body);
+        state = state.copyWith(
+            isLoading: false,
+            error: data['error'] ?? 'No se pudo actualizar la contraseña');
+        return false;
+      }
+    } catch (_) {
+      state = state.copyWith(
+          isLoading: false, error: 'Error de conexión con el servidor');
+      return false;
+    }
+  }
+
   Future<bool> solicitarAcceso(String cargo, String direccionMunicipal) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -227,6 +288,38 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _storage.delete(key: 'refresh_token');
     await _storage.delete(key: 'user_info');
     state = AuthState(); // Reset state
+  }
+
+  /// Intenta refrescar el access token usando el refresh token almacenado.
+  ///
+  /// Devuelve true si obtuvo un nuevo par de tokens. Si el refresh ya no es
+  /// válido (revocado, expirado o reusado) hace logout y devuelve false —
+  /// el caller debe redirigir a login.
+  ///
+  /// Pensado para ser invocado por wrappers HTTP cuando el backend devuelve
+  /// 401, evitando que cada feature implemente su propia lógica de refresh.
+  Future<bool> tryRefresh() async {
+    final refresh = await _storage.read(key: 'refresh_token');
+    if (refresh == null) return false;
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': refresh}),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        await _storage.write(key: 'access_token', value: data['access_token']);
+        await _storage.write(key: 'refresh_token', value: data['refresh_token']);
+        return true;
+      }
+      // 401/403: refresh inválido — sesión muerta, limpiar.
+      await logout();
+      return false;
+    } catch (_) {
+      // Error de red: NO hacer logout (puede ser transiente offline).
+      return false;
+    }
   }
 }
 

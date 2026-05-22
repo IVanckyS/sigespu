@@ -61,7 +61,16 @@ Future<void> runMigrations(Pool db) async {
       final sql = await file.readAsString();
 
       await db.runTx((tx) async {
-        await tx.execute(sql);
+        // Split on semicolons so multi-statement files work with the
+        // extended query protocol (which rejects multiple commands per call).
+        final stmts = sql
+            .split(';')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty && !RegExp(r'^--').hasMatch(s))
+            .toList();
+        for (final stmt in stmts) {
+          await tx.execute(stmt);
+        }
         await tx.execute(
           Sql.named(
               'INSERT INTO schema_migrations (version) VALUES (@v)'),

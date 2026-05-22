@@ -1,19 +1,31 @@
 import 'dart:convert';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_heatmap/flutter_map_heatmap.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:logging/logging.dart';
 import 'package:shared/shared.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../config/constants.dart';
+import '../../../data/providers.dart';
+import '../../../data/remote/cached_api.dart';
 import '../../../data/seed_data.dart';
 import '../../auth/auth_provider.dart';
 import '../../actividades/actividades_provider.dart';
 import '../layers/plan_regulador_layer.dart';
+import 'visor_provider.dart';
 
 // ── Capas activas ─────────────────────────────────────────────────────────────
 
 final activeLayersProvider = StateProvider<Set<String>>((ref) => {});
+
+// ── Ubicación del usuario (GPS) ───────────────────────────────────────────────
+
+/// Última posición GPS obtenida del dispositivo. `null` mientras el usuario
+/// no haya pedido localizarse o no se haya conseguido lectura todavía.
+/// El marker dedicado en el mapa solo se renderiza cuando este provider
+/// tiene un valor — así no aparece un punto fantasma en (0,0) al cargar.
+final userLocationProvider = StateProvider<LatLng?>((ref) => null);
 
 // ── Modo dibujo ───────────────────────────────────────────────────────────────
 
@@ -52,6 +64,9 @@ bool _isTransient(String tipo) =>
 
 // ── Elementos en memoria y persistencia local ────────────────────────────────
 
+final _logElems = Logger('UserElements');
+final _logDeleted = Logger('DeletedIds');
+
 class UserElementsNotifier extends Notifier<List<ElementoMapa>> {
   static const _storageKey = 'sigespu_user_elements';
   static const _polygonsKey = 'sigespu_user_polygons_v1';
@@ -72,7 +87,7 @@ class UserElementsNotifier extends Notifier<List<ElementoMapa>> {
         state = list.map((item) => _fromJson(item as Map<String, dynamic>)).toList();
       }
     } catch (e) {
-      print('Error cargando elementos locales: $e');
+      _logElems.warning('Error cargando elementos locales', e);
     }
     await _loadLocalPolygons();
   }
@@ -97,7 +112,7 @@ class UserElementsNotifier extends Notifier<List<ElementoMapa>> {
         ref.read(userPolygonsProvider.notifier).state = restored;
       }
     } catch (e) {
-      print('Error cargando polígonos locales: $e');
+      _logElems.warning('Error cargando polígonos locales', e);
     }
   }
 
@@ -116,7 +131,7 @@ class UserElementsNotifier extends Notifier<List<ElementoMapa>> {
       });
       await prefs.setString(_polygonsKey, jsonEncode(current));
     } catch (e) {
-      print('Error guardando polígono local: $e');
+      _logElems.warning('Error guardando polígono local', e);
     }
   }
 
@@ -126,98 +141,111 @@ class UserElementsNotifier extends Notifier<List<ElementoMapa>> {
       final token = await storage.read(key: 'access_token');
       const apiBase = AppConstants.apiBaseUrl;
       final headers = token != null ? {'Authorization': 'Bearer $token'} : null;
+      final api = ref.read(cachedApiProvider);
 
-      // 1. Cargar Puntos de Interés
-      final respPuntos = await http.get(
+      // 1. Puntos de Interés — cache-first
+      final puntosResp = await api.get(
         Uri.parse('$apiBase/api/elementos'),
         headers: headers,
-      ).timeout(const Duration(seconds: 10));
+        cacheKey: 'api:/api/elementos',
+      );
 
-      List<ElementoMapa> backendElements = [];
+      final backendElements = <ElementoMapa>[];
 
-      if (respPuntos.statusCode == 200) {
-        final List list = jsonDecode(respPuntos.body);
-        backendElements.addAll(list.map((j) {
-          final p = PuntoInteres.fromJson(j);
-          return ElementoMapa(
-            id: p.id,
-            tipo: p.tipo,
-            nombre: p.nombre ?? '',
-            direccion: p.direccion ?? '',
-            sector: p.metadata?['sector'] ?? 'Centro',
-            lat: p.lat,
-            lng: p.lng,
-            estado: p.estado,
-            fecha: p.createdAt?.toIso8601String().substring(0, 10) ?? '',
-            by: p.createdBy ?? 'Sistema',
-            notas: p.descripcion ?? '',
-            capacidad: p.metadata?['capacidad'],
-            rut: p.metadata?['rut'],
-            giro: p.metadata?['giro'],
-            tipoPeligro: p.metadata?['tipoPeligro'],
-            nivel: p.metadata?['nivel'],
-            horario: p.metadata?['horario'],
-          );
-        }));
+      if (puntosResp.hasData) {
+        try {
+          final List list = jsonDecode(puntosResp.body!);
+          backendElements.addAll(list.map((j) {
+            final p = PuntoInteres.fromJson(j);
+            return ElementoMapa(
+              id: p.id,
+              tipo: p.tipo,
+              nombre: p.nombre ?? '',
+              direccion: p.direccion ?? '',
+              sector: p.metadata?['sector'] ?? 'Centro',
+              lat: p.lat,
+              lng: p.lng,
+              estado: p.estado,
+              fecha: p.createdAt?.toIso8601String().substring(0, 10) ?? '',
+              by: p.createdBy ?? 'Sistema',
+              notas: p.descripcion ?? '',
+              capacidad: p.metadata?['capacidad'],
+              rut: p.metadata?['rut'],
+              giro: p.metadata?['giro'],
+              tipoPeligro: p.metadata?['tipoPeligro'],
+              nivel: p.metadata?['nivel'],
+              horario: p.metadata?['horario'],
+            );
+          }));
+        } catch (e) {
+          _logElems.fine('Elemento mal formado del backend: $e');
+        }
       }
 
-      // 2. Cargar Zonas (opcional, si se implementa el GET en el backend)
-      final respZonas = await http.get(
+      // 2. Zonas — cache-first
+      final zonasResp = await api.get(
         Uri.parse('$apiBase/api/zonas'),
         headers: headers,
-      ).timeout(const Duration(seconds: 10));
+        cacheKey: 'api:/api/zonas',
+      );
 
-      if (respZonas.statusCode == 200) {
-        final List list = jsonDecode(respZonas.body);
-        for (final j in list) {
-          final id = j['id'] as String;
-          if (backendElements.any((e) => e.id == id)) continue;
-          
-          final geojson = j['geojson'] as Map<String, dynamic>;
-          final coords = (geojson['coordinates'] as List)[0] as List;
-          // Calcular centroide para el marcador
-          double sumLat = 0, sumLng = 0;
-          for (final c in coords) {
-            sumLng += c[0];
-            sumLat += c[1];
+      if (zonasResp.hasData) {
+        try {
+          final List list = jsonDecode(zonasResp.body!);
+          for (final j in list) {
+            final id = j['id'] as String;
+            if (backendElements.any((e) => e.id == id)) continue;
+
+            final geojson = j['geojson'] as Map<String, dynamic>;
+            final coords = (geojson['coordinates'] as List)[0] as List;
+            double sumLat = 0, sumLng = 0;
+            for (final c in coords) {
+              sumLng += c[0];
+              sumLat += c[1];
+            }
+            final lat = sumLat / coords.length;
+            final lng = sumLng / coords.length;
+
+            backendElements.add(ElementoMapa(
+              id: id,
+              tipo: 'zona_peligro',
+              nombre: j['nombre'] as String? ?? 'Zona',
+              direccion: 'Lota',
+              sector: 'Centro',
+              lat: lat,
+              lng: lng,
+              estado: 'activo',
+              fecha: (j['createdAt'] as String).substring(0, 10),
+              by: 'Sistema',
+              notas: j['descripcion'] as String? ?? '',
+              nivel: j['nivelRiesgo'] as int?,
+              tipoPeligro: j['tipoRiesgo'] as String?,
+            ));
+
+            final points = coords
+                .map((c) => LatLng(c[1] as double, c[0] as double))
+                .toList();
+            ref.read(userPolygonsProvider.notifier).update((s) {
+              if (s.any((p) => p.zona.id == id)) return s;
+              return [...s, (points: points, zona: backendElements.last)];
+            });
           }
-          final lat = sumLat / coords.length;
-          final lng = sumLng / coords.length;
-
-          backendElements.add(ElementoMapa(
-            id: id,
-            tipo: 'zona_peligro',
-            nombre: j['nombre'] as String? ?? 'Zona',
-            direccion: 'Lota',
-            sector: 'Centro',
-            lat: lat,
-            lng: lng,
-            estado: 'activo',
-            fecha: (j['createdAt'] as String).substring(0, 10),
-            by: 'Sistema',
-            notas: j['descripcion'] as String? ?? '',
-            nivel: j['nivelRiesgo'] as int?,
-            tipoPeligro: j['tipoRiesgo'] as String?,
-          ));
-
-          // Actualizar polígonos
-          final points = coords.map((c) => LatLng(c[1] as double, c[0] as double)).toList();
-          ref.read(userPolygonsProvider.notifier).update((s) {
-            if (s.any((p) => p.zona.id == id)) return s;
-            return [...s, (points: points, zona: backendElements.last)];
-          });
+        } catch (e) {
+          _logElems.fine('Zona mal formada del backend: $e');
         }
       }
 
       if (backendElements.isNotEmpty) {
-        // Mezclar con locales, evitando duplicados por ID
         final localIds = state.map((e) => e.id).toSet();
-        final newFromBackend = backendElements.where((e) => !localIds.contains(e.id)).toList();
-        state = [...state, ...newFromBackend];
+        final newFromBackend =
+            backendElements.where((e) => !localIds.contains(e.id)).toList();
+        if (newFromBackend.isNotEmpty) {
+          state = [...state, ...newFromBackend];
+        }
       }
-
     } catch (e) {
-      print('Error cargando elementos del backend: $e');
+      // Capa final de seguridad: cualquier error inesperado no rompe la app.
+      _logElems.warning('_loadFromBackend falló', e);
     }
   }
 
@@ -227,7 +255,7 @@ class UserElementsNotifier extends Notifier<List<ElementoMapa>> {
       final jsonStr = jsonEncode(state.map((e) => _toJson(e)).toList());
       await prefs.setString(_storageKey, jsonStr);
     } catch (e) {
-      print('Error guardando elementos locales: $e');
+      _logElems.warning('Error guardando elementos locales', e);
     }
   }
 
@@ -277,7 +305,7 @@ class DeletedIdsNotifier extends Notifier<Set<String>> {
         state = list.cast<String>().toSet();
       }
     } catch (e) {
-      print('Error cargando IDs eliminados: $e');
+      _logDeleted.warning('Error cargando', e);
     }
   }
 
@@ -286,7 +314,7 @@ class DeletedIdsNotifier extends Notifier<Set<String>> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, jsonEncode(state.toList()));
     } catch (e) {
-      print('Error guardando IDs eliminados: $e');
+      _logDeleted.warning('Error guardando', e);
     }
   }
 
@@ -355,9 +383,19 @@ final filteredUserPolygonsProvider =
   final activeLayers = ref.watch(activeLayersProvider);
   final userPolygons = ref.watch(userPolygonsProvider);
   final dateLimit = ref.watch(dateLimitProvider);
+  final activeCats = ref.watch(activeZonaCategoriesProvider);
+
+  // El toggle "Mostrar zonas dibujadas" activa la pseudo-capa 'zona_custom'.
+  // Sin él, las zonas no se muestran independientemente del tipo real.
+  final showAllCustom = activeLayers.contains('zona_custom');
 
   return userPolygons.where((p) {
-    if (!activeLayers.contains(p.zona.layerKey)) return false;
+    if (!showAllCustom && !activeLayers.contains(p.zona.layerKey)) return false;
+    // Si hay filtro por tipo de peligro activo, aplica solo a zonas de seguridad
+    // (las únicas que llevan p.zona.tipoPeligro). El resto pasa siempre.
+    if (activeCats.isNotEmpty && p.zona.tipoPeligro != null) {
+      if (!activeCats.contains(p.zona.tipoPeligro)) return false;
+    }
     if (dateLimit != null && _isTransient(p.zona.tipo)) {
       final d = DateTime.tryParse(p.zona.fecha);
       if (d != null && d.isBefore(dateLimit)) return false;
@@ -368,12 +406,72 @@ final filteredUserPolygonsProvider =
 
 // ── Plan Regulador ────────────────────────────────────────────────────────────
 
-final planReguladorEditsProvider =
-    StateProvider<Map<String, List<LatLng>>>((ref) => {});
+class PlanReguladorEditsNotifier extends Notifier<Map<String, List<LatLng>>> {
+  static const _storageKey = 'sigespu_plan_regulador_edits_v1';
+
+  @override
+  Map<String, List<LatLng>> build() {
+    _load();
+    return {};
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storageKey);
+      if (raw == null || raw.isEmpty) return;
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      state = map.map((k, v) {
+        final pts = (v as List).map((p) {
+          final m = p as Map<String, dynamic>;
+          return LatLng(
+            (m['lat'] as num).toDouble(),
+            (m['lng'] as num).toDouble(),
+          );
+        }).toList();
+        return MapEntry(k, pts);
+      });
+    } catch (_) {
+      // Si el JSON está corrupto, ignoramos: state se queda vacío.
+    }
+  }
+
+  Future<void> _persist() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = state.map((k, v) => MapEntry(
+            k,
+            v.map((p) => {'lat': p.latitude, 'lng': p.longitude}).toList(),
+          ));
+      await prefs.setString(_storageKey, jsonEncode(encoded));
+    } catch (_) {}
+  }
+
+  void setSector(String code, List<LatLng> points) {
+    state = {...state, code: points};
+    _persist();
+  }
+
+  void clearSector(String code) {
+    final next = Map<String, List<LatLng>>.from(state)..remove(code);
+    state = next;
+    _persist();
+  }
+}
+
+final planReguladorEditsProvider = NotifierProvider<
+    PlanReguladorEditsNotifier, Map<String, List<LatLng>>>(
+  PlanReguladorEditsNotifier.new,
+);
 
 final planReguladorPolygonsProvider = Provider<List<Polygon>>((ref) {
   final edits = ref.watch(planReguladorEditsProvider);
-  return PlanReguladorLayer.buildPolygons(edits: edits);
+  final isDrawing = ref.watch(isDrawingModeProvider);
+  final target = ref.watch(drawingTargetProvider);
+  return PlanReguladorLayer.buildPolygons(
+    edits: edits,
+    hiddenCode: isDrawing ? target : null,
+  );
 });
 
 final planReguladorObsProvider =
@@ -399,11 +497,19 @@ final scrapingFilteredPatenteProvider =
 final scrapingFilteredPermisoProvider =
     StateProvider<List<DatoPermiso>>((ref) => kPermisos);
 
-final scrapingFilteredTransitoProvider =
-    StateProvider<List<DatoTransito>>((ref) => kTransito);
-
 final scrapingFilteredOrgProvider =
     StateProvider<List<DatoOrganizacion>>((ref) => kOrganizaciones);
+
+// Página actual del scraping (los 20 registros visibles en pantalla).
+// Usado por el PDF export para exportar solo lo que está en pantalla.
+final scrapingPagedPatenteProvider =
+    StateProvider<List<DatoPatente>>((ref) => const []);
+
+final scrapingPagedPermisoProvider =
+    StateProvider<List<DatoPermiso>>((ref) => const []);
+
+final scrapingPagedOrgProvider =
+    StateProvider<List<DatoOrganizacion>>((ref) => const []);
 
 // ── Capa actividades municipales ──────────────────────────────────────────────
 
@@ -448,3 +554,185 @@ final customZonaCategoriesProvider = Provider<List<String>>((ref) {
 
 /// Categorías de zonas dibujadas actualmente visibles.
 final activeZonaCategoriesProvider = StateProvider<Set<String>>((ref) => {});
+
+// ── Providers memoizados (evitan recomputaciones por gesto/rebuild) ──────────
+
+/// HeatMapDataSource memoizado: solo se reconstruye cuando cambia allElements.
+///
+/// Antes se reconstruía en cada `build()` del MapScreen, lo que incluía cada
+/// frame del gesto de paneo.
+class _CachedHeatMapDataSource extends HeatMapDataSource {
+  final List<WeightedLatLng> _data;
+  _CachedHeatMapDataSource(this._data);
+
+  @override
+  List<WeightedLatLng> getData(LatLngBounds bounds, double zoom) => _data;
+}
+
+final heatmapDataSourceProvider = Provider<HeatMapDataSource>((ref) {
+  final all = ref.watch(allElementsProvider);
+  final data = <WeightedLatLng>[];
+  for (final e in all) {
+    if (e.tipo.startsWith('reporte_') || e.tipo == 'zona_peligro') {
+      data.add(WeightedLatLng(
+        e.latLng,
+        e.tipo == 'zona_peligro'
+            ? ((e.nivel ?? 3) * 0.2).clamp(0.2, 1.0)
+            : 0.7,
+      ));
+    }
+  }
+  return _CachedHeatMapDataSource(data);
+});
+
+/// Entidades del syncQueueTable que representan elementos del mapa.
+/// Activities, reports y demás viven en sus propios providers de "pending".
+const _kElementSyncEntidades = ['punto_interes', 'zona_peligro'];
+
+/// Stream reactivo de IDs con entries pendientes en el syncQueueTable.
+/// Cuando el SyncService confirma la subida al backend, elimina el row de
+/// la cola y este stream emite el set sin ese id → la UI re-construye sin
+/// el badge "Pendiente sync".
+final _pendingSyncIdsStreamProvider = StreamProvider<Set<String>>((ref) {
+  final db = ref.watch(databaseProvider);
+  final query = db.select(db.syncQueueTable)
+    ..where((t) => t.entidad.isIn(_kElementSyncEntidades));
+  return query
+      .watch()
+      .map((rows) => {for (final r in rows) r.entidadId});
+});
+
+/// Set de IDs de elementos pendientes de sincronizar con el backend.
+/// Lee del syncQueueTable (fuente de verdad), no del cache local — así un
+/// elemento creado y sincronizado deja de aparecer como "Pendiente sync".
+final pendingElementIdsProvider = Provider<Set<String>>((ref) {
+  return ref.watch(_pendingSyncIdsStreamProvider).valueOrNull ?? const {};
+});
+
+/// Geometrías parseadas de una capa personalizada (markers/polygons/polylines).
+///
+/// Parsear el GeoJSON con cientos/miles de features es caro. Esta familia
+/// memoiza el resultado por id de capa: solo se re-ejecuta cuando cambia el
+/// GeoJSON crudo (cambio de bounds) o los metadatos de la capa.
+typedef CapaGeometries = ({
+  List<({double lat, double lng, int color})> points,
+  List<({List<({double lat, double lng})> ring, int color, double opacidad})>
+      polygons,
+  List<({List<({double lat, double lng})> line, int color})> lines,
+});
+
+final capaParsedGeomsProvider =
+    Provider.family<CapaGeometries?, String>((ref, capaId) {
+  final fcAsync = ref.watch(capaGeoJsonProviderRef(capaId));
+  final fc = fcAsync;
+  if (fc == null) return null;
+
+  final capa = ref.watch(_capaByIdProvider(capaId));
+  if (capa == null) return null;
+
+  final baseColorVal =
+      int.tryParse(capa.color.replaceFirst('#', '0xFF')) ?? 0xFFFF5722;
+
+  final points = <({double lat, double lng, int color})>[];
+  final polygons =
+      <({List<({double lat, double lng})> ring, int color, double opacidad})>[];
+  final lines = <({List<({double lat, double lng})> line, int color})>[];
+
+  final features = (fc['features'] as List).cast<Map<String, dynamic>>();
+  for (final f in features) {
+    final geom = f['geometry'] as Map<String, dynamic>?;
+    if (geom == null) continue;
+    final type = geom['type'] as String;
+    final coords = geom['coordinates'];
+    final props = f['properties'] as Map<String, dynamic>? ?? {};
+
+    int colorVal = baseColorVal;
+    if (props.containsKey('kml_color')) {
+      final kml = props['kml_color'] as String;
+      if (kml.length == 8) {
+        final a = int.parse(kml.substring(0, 2), radix: 16);
+        final b = int.parse(kml.substring(2, 4), radix: 16);
+        final g = int.parse(kml.substring(4, 6), radix: 16);
+        final r = int.parse(kml.substring(6, 8), radix: 16);
+        colorVal = (a << 24) | (r << 16) | (g << 8) | b;
+      }
+    } else {
+      // variación tonal por hash del id
+      final seed = (f['id']?.toString().hashCode ?? 0) % 100;
+      final lightnessShift = (seed - 50) / 330;
+      // aproximación rápida: aclarar/oscurecer canales RGB
+      final r = ((baseColorVal >> 16) & 0xFF).toDouble();
+      final g = ((baseColorVal >> 8) & 0xFF).toDouble();
+      final b = (baseColorVal & 0xFF).toDouble();
+      final factor = 1.0 + lightnessShift.clamp(-0.4, 0.4);
+      final nr = (r * factor).clamp(0, 255).toInt();
+      final ng = (g * factor).clamp(0, 255).toInt();
+      final nb = (b * factor).clamp(0, 255).toInt();
+      colorVal = 0xFF000000 | (nr << 16) | (ng << 8) | nb;
+    }
+
+    if (type == 'Point') {
+      final c = coords as List;
+      points.add((
+        lat: (c[1] as num).toDouble(),
+        lng: (c[0] as num).toDouble(),
+        color: colorVal,
+      ));
+    } else if (type == 'Polygon') {
+      final rings = (coords as List).cast<List>();
+      final ring = <({double lat, double lng})>[
+        for (final c in rings.first.cast<List>())
+          (lat: (c[1] as num).toDouble(), lng: (c[0] as num).toDouble()),
+      ];
+      polygons.add((ring: ring, color: colorVal, opacidad: capa.opacidad));
+    } else if (type == 'MultiPolygon') {
+      for (final polyCoords in (coords as List)) {
+        final rings = (polyCoords as List).cast<List>();
+        final ring = <({double lat, double lng})>[
+          for (final c in rings.first.cast<List>())
+            (lat: (c[1] as num).toDouble(), lng: (c[0] as num).toDouble()),
+        ];
+        polygons.add((ring: ring, color: colorVal, opacidad: capa.opacidad));
+      }
+    } else if (type == 'LineString') {
+      final line = <({double lat, double lng})>[
+        for (final c in (coords as List).cast<List>())
+          (lat: (c[1] as num).toDouble(), lng: (c[0] as num).toDouble()),
+      ];
+      lines.add((line: line, color: colorVal));
+    } else if (type == 'MultiLineString') {
+      for (final lineCoords in (coords as List)) {
+        final line = <({double lat, double lng})>[
+          for (final c in (lineCoords as List).cast<List>())
+            (lat: (c[1] as num).toDouble(), lng: (c[0] as num).toDouble()),
+        ];
+        lines.add((line: line, color: colorVal));
+      }
+    }
+  }
+
+  return (points: points, polygons: polygons, lines: lines);
+});
+
+// Helper: capa por id desde el provider async (resuelto)
+final _capaByIdProvider =
+    Provider.family<CapaPersonalizadaDto?, String>((ref, id) {
+  return ref.watch(capasPersonalizadasProvider).maybeWhen(
+        data: (list) {
+          for (final c in list) {
+            if (c.id == id) return c;
+          }
+          return null;
+        },
+        orElse: () => null,
+      );
+});
+
+// Helper: GeoJSON crudo de una capa, resuelto. Devuelve null si aún no cargó.
+final capaGeoJsonProviderRef =
+    Provider.family<Map<String, dynamic>?, String>((ref, id) {
+  return ref.watch(capaGeoJsonProvider(id)).maybeWhen(
+        data: (v) => v,
+        orElse: () => null,
+      );
+});

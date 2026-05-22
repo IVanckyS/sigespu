@@ -18,14 +18,24 @@ Future<void> showNuevaActividadSheet(
   return showDialog(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.72),
-    builder: (ctx) => Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 60, vertical: 40),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 700, maxHeight: 720),
-        child: NuevaActividadSheet(estadoInicial: estadoInicial),
-      ),
-    ),
+    builder: (ctx) {
+      final screen = MediaQuery.sizeOf(ctx);
+      // Apretar el inset en pantallas angostas (móvil) para que el contenido
+      // respire. En desktop el ConstrainedBox limita a 700 igualmente.
+      final horizontalInset = screen.width < 600 ? 12.0 : 40.0;
+      final verticalInset = screen.height < 700 ? 16.0 : 32.0;
+      final maxHeight =
+          (screen.height - verticalInset * 2).clamp(420.0, 820.0);
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(
+            horizontal: horizontalInset, vertical: verticalInset),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 700, maxHeight: maxHeight),
+          child: NuevaActividadSheet(estadoInicial: estadoInicial),
+        ),
+      );
+    },
   );
 }
 

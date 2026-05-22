@@ -1,26 +1,32 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:crypto/crypto.dart';
 import 'package:postgres/postgres.dart';
 import '../database/db_pool.dart';
+import '../services/email_service.dart';
 import 'jwt_service.dart';
 import '../middleware/auth_middleware.dart';
 
 class AuthHandler {
   final DatabaseService _dbService;
   final JwtService _jwtService;
-  
-  static const allowedDomains = ['lota.cl', 'munilota.cl'];
+  final EmailService _emailService;
 
-  AuthHandler(this._dbService, this._jwtService);
+  static const allowedDomains = ['lota.cl', 'munilota.cl'];
+  static const _codeTtlSeconds = 900; // 15 min
+
+  AuthHandler(this._dbService, this._jwtService, this._emailService);
 
   Router get router {
     final router = Router();
-    
+
     // Public routes
     router.post('/register', _register);
+    router.post('/verificar', _verificar);
+    router.post('/reenviar-codigo', _reenviarCodigo);
     router.post('/login', _login);
     router.post('/refresh', _refresh);
     router.post('/logout', _logout);
@@ -33,6 +39,7 @@ class AuthHandler {
     final directorRouter = Router();
     directorRouter.get('/solicitudes', _listarSolicitudes);
     directorRouter.put('/solicitudes/<id>', _resolverSolicitud);
+    directorRouter.get('/usuarios', _listarUsuarios);
 
     // Mount protected routers
     router.mount('/', Pipeline()
@@ -49,7 +56,12 @@ class AuthHandler {
 
   Future<Response> _register(Request req) async {
     final body = await req.readAsString();
-    final data = jsonDecode(body);
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final emailRaw = data['email'] as String?;
     final nombre = data['nombre'] as String?;
     final password = data['password'] as String?;
@@ -68,8 +80,8 @@ class AuthHandler {
     final hash = BCrypt.hashpw(password, BCrypt.gensalt(logRounds: 12));
 
     try {
-      final result = await _dbService.db.execute(
-        Sql.named('INSERT INTO usuarios (email, nombre, password_hash, nivel_acceso) VALUES (@email, @nombre, @hash, @nivel) RETURNING id, nivel_acceso, solicitud_operativo'),
+      await _dbService.db.execute(
+        Sql.named('INSERT INTO usuarios (email, nombre, password_hash, nivel_acceso, activo) VALUES (@email, @nombre, @hash, @nivel, false)'),
         parameters: {
           'email': email,
           'nombre': nombre,
@@ -78,36 +90,136 @@ class AuthHandler {
         }
       );
 
-      final row = result.first;
-      final userId = row[0] as String;
-      final nivelAcceso = row[1] as String;
-      final solicitudOperativo = row[2] as String?;
+      await _generarYEnviarCodigo(email, nombre);
 
-      final accessToken = _jwtService.generateAccessToken(userId, nivelAcceso);
-      final refreshData = await _jwtService.createRefreshToken(userId);
-
-      return Response.ok(jsonEncode({
-        'access_token': accessToken,
-        'refresh_token': refreshData['token'],
-        'user': {
-          'id': userId,
-          'email': email,
-          'nombre': nombre,
-          'nivel_acceso': nivelAcceso,
-          'solicitud_operativo': solicitudOperativo,
-        }
-      }), headers: {'Content-Type': 'application/json'});
+      return Response.ok(
+        jsonEncode({'message': 'Código de verificación enviado al correo'}),
+        headers: {'Content-Type': 'application/json'},
+      );
     } catch (e) {
       if (e.toString().contains('usuarios_email_key')) {
         return Response(409, body: jsonEncode({'error': 'El email ya está registrado'}));
       }
+      print('[auth] Error en /register: $e');
       return Response.internalServerError(body: jsonEncode({'error': 'Error de servidor'}));
     }
   }
 
+  Future<Response> _verificar(Request req) async {
+    final body = await req.readAsString();
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
+    final emailRaw = data['email'] as String?;
+    final codigo = data['codigo'] as String?;
+
+    if (emailRaw == null || codigo == null) {
+      return Response.badRequest(body: jsonEncode({'error': 'Faltan campos requeridos'}));
+    }
+
+    final email = emailRaw.trim().toLowerCase();
+    final key = 'verification:$email';
+    final stored = await _dbService.redis.send_object(['GET', key]);
+
+    if (stored == null || stored is! String || stored != codigo) {
+      return Response.unauthorized(jsonEncode({'error': 'Código incorrecto o expirado'}));
+    }
+
+    final result = await _dbService.db.execute(
+      Sql.named('''
+        UPDATE usuarios
+        SET activo = true, updated_at = NOW()
+        WHERE email = @email
+        RETURNING id, nombre, nivel_acceso, solicitud_operativo
+      '''),
+      parameters: {'email': email},
+    );
+
+    if (result.isEmpty) {
+      return Response.notFound(jsonEncode({'error': 'Usuario no encontrado'}));
+    }
+
+    await _dbService.redis.send_object(['DEL', key]);
+
+    final row = result.first;
+    final userId = row[0] as String;
+    final nombre = row[1] as String;
+    final nivelAcceso = row[2] as String;
+    final solicitudOperativo = row[3] as String?;
+
+    final accessToken = _jwtService.generateAccessToken(userId, nivelAcceso);
+    final refreshData = await _jwtService.createRefreshToken(userId);
+
+    return Response.ok(jsonEncode({
+      'access_token': accessToken,
+      'refresh_token': refreshData['token'],
+      'user': {
+        'id': userId,
+        'email': email,
+        'nombre': nombre,
+        'nivel_acceso': nivelAcceso,
+        'solicitud_operativo': solicitudOperativo,
+      }
+    }), headers: {'Content-Type': 'application/json'});
+  }
+
+  Future<Response> _reenviarCodigo(Request req) async {
+    final body = await req.readAsString();
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
+    final emailRaw = data['email'] as String?;
+
+    if (emailRaw == null) {
+      return Response.badRequest(body: jsonEncode({'error': 'Falta email'}));
+    }
+
+    final email = emailRaw.trim().toLowerCase();
+
+    final result = await _dbService.db.execute(
+      Sql.named('SELECT nombre, activo FROM usuarios WHERE email = @email'),
+      parameters: {'email': email},
+    );
+
+    if (result.isEmpty) {
+      return Response.notFound(jsonEncode({'error': 'Usuario no encontrado'}));
+    }
+
+    final nombre = result.first[0] as String;
+    final activo = result.first[1] as bool;
+
+    if (activo) {
+      return Response(409, body: jsonEncode({'error': 'La cuenta ya está verificada'}));
+    }
+
+    await _generarYEnviarCodigo(email, nombre);
+
+    return Response.ok(jsonEncode({'message': 'Código reenviado'}));
+  }
+
+  Future<void> _generarYEnviarCodigo(String email, String nombre) async {
+    final rng = Random.secure();
+    final codigo = (rng.nextInt(900000) + 100000).toString(); // 6 dígitos
+    await _dbService.redis.send_object([
+      'SET', 'verification:$email', codigo, 'EX', '$_codeTtlSeconds',
+    ]);
+    await _emailService.sendVerificationCode(email, nombre, codigo);
+  }
+
   Future<Response> _login(Request req) async {
     final body = await req.readAsString();
-    final data = jsonDecode(body);
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final emailRaw = data['email'] as String?;
     final password = data['password'] as String?;
 
@@ -160,7 +272,12 @@ class AuthHandler {
 
   Future<Response> _refresh(Request req) async {
     final body = await req.readAsString();
-    final data = jsonDecode(body);
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final token = data['refresh_token'] as String?;
 
     if (token == null) return Response.badRequest(body: jsonEncode({'error': 'Se requiere refresh_token'}));
@@ -253,8 +370,12 @@ class AuthHandler {
   Future<Response> _solicitarAcceso(Request req) async {
     final userId = req.context['user_id'] as String;
     final body = await req.readAsString();
-    final data = jsonDecode(body);
-    
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final cargo = data['cargo'] as String?;
     final direccion = data['direccion_municipal'] as String?;
 
@@ -294,6 +415,50 @@ class AuthHandler {
     return Response.ok(jsonEncode({'message': 'Solicitud enviada correctamente'}));
   }
 
+  Future<Response> _listarUsuarios(Request req) async {
+    try {
+      final rows = await _dbService.db.execute('''
+        SELECT id, email, nombre, nivel_acceso, activo, created_at,
+               solicitud_cargo, solicitud_direccion_municipal
+        FROM usuarios
+        ORDER BY
+          CASE nivel_acceso WHEN 'director' THEN 0 WHEN 'operativo' THEN 1 ELSE 2 END,
+          nombre
+      ''');
+
+      String _unidad(String nivel, String? direccion) {
+        if (direccion != null && direccion.isNotEmpty) return direccion;
+        return switch (nivel) {
+          'director' => 'Dir. Seguridad Pública',
+          'operativo' => 'Inspección',
+          _ => 'Municipal',
+        };
+      }
+
+      final items = rows.map((r) {
+        final nivel = r[3] as String? ?? 'visitante';
+        return {
+          'id': (r[0] as Object).toString(),
+          'email': r[1] as String,
+          'nombre': r[2] as String,
+          'nivel_acceso': nivel,
+          'activo': r[4] as bool? ?? true,
+          'ultima_sesion': (r[5] as DateTime?)?.toIso8601String(),
+          'cargo': r[6] as String?,
+          'unidad': _unidad(nivel, r[7] as String?),
+        };
+      }).toList();
+
+      return Response.ok(
+        jsonEncode(items),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      print('[auth] Error en /usuarios: $e');
+      return Response.internalServerError(body: jsonEncode({'error': 'Error de servidor'}));
+    }
+  }
+
   Future<Response> _listarSolicitudes(Request req) async {
     final result = await _dbService.db.execute('''
       SELECT id, email, nombre, solicitud_fecha, solicitud_cargo, solicitud_direccion_municipal, solicitud_operativo 
@@ -318,8 +483,12 @@ class AuthHandler {
   Future<Response> _resolverSolicitud(Request req, String id) async {
     final directorId = req.context['user_id'] as String;
     final body = await req.readAsString();
-    final data = jsonDecode(body);
-    
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
     final accion = data['accion'] as String?;
 
     if (accion != 'aprobar' && accion != 'rechazar') {
@@ -349,6 +518,6 @@ class AuthHandler {
       return Response.notFound(jsonEncode({'error': 'Solicitud no encontrada o ya procesada'}));
     }
 
-    return Response.ok(jsonEncode({'message': 'Solicitud \$estado correctamente'}));
+    return Response.ok(jsonEncode({'message': 'Solicitud $estado correctamente'}));
   }
 }

@@ -2,6 +2,9 @@
 .packages
 build/
 .env
+.env.production
+.superpowers/
+.claude/worktrees/
 *.iml
 .idea/
 .vscode/

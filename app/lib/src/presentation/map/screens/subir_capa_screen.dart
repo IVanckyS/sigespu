@@ -70,6 +70,7 @@ class _SubirCapaScreenState extends ConsumerState<SubirCapaScreen> {
             _field(_descCtrl, 'Descripción (opcional)'),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
+              // ignore: deprecated_member_use
               value: _categoria,
               dropdownColor: const Color(0xFF1E2327),
               style: const TextStyle(color: Colors.white, fontSize: 12),

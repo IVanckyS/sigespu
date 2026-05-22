@@ -8,8 +8,10 @@ import '../presentation/auth/auth_provider.dart';
 import '../presentation/resumen/resumen_screen.dart';
 import '../presentation/tabla/tabla_screen.dart';
 import '../presentation/scraping/scraping_screen.dart';
+import '../presentation/sync/conflicts_screen.dart';
 import '../presentation/users/users_screen.dart';
 import '../presentation/actividades/actividades_screen.dart';
+import '../presentation/profile/profile_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -32,6 +34,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         builder: (context, state) => const AuthScreen(),
       ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
       ShellRoute(
         builder: (context, state, child) {
           return AppShell(child: child);
@@ -39,27 +45,48 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/map',
-            builder: (context, state) => const MapScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: MapScreen()),
           ),
           GoRoute(
             path: '/resumen',
-            builder: (context, state) => const ResumenScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ResumenScreen()),
           ),
           GoRoute(
             path: '/tabla',
-            builder: (context, state) => const TablaScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: TablaScreen()),
           ),
           GoRoute(
             path: '/scraping',
-            builder: (context, state) => const ScrapingScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ScrapingScreen()),
           ),
           GoRoute(
             path: '/users',
-            builder: (context, state) => const UsersScreen(),
+            redirect: (context, state) {
+              final role = authState.user?['nivel_acceso'] as String? ?? '';
+              if (role != 'director') return '/map';
+              return null;
+            },
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: UsersScreen()),
           ),
           GoRoute(
             path: '/actividades',
-            builder: (context, state) => const ActividadesScreen(),
+            redirect: (context, state) {
+              final role = authState.user?['nivel_acceso'] as String? ?? '';
+              if (role == 'visitante' || role.isEmpty) return '/map';
+              return null;
+            },
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ActividadesScreen()),
+          ),
+          GoRoute(
+            path: '/conflicts',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ConflictsScreen()),
           ),
         ],
       ),

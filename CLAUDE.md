@@ -1,6 +1,6 @@
 # CLAUDE.md — SIGESPU Lota
 > Documento rector del proyecto. Fuente de verdad para todas las sesiones de Claude Code.
-> Última actualización: abril 2026
+> Última actualización: mayo 2026
 
 ---
 
@@ -718,6 +718,19 @@ const amberWarning = Color(0xFFCA8A04);
 
 La maqueta HTML en `docs/mockup/sigespu-lota-maqueta.html` es la referencia visual aprobada para la UX. No reproducirla exactamente en código Flutter, pero respetar la estructura: header con 4 modos (Mapa/Resumen/Tabla/Scraping), sidebar colapsable, FAB group flotante.
 
+### Emblema institucional
+
+El header (`app_shell.dart > _BrandLogo`) usa **únicamente** `SigespuEmblem` (el emblema oficial del Horizonte de Lota). No agregar pintores personalizados adicionales — fue revertido explícitamente por el cliente.
+
+### Design handoffs disponibles
+
+| Pantalla | Carpeta de handoff |
+|---|---|
+| Scraping | `design_handoff_scraping/` |
+| Móvil (general) | `design_handoff_sigespu_movil/` |
+
+Ante cualquier duda visual en estas pantallas, leer el `README.md` dentro de la carpeta de handoff correspondiente antes de escribir código.
+
 ---
 
 ## 11. Convenciones de código
@@ -766,12 +779,36 @@ chore/*       # mantenimiento
 
 | Sprint | Estado | Descripción |
 |---|---|---|
-| Sprint 0 | 🔄 En progreso | Repo, Docker, auth, schema BD |
-| Sprint 1 | ⏳ Pendiente | Scraper patentes + geocoder |
-| Sprint 2 | ⏳ Pendiente | App Flutter base + mapa + capas |
+| Sprint 0 | ✅ Completado | Repo, Docker, auth (JWT + refresh rotation + 401 auto-refresh), schema BD, seed director |
+| Sprint 1 | 🔄 En progreso | Scraper patentes + geocoder (worker Dart estructura lista); vista /scraping Flutter completada con design handoff |
+| Sprint 2 | 🔄 En progreso | App Flutter base construida: map_screen, resumen, tabla, scraping, actividades, users, profile, conflicts, app_shell |
 | Sprint 3 | ⏳ Pendiente | Reportes, zonas, offline sync |
 | Sprint 4 | ⏳ Pendiente | App móvil nativa + cámara |
 | Sprint 5 | ⏳ Pendiente | Hardening + despliegue VPS |
+
+### Estado actual de pantallas Flutter (rama `feat/actividades-mobile-fixes`)
+
+| Pantalla | Ruta | Estado | Notas |
+|---|---|---|---|
+| Auth / Login | `/login` | ✅ Funcional | JWT, refresh rotation, verificación email |
+| Mapa principal | `/map` | ✅ Funcional | flutter_map + CartoDB, capas toggle, location picker |
+| Resumen | `/resumen` | ✅ UI lista | Pendiente conexión API real |
+| Tabla | `/tabla` | ✅ UI lista | Filtros, detalle con mini-mapa |
+| Scraping | `/scraping` | ✅ UI completa | Sidebar filtros, mini-mapa real, editar ubicación, mobile bottom-sheet |
+| Actividades | `/actividades` | ✅ UI lista | Kanban board; bug borderRadius pendiente en `kanban_board.dart:315` |
+| Usuarios | `/users` | ✅ UI lista | Solo rol `director` |
+| Perfil | `/profile` | ✅ UI lista | |
+| Conflictos sync | `/conflicts` | ✅ UI lista | |
+
+### Pendientes conocidos (tareas concretas)
+
+1. **`kanban_board.dart:315`** — mismo bug `Border` no uniforme + `borderRadius` que se arregló en `scraping_screen.dart`. Aún no corregido. Aplicar el mismo patrón `IntrinsicHeight` (ver ADR-008).
+
+2. **Persitir edición de ubicación en scraping view** — "Editar ubicación" actualmente solo actualiza estado local con snackbar de advertencia. Requiere endpoint `POST /api/verificaciones_terreno` (tabla ya definida en schema §5) para persistir el cambio.
+
+3. **Filtros de chips en mobile scraping** — Los chips `Año Todos`, `Mes Todos`, `Geo Todos` tienen `onTap: () {}` vacío. Necesitan selectores apropiados para móvil (Sprint 3+).
+
+4. **Conectar pantallas de Resumen/Tabla/Scraping a API real** — Actualmente muestran datos mock. Requiere implementar los endpoints correspondientes en el backend.
 
 ---
 
@@ -821,6 +858,54 @@ chore/*       # mantenimiento
 
 **Razones**: lotatransparente.cl es HTML estático (no JS rendering), sin anti-bot, URLs predecibles. La Ley 20.285 obliga al municipio a publicar esta información, por lo que es acceso legítimo a datos de publicación obligatoria.
 
+### ADR-008: IntrinsicHeight + Row(stretch) para barras de acento en tarjetas redondeadas
+
+**Decisión**: implementar la barra de acento izquierda (3px de color) en tarjetas con `borderRadius` usando `IntrinsicHeight > Row(crossAxisAlignment: CrossAxisAlignment.stretch) > [Container(width: 3, color: accent), Expanded(content)]`, **no** con `Border(left: BorderSide(color: accent, width: 3), ...)`.
+
+**Razones**: Flutter lanza `"A borderRadius can only be given on borders with uniform colors"` en tiempo de paint cuando un `BoxDecoration` combina un `Border` no uniforme (distintos colores/anchos por lado) con `borderRadius`. El error puede ser silencioso en algunas builds, haciendo que la tarjeta se renderice en blanco sin excepción visible.
+
+**Patrón correcto**:
+```dart
+Material(
+  color: isActive ? AppTheme.orange50 : Colors.white,
+  borderRadius: BorderRadius.circular(8),
+  child: InkWell(
+    borderRadius: BorderRadius.circular(8),
+    onTap: onTap,
+    child: Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppTheme.stone200),  // uniforme
+        borderRadius: BorderRadius.circular(8),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: 3, color: accentColor),  // barra de acento
+            Expanded(child: contentWidget),
+          ],
+        ),
+      ),
+    ),
+  ),
+)
+```
+
+### ADR-009: Material wrapper obligatorio para InkWell en Flutter Web
+
+**Decisión**: siempre envolver `InkWell` en `Material(color: ..., borderRadius: ...)` cuando el widget tiene fondo de color propio.
+
+**Razones**: en Flutter Web, `InkWell` sin un `Material` ancestro inmediato puede no renderizar el contenido hijo correctamente (aparece en blanco). El `Material` actúa como superficie de ink splash y garantiza que el fondo y los hijos sean visibles.
+
+### ADR-010: flutter_map reutilizado en panel de detalle de scraping
+
+**Decisión**: el mini-mapa interactivo dentro de `_MapDetailPanel` (en `scraping_screen.dart`) usa `flutter_map` con los mismos tiles CartoDB Voyager, `CancellableNetworkTileProvider`, `MarkerLayer` y `MapController` que `map_screen.dart`.
+
+**Razones**: consistencia visual, sin costo adicional de dependencias, los tiles ya están en caché del tile provider. El mini-mapa es `StatefulWidget` con estado local `_lat`, `_lng`, `_edited` desacoplado del estado global de la pantalla.
+
+**Trade-off**: si el usuario edita la ubicación en el panel de detalle, el cambio es local a ese widget hasta que se persista en API (ver Pendiente #2 en §12).
+
 ---
 
 ## 14. Información de contexto (Lota)
@@ -846,7 +931,72 @@ Lota Alto            → sector alto de la ciudad
 
 ---
 
-## 15. Instrucciones para Claude Code
+## 15. Gotchas de Flutter conocidos en este proyecto
+
+Errores que ya ocurrieron y están resueltos — no repetirlos.
+
+### 1. `Container(color: X, decoration: BoxDecoration(...))`  — PROHIBIDO
+
+Flutter lanza `AssertionError: Cannot provide both a color and a decoration` en runtime. **Siempre** mover el color dentro de `BoxDecoration`:
+
+```dart
+// MAL
+Container(color: Colors.white, decoration: BoxDecoration(borderRadius: ...))
+
+// BIEN
+Container(decoration: BoxDecoration(color: Colors.white, borderRadius: ...))
+```
+
+**Archivos ya corregidos**: `scraping_screen.dart` (5 ocurrencias). Escanear con:
+```python
+# grep: 'color:' dentro de Container Y 'decoration:' en el mismo widget
+```
+
+### 2. `Border` no uniforme + `borderRadius` — PROHIBIDO
+
+`BoxDecoration(border: Border(top:..., left: BorderSide(color:X, width:3), ...), borderRadius: ...)` lanza `"A borderRadius can only be given on borders with uniform colors"` en tiempo de paint. La tarjeta puede quedar en blanco **sin excepción visible** en dev mode.
+
+**Solución**: usar `Border.all(...)` + patrón `IntrinsicHeight` de ADR-008.
+
+**Archivos con bug conocido pendiente**: `actividades/widgets/kanban_board.dart:315`
+
+### 3. `InkWell` sin `Material` ancestro en Flutter Web
+
+En Flutter Web, `InkWell` sobre un `Container` de color puede no renderizar los widgets hijos. **Siempre** envolver con `Material(color: ..., borderRadius: ...)` (ADR-009).
+
+### 4. `showMenu` con `RelativeRect` hardcodeado
+
+`RelativeRect.fromLTRB(280, 200, 0, 0)` pone el menú en coordenadas fijas de pantalla, lo que queda fuera de la vista en pantallas distintas. **Siempre** calcular la posición real:
+
+```dart
+void _openMenu(BuildContext context) async {
+  final box = context.findRenderObject() as RenderBox;
+  final pos = box.localToGlobal(Offset.zero);
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+  final result = await showMenu<String>(
+    context: context,
+    position: RelativeRect.fromRect(
+      Rect.fromLTWH(pos.dx, pos.dy + box.size.height, box.size.width, 0),
+      Offset.zero & overlay.size,
+    ),
+    items: [...],
+  );
+}
+```
+
+### 5. `position.center` nullable en `MapOptions.onPositionChanged`
+
+En versiones recientes de `flutter_map`, `MapPosition.center` es `LatLng?`. Siempre verificar:
+
+```dart
+onPositionChanged: (position, hasGesture) {
+  if (hasGesture && position.center != null) { ... }
+},
+```
+
+---
+
+## 16. Instrucciones para Claude Code
 
 **Antes de escribir cualquier código:**
 1. Lista los archivos que vas a crear/modificar

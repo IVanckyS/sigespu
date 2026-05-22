@@ -40,7 +40,7 @@ const _cols = [
 
 // ── KanbanBoard ───────────────────────────────────────────────────────────────
 
-class KanbanBoard extends ConsumerWidget {
+class KanbanBoard extends ConsumerStatefulWidget {
   final ActividadMunicipal? highlightedActividad;
   final void Function(ActividadMunicipal) onCardTap;
   final void Function({EstadoActividad? estado}) onNuevaActividad;
@@ -53,9 +53,14 @@ class KanbanBoard extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final filtradas = ref.watch(actividadesFiltadasProvider);
+  ConsumerState<KanbanBoard> createState() => _KanbanBoardState();
+}
 
+class _KanbanBoardState extends ConsumerState<KanbanBoard> {
+  int _activeColIndex = 1; // En curso por defecto
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -67,37 +72,14 @@ class KanbanBoard extends ConsumerWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isMobile = constraints.maxWidth < 768;
-          final columns = _cols.map((col) {
-            final items = filtradas.where((a) => a.estado == col.estado).toList();
-            final column = _KanbanColumn(
-              label: col.label,
-              bg: col.bg,
-              accent: col.accent,
-              muted: col.muted,
-              items: items,
-              estado: col.estado,
-              highlightedId: highlightedActividad?.id,
-              onCardTap: onCardTap,
-              onNuevaActividad: () => onNuevaActividad(estado: col.estado),
-            );
-            return (col: col, column: column);
-          }).toList();
 
           if (isMobile) {
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: columns.map((entry) {
-                  return Padding(
-                    padding: EdgeInsets.only(
-                      right: entry.col.estado == EstadoActividad.archivado ? 0 : 12,
-                    ),
-                    child: SizedBox(width: 280.0, child: entry.column),
-                  );
-                }).toList(),
-              ),
+            return _MobileKanbanView(
+              activeIndex: _activeColIndex,
+              onTabChange: (i) => setState(() => _activeColIndex = i),
+              highlightedId: widget.highlightedActividad?.id,
+              onCardTap: widget.onCardTap,
+              onNuevaActividad: widget.onNuevaActividad,
             );
           }
 
@@ -105,13 +87,24 @@ class KanbanBoard extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: columns.map((entry) {
+              children: _cols.map((col) {
                 return Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(
-                      right: entry.col.estado == EstadoActividad.archivado ? 0 : 12,
+                      right: col.estado == EstadoActividad.archivado ? 0 : 12,
                     ),
-                    child: entry.column,
+                    child: _KanbanColumn(
+                      key: ValueKey('kcol_${col.estado.name}'),
+                      label: col.label,
+                      bg: col.bg,
+                      accent: col.accent,
+                      muted: col.muted,
+                      estado: col.estado,
+                      highlightedId: widget.highlightedActividad?.id,
+                      onCardTap: widget.onCardTap,
+                      onNuevaActividad: () =>
+                          widget.onNuevaActividad(estado: col.estado),
+                    ),
                   ),
                 );
               }).toList(),
@@ -123,6 +116,164 @@ class KanbanBoard extends ConsumerWidget {
   }
 }
 
+// ── Mobile kanban view ────────────────────────────────────────────────────────
+
+class _MobileKanbanView extends ConsumerWidget {
+  final int activeIndex;
+  final ValueChanged<int> onTabChange;
+  final String? highlightedId;
+  final void Function(ActividadMunicipal) onCardTap;
+  final void Function({EstadoActividad? estado}) onNuevaActividad;
+
+  const _MobileKanbanView({
+    required this.activeIndex,
+    required this.onTabChange,
+    required this.highlightedId,
+    required this.onCardTap,
+    required this.onNuevaActividad,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final col = _cols[activeIndex];
+    final items = ref.watch(actividadesFiltradasPorEstadoProvider(col.estado));
+    final counts = _cols
+        .map((c) =>
+            ref.watch(actividadesFiltradasPorEstadoProvider(c.estado)).length)
+        .toList();
+
+    return Column(
+      children: [
+        // ── Tab bar ──────────────────────────────────────────────────────────
+        Container(
+          color: Colors.white,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Row(
+                children: List.generate(_cols.length, (i) {
+                  final c = _cols[i];
+                  final active = i == activeIndex;
+                  return GestureDetector(
+                    onTap: () => onTabChange(i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 9),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: active ? c.accent : Colors.transparent,
+                            width: 2.5,
+                          ),
+                        ),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(
+                          c.label,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight:
+                                active ? FontWeight.w700 : FontWeight.w500,
+                            color: active
+                                ? c.accent
+                                : const Color(0xFF78716C),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: active
+                                ? c.accent.withValues(alpha: 0.12)
+                                : const Color(0xFFF5F5F4),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '${counts[i]}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: active
+                                  ? c.accent
+                                  : const Color(0xFF78716C),
+                            ),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  );
+                }),
+              ),
+            ),
+            const Divider(height: 1, thickness: 1, color: Color(0x14000000)),
+          ]),
+        ),
+
+        // ── Cards list ───────────────────────────────────────────────────────
+        Expanded(
+          child: items.isEmpty
+              ? Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.inbox_outlined,
+                        size: 40, color: Color(0xFFD6D3D1)),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Sin actividades en ${col.label.toLowerCase()}',
+                      style: const TextStyle(
+                          fontSize: 14, color: Color(0xFF78716C)),
+                    ),
+                    const SizedBox(height: 16),
+                    GestureDetector(
+                      onTap: () => onNuevaActividad(estado: col.estado),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: col.accent),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Agregar actividad',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: col.accent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ]),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  itemCount: items.length + 1,
+                  itemBuilder: (ctx, i) {
+                    if (i == items.length) {
+                      return _DashedAddBtn(
+                        onTap: () => onNuevaActividad(estado: col.estado),
+                      );
+                    }
+                    final a = items[i];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: ActividadCard(
+                        actividad: a,
+                        highlighted: highlightedId == a.id,
+                        muted: col.muted,
+                        onTap: () => onCardTap(a),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── KanbanColumn ──────────────────────────────────────────────────────────────
 
 class _KanbanColumn extends ConsumerWidget {
@@ -130,18 +281,17 @@ class _KanbanColumn extends ConsumerWidget {
   final Color bg;
   final Color accent;
   final bool muted;
-  final List<ActividadMunicipal> items;
   final EstadoActividad estado;
   final String? highlightedId;
   final void Function(ActividadMunicipal) onCardTap;
   final VoidCallback onNuevaActividad;
 
   const _KanbanColumn({
+    super.key,
     required this.label,
     required this.bg,
     required this.accent,
     required this.muted,
-    required this.items,
     required this.estado,
     required this.onCardTap,
     required this.onNuevaActividad,
@@ -150,144 +300,198 @@ class _KanbanColumn extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Opacity(
-      opacity: muted ? 0.92 : 1.0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE7E5E4)),
-        ),
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.5),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-                border: Border(left: BorderSide(color: accent, width: 3)),
-              ),
+    final items = ref.watch(actividadesFiltradasPorEstadoProvider(estado));
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE7E5E4)),
+      ),
+      child: Column(
+        children: [
+          // Header — ADR-008: IntrinsicHeight pattern to avoid
+          // "A borderRadius can only be given on borders with uniform colors"
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.5),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+              border: Border.all(color: Colors.transparent, width: 0),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: IntrinsicHeight(
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    label.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF292524),
-                      letterSpacing: 0.06,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: const Color(0xFFE7E5E4)),
-                    ),
-                    child: Text(
-                      '${items.length}',
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF57534E),
-                        fontFeatures: [FontFeature.tabularFigures()],
+                  // Accent bar (left)
+                  Container(width: 3, color: accent),
+                  // Header content
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(11, 12, 10, 10),
+                      child: Row(
+                        children: [
+                          Text(
+                            label.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF292524),
+                              letterSpacing: 0.06,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: const Color(0xFFE7E5E4)),
+                            ),
+                            child: Text(
+                              '${items.length}',
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF57534E),
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          _IconBtn(Icons.add, onTap: onNuevaActividad),
+                          const SizedBox(width: 2),
+                          if (estado == EstadoActividad.archivado && items.isNotEmpty)
+                            _IconBtn(
+                              Icons.delete_sweep_outlined,
+                              onTap: () => _confirmarLimpiarArchivados(context, ref, items.length),
+                            )
+                          else
+                            _IconBtn(Icons.more_horiz, onTap: () {}),
+                        ],
                       ),
                     ),
                   ),
-                  const Spacer(),
-                  _IconBtn(Icons.add, onTap: onNuevaActividad),
-                  const SizedBox(width: 2),
-                  if (estado == EstadoActividad.archivado && items.isNotEmpty)
-                    _IconBtn(
-                      Icons.delete_sweep_outlined,
-                      onTap: () => _confirmarLimpiarArchivados(context, ref, items.length),
-                    )
-                  else
-                    _IconBtn(Icons.more_horiz, onTap: () {}),
                 ],
               ),
             ),
+          ),
 
-            // Cards
-            Expanded(
-              child: DragTarget<ActividadMunicipal>(
-                onAcceptWithDetails: (details) {
-                  final estadoLabel = switch (estado) {
-                    EstadoActividad.planificado => 'Planificado',
-                    EstadoActividad.enCurso => 'En curso',
-                    EstadoActividad.completado => 'Completado',
-                    EstadoActividad.archivado => 'Archivado',
-                  };
-                  ref.read(actividadesProvider.notifier).updateEstado(
-                    details.data.id,
-                    estado,
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${details.data.titulo.length > 40 ? '${details.data.titulo.substring(0, 40)}…' : details.data.titulo} → $estadoLabel · por director@lota.cl',
-                      ),
-                      duration: const Duration(seconds: 3),
-                      behavior: SnackBarBehavior.floating,
+          // Cards
+          Expanded(
+            child: DragTarget<ActividadMunicipal>(
+              onAcceptWithDetails: (details) {
+                final estadoLabel = switch (estado) {
+                  EstadoActividad.planificado => 'Planificado',
+                  EstadoActividad.enCurso => 'En curso',
+                  EstadoActividad.completado => 'Completado',
+                  EstadoActividad.archivado => 'Archivado',
+                };
+                ref.read(actividadesProvider.notifier).updateEstado(
+                  details.data.id,
+                  estado,
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${details.data.titulo.length > 40 ? '${details.data.titulo.substring(0, 40)}…' : details.data.titulo} → $estadoLabel · por director@lota.cl',
                     ),
-                  );
-                },
-                onWillAcceptWithDetails: (details) => details.data.estado != estado,
-                builder: (context, candidateData, rejectedData) {
-                  final isDragOver = candidateData.isNotEmpty;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    decoration: BoxDecoration(
-                      color: isDragOver ? accent.withValues(alpha: 0.06) : Colors.transparent,
-                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
-                    ),
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-                      children: [
-                        ...items.map((a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Draggable<ActividadMunicipal>(
-                            data: a,
-                            feedback: Material(
-                              color: Colors.transparent,
-                              child: SizedBox(
-                                width: 260,
-                                child: ActividadCard(
-                                  actividad: a,
-                                  onTap: () {},
-                                  highlighted: true,
-                                ),
-                              ),
-                            ),
-                            childWhenDragging: Opacity(
-                              opacity: 0.35,
-                              child: ActividadCard(
-                                actividad: a,
-                                onTap: () {},
-                              ),
-                            ),
-                            child: ActividadCard(
-                              actividad: a,
-                              highlighted: highlightedId == a.id,
-                              muted: muted,
-                              onTap: () => onCardTap(a),
-                            ),
-                          ),
-                        )),
+                    duration: const Duration(seconds: 3),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              onWillAcceptWithDetails: (details) => details.data.estado != estado,
+              builder: (context, candidateData, rejectedData) {
+                final isDragOver = candidateData.isNotEmpty;
+                return _ColumnList(
+                  items: items,
+                  isDragOver: isDragOver,
+                  accent: accent,
+                  muted: muted,
+                  highlightedId: highlightedId,
+                  onCardTap: onCardTap,
+                  onNuevaActividad: onNuevaActividad,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-                        // Dashed "add" button
-                        _DashedAddBtn(onTap: onNuevaActividad),
-                      ],
-                    ),
-                  );
-                },
+// Aísla el repintado del fondo "drag-over" del rebuild de los items —
+// solo el AnimatedContainer reacciona a candidateData; ListView.builder
+// recicla las tarjetas y no se reconstruye al cambiar el hover state.
+class _ColumnList extends StatelessWidget {
+  final List<ActividadMunicipal> items;
+  final bool isDragOver;
+  final Color accent;
+  final bool muted;
+  final String? highlightedId;
+  final void Function(ActividadMunicipal) onCardTap;
+  final VoidCallback onNuevaActividad;
+
+  const _ColumnList({
+    required this.items,
+    required this.isDragOver,
+    required this.accent,
+    required this.muted,
+    required this.highlightedId,
+    required this.onCardTap,
+    required this.onNuevaActividad,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        color: isDragOver ? accent.withValues(alpha: 0.06) : Colors.transparent,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+      ),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        itemCount: items.length + 1,
+        itemBuilder: (ctx, i) {
+          if (i == items.length) {
+            return _DashedAddBtn(onTap: onNuevaActividad);
+          }
+          final a = items[i];
+          return Padding(
+            key: ValueKey('actcard_${a.id}'),
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Draggable<ActividadMunicipal>(
+              data: a,
+              dragAnchorStrategy: pointerDragAnchorStrategy,
+              feedback: Material(
+                color: Colors.transparent,
+                child: SizedBox(
+                  width: 260,
+                  child: ActividadCard(
+                    actividad: a,
+                    onTap: () {},
+                    highlighted: true,
+                  ),
+                ),
+              ),
+              childWhenDragging: Opacity(
+                opacity: 0.35,
+                child: ActividadCard(
+                  actividad: a,
+                  onTap: () {},
+                ),
+              ),
+              child: ActividadCard(
+                actividad: a,
+                highlighted: highlightedId == a.id,
+                muted: muted,
+                onTap: () => onCardTap(a),
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

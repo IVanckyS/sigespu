@@ -28,7 +28,7 @@ class CustomMarkers {
               height: 32,
               decoration: BoxDecoration(
                 color: color,
-                shape: BoxShape.circle, // Simplified shape for mockup
+                shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
                 boxShadow: const [
                   BoxShadow(
@@ -94,6 +94,12 @@ class CustomMarkers {
       case 'patente':            return LucideIcons.bookmark;
       case 'luminaria':          return LucideIcons.lightbulb;
       case 'camara_cctv':        return LucideIcons.video;
+      // Actividades municipales
+      case 'actividad_reunion':       return LucideIcons.users;
+      case 'actividad_operativo':     return LucideIcons.shield;
+      case 'actividad_evento':        return LucideIcons.calendar;
+      case 'actividad_capacitacion':  return LucideIcons.graduationCap;
+      case 'actividad_municipal':     return LucideIcons.calendar;
       // Capas del sistema (sin marcador propio)
       case 'reporte':            return LucideIcons.alertTriangle;
       case 'plan_regulador':     return LucideIcons.map;
@@ -109,7 +115,7 @@ class CustomMarkers {
     switch (tipo) {
       case 'centro_acopio': return AppTheme.orange600;
       case 'sede_comunitaria': return AppTheme.tSede;
-      case 'infraestructura': return AppTheme.blue800;
+      case 'infraestructura': return AppTheme.orange700;
       case 'zona_peligro': return AppTheme.redDanger;
       case 'patente': return AppTheme.amberWarning;
       case 'reporte_robo': return AppTheme.tRobo;
@@ -125,8 +131,15 @@ class CustomMarkers {
       case 'socavon': return AppTheme.tSocavon;
       case 'fuga_agua': return AppTheme.tAgua;
       case 'microbasural': return AppTheme.tBasural;
+      // Actividades municipales: cada tipo con su color institucional
+      case 'actividad_reunion':       return AppTheme.blue800;          // azul institucional
+      case 'actividad_operativo':     return const Color(0xFFDC2626);    // rojo operativo
+      case 'actividad_evento':        return const Color(0xFF7C3AED);    // morado eventos
+      case 'actividad_capacitacion':  return AppTheme.greenSuccess;     // verde formación
+      case 'actividad_municipal':     return const Color(0xFF7C3AED);    // fallback genérico
       default:
         if (tipo.startsWith('reporte_')) return AppTheme.redDanger;
+        if (tipo.startsWith('actividad_')) return const Color(0xFF7C3AED);
         return AppTheme.stone600;
     }
   }

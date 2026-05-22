@@ -104,6 +104,7 @@ class DatoPatente {
   final int nDecreto;
   final String fechaDecreto;
   final String tipo;
+  final String monto; // valor anual de la patente, puede ser '' si no disponible
   final String rut;
   final String razonSocial;
   final String giro;
@@ -118,6 +119,7 @@ class DatoPatente {
     required this.nDecreto,
     required this.fechaDecreto,
     required this.tipo,
+    this.monto = '',
     required this.rut,
     required this.razonSocial,
     required this.giro,
@@ -128,6 +130,29 @@ class DatoPatente {
     required this.url,
     required this.scrapedAt,
   });
+
+  /// Cuando el scraper guardó el monto en la columna tipo (bug de formato),
+  /// el monto real es el tipo, y el tipo efectivo es desconocido.
+  bool get tipoEsMonto => RegExp(r'^[\d.,]+$').hasMatch(tipo.trim());
+
+  String get tipoEfectivo => tipoEsMonto ? '' : tipo;
+  String get montoEfectivo => tipoEsMonto ? tipo : monto;
+
+  factory DatoPatente.fromJson(Map<String, dynamic> j) => DatoPatente(
+        nDecreto: (j['n_decreto'] as num?)?.toInt() ?? 0,
+        fechaDecreto: _dateOnly(j['fecha_decreto']),
+        tipo: _cleanText(j['tipo'] as String?),
+        monto: j['monto'] as String? ?? '',
+        rut: j['rut'] as String? ?? '',
+        razonSocial: _cleanText(j['razon_social'] as String?),
+        giro: _cleanText(j['giro'] as String?),
+        direccion: _cleanText(j['direccion'] as String?),
+        lat: (j['lat'] as num?)?.toDouble() ?? 0,
+        lng: (j['lng'] as num?)?.toDouble() ?? 0,
+        confianza: _mapConfianza(j['confianza'] as String?),
+        url: j['url'] as String? ?? '',
+        scrapedAt: _isoToShort(j['scraped_at']),
+      );
 }
 
 class DatoPermiso {
@@ -142,6 +167,9 @@ class DatoPermiso {
   final String estado;
   final String confianza;
   final String url;
+  final String fechaPublicacion;
+  final String tipoActo;
+  final String denominacionActo;
 
   const DatoPermiso({
     required this.nPermiso,
@@ -155,7 +183,27 @@ class DatoPermiso {
     required this.estado,
     required this.confianza,
     required this.url,
+    this.fechaPublicacion = '',
+    this.tipoActo = '',
+    this.denominacionActo = '',
   });
+
+  factory DatoPermiso.fromJson(Map<String, dynamic> j) => DatoPermiso(
+        nPermiso: j['n_permiso'] as String? ?? '',
+        tipo: _cleanText(j['tipo'] as String?),
+        direccion: _cleanText(j['direccion'] as String?),
+        sector: j['sector'] as String? ?? '',
+        lat: (j['lat'] as num?)?.toDouble() ?? 0,
+        lng: (j['lng'] as num?)?.toDouble() ?? 0,
+        descripcion: _cleanText(j['descripcion'] as String?),
+        fecha: _dateOnly(j['fecha']),
+        estado: j['estado'] as String? ?? 'activo',
+        confianza: _mapConfianza(j['confianza'] as String?),
+        url: j['url'] as String? ?? '',
+        fechaPublicacion: _dateOnly(j['fecha_publicacion']),
+        tipoActo: j['tipo_acto'] as String? ?? '',
+        denominacionActo: j['denominacion_acto'] as String? ?? '',
+      );
 }
 
 class DatoTransito {
@@ -178,6 +226,17 @@ class DatoTransito {
     required this.estado,
     required this.url,
   });
+
+  factory DatoTransito.fromJson(Map<String, dynamic> j) => DatoTransito(
+        nDecreto: j['n_decreto'] as String? ?? '',
+        tipo: j['tipo'] as String? ?? '',
+        direccion: j['direccion'] as String? ?? '',
+        motivo: j['motivo'] as String? ?? '',
+        fechaInicio: _dateOnly(j['fecha_inicio']),
+        fechaFin: _dateOnly(j['fecha_fin']),
+        estado: j['estado'] as String? ?? 'activo',
+        url: j['url'] as String? ?? '',
+      );
 }
 
 class DatoOrganizacion {
@@ -186,10 +245,14 @@ class DatoOrganizacion {
   final String nombre;
   final String direccion;
   final String representante;
-  final String rutRep;
   final String vigencia;
   final String sector;
   final String url;
+  final String rolMunicipalidad;
+  final String nInscripcionRegistroCivil;
+  final String directiva;
+  final String fechaConcesion;
+  final String fechaModificaciones;
 
   const DatoOrganizacion({
     required this.nPersonalidad,
@@ -197,11 +260,70 @@ class DatoOrganizacion {
     required this.nombre,
     required this.direccion,
     required this.representante,
-    required this.rutRep,
     required this.vigencia,
     required this.sector,
     required this.url,
+    this.rolMunicipalidad = '',
+    this.nInscripcionRegistroCivil = '',
+    this.directiva = '',
+    this.fechaConcesion = '',
+    this.fechaModificaciones = '',
   });
+
+  factory DatoOrganizacion.fromJson(Map<String, dynamic> j) => DatoOrganizacion(
+        nPersonalidad: j['n_personalidad'] as String? ?? '',
+        tipo: _cleanText(j['tipo'] as String?),
+        nombre: _cleanText(j['nombre'] as String?),
+        direccion: _cleanText(j['direccion'] as String?),
+        representante: _cleanText(j['representante'] as String?),
+        vigencia: _dateOnly(j['vigencia']),
+        sector: j['sector'] as String? ?? '',
+        url: j['url'] as String? ?? '',
+        rolMunicipalidad: j['rol_municipalidad'] as String? ?? '',
+        nInscripcionRegistroCivil: j['n_inscripcion_registro_civil'] as String? ?? '',
+        directiva: _cleanText(j['directiva'] as String?),
+        fechaConcesion: _dateOnly(j['fecha_concesion']),
+        fechaModificaciones: _dateOnly(j['fecha_modificaciones']),
+      );
+}
+
+// ── Helpers de parsing JSON del backend ───────────────────────────────────────
+
+/// Reemplaza caracteres unicode especiales que Flutter Web no puede renderizar
+/// con el font stack por defecto (ej. ➢ U+27A2 del bloque Dingbats).
+String _cleanText(String? s) {
+  if (s == null || s.isEmpty) return '';
+  return s
+      .replaceAll('➢', '→') // ➢ → →
+      .replaceAll('➤', '→') // ➤ → →
+      .replaceAll('►', '→') // ► → →
+      .replaceAll('‣', '•') // ‣ → •
+      .trim();
+}
+
+/// Acepta ISO 8601 o `YYYY-MM-DD` y devuelve la parte de fecha.
+String _dateOnly(dynamic v) {
+  if (v is! String || v.isEmpty) return '';
+  final tIdx = v.indexOf('T');
+  return tIdx >= 0 ? v.substring(0, tIdx) : v;
+}
+
+/// Convierte ISO 8601 a `YYYY-MM-DD HH:mm`. La UI muestra esto en `scraped_at`.
+String _isoToShort(dynamic v) {
+  if (v is! String || v.isEmpty) return '';
+  if (v.length < 16) return v;
+  return '${v.substring(0, 10)} ${v.substring(11, 16)}';
+}
+
+/// El backend devuelve `alta|media|baja|fallo`; la UI espera `high|med|low|failed`.
+String _mapConfianza(String? c) {
+  switch (c) {
+    case 'alta': return 'high';
+    case 'media': return 'med';
+    case 'baja': return 'low';
+    case 'fallo': return 'failed';
+    default: return c ?? 'failed';
+  }
 }
 
 // ── Helpers de UI ──────────────────────────────────────────────────────────────
@@ -210,7 +332,7 @@ Color colorParaTipo(String tipo) {
   switch (tipo) {
     case 'centro_acopio': return const Color(0xFFEA580C);
     case 'sede_comunitaria': return const Color(0xFF16A34A);
-    case 'infraestructura': return const Color(0xFF1E3A8A);
+    case 'infraestructura': return const Color(0xFFC2410C);
     case 'reporte_robo': return const Color(0xFFB91C1C);
     case 'reporte_vandalismo': return const Color(0xFFA855F7);
     case 'reporte_accidente': return const Color(0xFFF97316);
@@ -470,12 +592,12 @@ const List<DatoTransito> kTransito = [
 ];
 
 const List<DatoOrganizacion> kOrganizaciones = [
-  DatoOrganizacion(nPersonalidad: '3421', tipo: 'Junta de Vecinos', nombre: 'JJ.VV. Los Aromos', direccion: 'Los Aromos 245', representante: 'María Hernández Parra', rutRep: '12.345.678-9', vigencia: 'Vigente hasta 2027-05-30', sector: 'S-2', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
-  DatoOrganizacion(nPersonalidad: '3398', tipo: 'Junta de Vecinos', nombre: 'Junta Vecinal El Esfuerzo', direccion: 'Pabellón 4, Lota Alto', representante: 'Carlos Sanhueza Vera', rutRep: '10.987.654-3', vigencia: 'Vigente hasta 2026-11-20', sector: 'Centro', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
-  DatoOrganizacion(nPersonalidad: '3287', tipo: 'Centro de Madres', nombre: 'Centro de Madres Nueva Vida', direccion: 'Vista Hermosa 890', representante: 'Alejandra Roa Mella', rutRep: '14.567.890-2', vigencia: 'Vigente hasta 2027-01-15', sector: 'S-3', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
-  DatoOrganizacion(nPersonalidad: '3145', tipo: 'Club Deportivo', nombre: 'Club Deportivo Minero', direccion: 'Cancha Los Aromos', representante: 'Pedro Cifuentes Luna', rutRep: '11.222.333-4', vigencia: 'Vigente hasta 2026-08-30', sector: 'S-2', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
-  DatoOrganizacion(nPersonalidad: '3098', tipo: 'Junta de Vecinos', nombre: 'JJ.VV. Vista Hermosa', direccion: 'Vista Hermosa 1150', representante: 'Rosa Mardones Gutierrez', rutRep: '13.444.555-6', vigencia: 'Vigente hasta 2026-12-10', sector: 'S-3', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
-  DatoOrganizacion(nPersonalidad: '2987', tipo: 'Adulto Mayor', nombre: 'Club Adulto Mayor Los Pioneros', direccion: 'Sede Carlos Cousiño 320', representante: 'Juan Espinoza Vega', rutRep: '6.789.012-3', vigencia: 'Vigente hasta 2027-03-20', sector: 'Centro', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
-  DatoOrganizacion(nPersonalidad: '2876', tipo: 'Comité', nombre: 'Comité de Allegados La Esperanza', direccion: 'Sector Lota Alto Norte', representante: 'Patricia Bravo Núñez', rutRep: '15.678.901-2', vigencia: 'Vigente hasta 2026-07-15', sector: 'S-5', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
-  DatoOrganizacion(nPersonalidad: '2754', tipo: 'Junta de Vecinos', nombre: 'JJ.VV. Los Mineros', direccion: 'Pabellón 7, Lota Alto', representante: 'Sergio Aravena Pino', rutRep: '9.123.456-K', vigencia: 'Vigente hasta 2027-02-28', sector: 'Centro', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
+  DatoOrganizacion(nPersonalidad: '3421', tipo: 'Junta de Vecinos', nombre: 'JJ.VV. Los Aromos', direccion: 'Los Aromos 245', representante: 'María Hernández Parra', vigencia: 'Vigente hasta 2027-05-30', sector: 'S-2', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
+  DatoOrganizacion(nPersonalidad: '3398', tipo: 'Junta de Vecinos', nombre: 'Junta Vecinal El Esfuerzo', direccion: 'Pabellón 4, Lota Alto', representante: 'Carlos Sanhueza Vera', vigencia: 'Vigente hasta 2026-11-20', sector: 'Centro', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
+  DatoOrganizacion(nPersonalidad: '3287', tipo: 'Centro de Madres', nombre: 'Centro de Madres Nueva Vida', direccion: 'Vista Hermosa 890', representante: 'Alejandra Roa Mella', vigencia: 'Vigente hasta 2027-01-15', sector: 'S-3', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
+  DatoOrganizacion(nPersonalidad: '3145', tipo: 'Club Deportivo', nombre: 'Club Deportivo Minero', direccion: 'Cancha Los Aromos', representante: 'Pedro Cifuentes Luna', vigencia: 'Vigente hasta 2026-08-30', sector: 'S-2', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
+  DatoOrganizacion(nPersonalidad: '3098', tipo: 'Junta de Vecinos', nombre: 'JJ.VV. Vista Hermosa', direccion: 'Vista Hermosa 1150', representante: 'Rosa Mardones Gutierrez', vigencia: 'Vigente hasta 2026-12-10', sector: 'S-3', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
+  DatoOrganizacion(nPersonalidad: '2987', tipo: 'Adulto Mayor', nombre: 'Club Adulto Mayor Los Pioneros', direccion: 'Sede Carlos Cousiño 320', representante: 'Juan Espinoza Vega', vigencia: 'Vigente hasta 2027-03-20', sector: 'Centro', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
+  DatoOrganizacion(nPersonalidad: '2876', tipo: 'Comité', nombre: 'Comité de Allegados La Esperanza', direccion: 'Sector Lota Alto Norte', representante: 'Patricia Bravo Núñez', vigencia: 'Vigente hasta 2026-07-15', sector: 'S-5', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
+  DatoOrganizacion(nPersonalidad: '2754', tipo: 'Junta de Vecinos', nombre: 'JJ.VV. Los Mineros', direccion: 'Pabellón 7, Lota Alto', representante: 'Sergio Aravena Pino', vigencia: 'Vigente hasta 2027-02-28', sector: 'Centro', url: 'https://www.lotatransparente.cl/index.php?ig=351'),
 ];

@@ -35,7 +35,8 @@ class DatabaseService {
         port: int.tryParse(Platform.environment['DB_PORT'] ?? '') ?? 5432,
         database: Platform.environment['DB_NAME'] ?? 'sigespu',
         username: Platform.environment['DB_USER'] ?? 'sigespu_user',
-        password: Platform.environment['DB_PASSWORD'] ?? 'secret_password',
+        password: Platform.environment['DB_PASSWORD'] ??
+            (throw StateError('DB_PASSWORD no está configurado. Establece DATABASE_URL o DB_PASSWORD.')),
       );
     }
 

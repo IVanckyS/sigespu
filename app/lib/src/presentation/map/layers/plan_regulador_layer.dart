@@ -4,7 +4,12 @@ import 'package:latlong2/latlong.dart';
 import '../../../config/theme.dart';
 
 class PlanReguladorLayer {
-  static List<Polygon> buildPolygons({Map<String, List<LatLng>>? edits}) {
+  /// [hiddenCode]: si se está re-dibujando un sector, su código va aquí para
+  /// ocultar el polígono original mientras el usuario coloca vértices nuevos.
+  static List<Polygon> buildPolygons({
+    Map<String, List<LatLng>>? edits,
+    String? hiddenCode,
+  }) {
     // Datos sacados de la maqueta
     final sectores = [
       {
@@ -39,14 +44,16 @@ class PlanReguladorLayer {
       }
     ];
 
-    return sectores.map((s) {
+    return sectores
+        .where((s) => s['code'] != hiddenCode)
+        .map((s) {
       final code = s['code'] as String;
       final points = edits != null && edits.containsKey(code)
           ? edits[code]!
           : (s['coords'] as List<List<double>>)
               .map((c) => LatLng(c[0], c[1]))
               .toList();
-      
+
       final color = s['color'] as Color;
 
       return Polygon(
@@ -75,9 +82,12 @@ class PlanReguladorLayer {
 
   static List<Marker> buildCentroidMarkers({
     Map<String, List<LatLng>>? edits,
+    String? hiddenCode,
     required void Function(Map<String, dynamic> sector, BuildContext context) onTap,
   }) {
-    return _sectores.map((s) {
+    return _sectores
+        .where((s) => s['code'] != hiddenCode)
+        .map((s) {
       final code = s['code'] as String;
       final List<LatLng> points;
       if (edits != null && edits.containsKey(code)) {

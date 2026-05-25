@@ -6,9 +6,8 @@ part of 'sector_plan_regulador.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$SectorPlanReguladorImpl _$$SectorPlanReguladorImplFromJson(
-        Map<String, dynamic> json) =>
-    _$SectorPlanReguladorImpl(
+_SectorPlanRegulador _$SectorPlanReguladorFromJson(Map<String, dynamic> json) =>
+    _SectorPlanRegulador(
       id: json['id'] as String,
       codigo: json['codigo'] as String?,
       nombre: json['nombre'] as String?,
@@ -26,8 +25,8 @@ _$SectorPlanReguladorImpl _$$SectorPlanReguladorImplFromJson(
           : DateTime.parse(json['created_at'] as String),
     );
 
-Map<String, dynamic> _$$SectorPlanReguladorImplToJson(
-        _$SectorPlanReguladorImpl instance) =>
+Map<String, dynamic> _$SectorPlanReguladorToJson(
+        _SectorPlanRegulador instance) =>
     <String, dynamic>{
       'id': instance.id,
       'codigo': instance.codigo,

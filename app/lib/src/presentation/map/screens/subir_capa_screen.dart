@@ -222,7 +222,7 @@ class _SubirCapaScreenState extends ConsumerState<SubirCapaScreen> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['kmz', 'geojson', 'json', 'zip'],
       withData: true, // Importante para la web y acceso a bytes

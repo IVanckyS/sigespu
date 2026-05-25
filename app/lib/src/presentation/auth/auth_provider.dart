@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -58,24 +59,44 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _checkAuth() async {
     final token = await _storage.read(key: 'access_token');
-    if (token != null) {
-      // Decode user info from JWT or stored user info
-      final userStr = await _storage.read(key: 'user_info');
-      Map<String, dynamic>? user;
-      if (userStr != null) {
-        user = jsonDecode(userStr);
+    if (token == null) return;
+
+    // Validate session expiry if one was stored (set at login time).
+    // Absent expiry = legacy session pre-feature → allow once (backwards compat).
+    final expiryStr = await _storage.read(key: 'session_expiry');
+    if (expiryStr != null) {
+      final expiry = DateTime.tryParse(expiryStr);
+      if (expiry != null && DateTime.now().isAfter(expiry)) {
+        await _clearSession();
+        return;
       }
-      state = state.copyWith(isAuthenticated: true, user: user);
     }
+
+    final userStr = await _storage.read(key: 'user_info');
+    Map<String, dynamic>? user;
+    if (userStr != null) user = jsonDecode(userStr);
+    state = state.copyWith(isAuthenticated: true, user: user);
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<void> _clearSession() async {
+    await _storage.delete(key: 'access_token');
+    await _storage.delete(key: 'refresh_token');
+    await _storage.delete(key: 'user_info');
+    await _storage.delete(key: 'session_expiry');
+    await _storage.delete(key: 'remember_me');
+  }
+
+  Future<bool> login(String email, String password, {bool rememberMe = false}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': normalizeEmail(email), 'password': password}),
+        body: jsonEncode({
+          'email': normalizeEmail(email),
+          'password': password,
+          'remember_me': rememberMe,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -83,7 +104,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await _storage.write(key: 'access_token', value: data['access_token']);
         await _storage.write(key: 'refresh_token', value: data['refresh_token']);
         await _storage.write(key: 'user_info', value: jsonEncode(data['user']));
-        
+        await _writeSessionExpiry(rememberMe: rememberMe);
+
         state = state.copyWith(isAuthenticated: true, isLoading: false, user: data['user']);
         return true;
       } else {
@@ -95,6 +117,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false, error: 'Error de conexión con el servidor');
       return false;
     }
+  }
+
+  Future<void> _writeSessionExpiry({required bool rememberMe}) async {
+    final expiry = DateTime.now().add(
+      rememberMe ? const Duration(days: 30) : const Duration(days: 7),
+    );
+    await _storage.write(key: 'session_expiry', value: expiry.toIso8601String());
+    await _storage.write(key: 'remember_me', value: rememberMe.toString());
   }
 
   Future<bool> register(String nombre, String email, String password) async {
@@ -138,6 +168,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await _storage.write(key: 'access_token', value: data['access_token']);
         await _storage.write(key: 'refresh_token', value: data['refresh_token']);
         await _storage.write(key: 'user_info', value: jsonEncode(data['user']));
+        // Registration flow: default 7-day session (no remember-me option at signup).
+        await _writeSessionExpiry(rememberMe: false);
         state = state.copyWith(
           isAuthenticated: true,
           isLoading: false,
@@ -284,10 +316,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
-    await _storage.delete(key: 'access_token');
-    await _storage.delete(key: 'refresh_token');
-    await _storage.delete(key: 'user_info');
-    state = AuthState(); // Reset state
+    await _clearSession();
+    state = AuthState();
   }
 
   /// Intenta refrescar el access token usando el refresh token almacenado.

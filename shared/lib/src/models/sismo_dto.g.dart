@@ -6,8 +6,7 @@ part of 'sismo_dto.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$SismoDtoImpl _$$SismoDtoImplFromJson(Map<String, dynamic> json) =>
-    _$SismoDtoImpl(
+_SismoDto _$SismoDtoFromJson(Map<String, dynamic> json) => _SismoDto(
       id: json['id'] as String,
       magnitude: (json['magnitude'] as num).toDouble(),
       magType: json['magType'] as String?,
@@ -21,8 +20,7 @@ _$SismoDtoImpl _$$SismoDtoImplFromJson(Map<String, dynamic> json) =>
       urlUsgs: json['urlUsgs'] as String?,
     );
 
-Map<String, dynamic> _$$SismoDtoImplToJson(_$SismoDtoImpl instance) =>
-    <String, dynamic>{
+Map<String, dynamic> _$SismoDtoToJson(_SismoDto instance) => <String, dynamic>{
       'id': instance.id,
       'magnitude': instance.magnitude,
       'magType': instance.magType,

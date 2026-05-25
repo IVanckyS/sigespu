@@ -6,9 +6,9 @@ part of 'capa_personalizada_dto.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$CapaPersonalizadaDtoImpl _$$CapaPersonalizadaDtoImplFromJson(
+_CapaPersonalizadaDto _$CapaPersonalizadaDtoFromJson(
         Map<String, dynamic> json) =>
-    _$CapaPersonalizadaDtoImpl(
+    _CapaPersonalizadaDto(
       id: json['id'] as String,
       nombre: json['nombre'] as String,
       descripcion: json['descripcion'] as String?,
@@ -20,8 +20,8 @@ _$CapaPersonalizadaDtoImpl _$$CapaPersonalizadaDtoImplFromJson(
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
 
-Map<String, dynamic> _$$CapaPersonalizadaDtoImplToJson(
-        _$CapaPersonalizadaDtoImpl instance) =>
+Map<String, dynamic> _$CapaPersonalizadaDtoToJson(
+        _CapaPersonalizadaDto instance) =>
     <String, dynamic>{
       'id': instance.id,
       'nombre': instance.nombre,

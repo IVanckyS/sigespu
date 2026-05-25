@@ -77,10 +77,10 @@ packages:
     dependency: transitive
     description:
       name: freezed_annotation
-      sha256: c2e2d632dd9b8a2b7751117abcfc2b4888ecfe181bd9fca7170d9ef02e595fe2
+      sha256: "7294967ff0a6d98638e7acb774aac3af2550777accd8149c90af5b014e6d44d8"
       url: "https://pub.dev"
     source: hosted
-    version: "2.4.4"
+    version: "3.1.0"
   html:
     dependency: "direct main"
     description:
@@ -109,18 +109,18 @@ packages:
     dependency: transitive
     description:
       name: json_annotation
-      sha256: cb09e7dac6210041fad964ed7fbee004f14258b4eca4040f72d1234062ace4c8
+      sha256: "2a743920d81b7910627f68ee2c9ac1fc0bfee32b9fc3403587d7c6791ca12f80"
       url: "https://pub.dev"
     source: hosted
-    version: "4.11.0"
+    version: "4.12.0"
   lints:
     dependency: "direct dev"
     description:
       name: lints
-      sha256: cbf8d4b858bb0134ef3ef87841abdf8d63bfc255c266b7bf6b39daa1085c4290
+      sha256: "12f842a479589fea194fe5c5a3095abc7be0c1f2ddfa9a0e76aed1dbd26a87df"
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.0"
+    version: "6.1.0"
   logger:
     dependency: "direct main"
     description:
@@ -133,10 +133,10 @@ packages:
     dependency: transitive
     description:
       name: meta
-      sha256: "23f08335362185a5ea2ad3a4e597f1375e78bce8a040df5c600c8d3552ef2394"
+      sha256: df0c643f44ad098eb37988027a8e2b2b5a031fd3977f06bbfd3a76637e8df739
       url: "https://pub.dev"
     source: hosted
-    version: "1.17.0"
+    version: "1.18.2"
   path:
     dependency: transitive
     description:
@@ -157,18 +157,18 @@ packages:
     dependency: "direct main"
     description:
       name: postgres
-      sha256: fefbbfe749c6130e5096588b9c4459173684c695952cd7636ab19be76f255469
+      sha256: fe4a19a69fad564efa8ced72d58b14e86d12a548f5f0a511b377089bf3b592ed
       url: "https://pub.dev"
     source: hosted
-    version: "3.5.9"
+    version: "3.5.11"
   redis:
     dependency: "direct main"
     description:
       name: redis
-      sha256: "32e28eb1ba2e0fe2af50bbd06e675e4dfdce4f0ba95c5bc885c72383a1b0b47e"
+      sha256: d7c7f18a374936baa786baf5f0e747aa5510bb289aad44b30ec41e3b703233b4
       url: "https://pub.dev"
     source: hosted
-    version: "3.1.0"
+    version: "4.1.0"
   shared:
     dependency: "direct main"
     description:

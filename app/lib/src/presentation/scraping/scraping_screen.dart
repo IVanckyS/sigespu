@@ -894,14 +894,14 @@ class _Sidebar extends StatelessWidget {
     );
   }
 
-  String _monthLabel(String m) {
+  static String _monthLabel(String m) {
     const months = {'all':'Todos','1':'Enero','2':'Febrero','3':'Marzo','4':'Abril',
       '5':'Mayo','6':'Junio','7':'Julio','8':'Agosto',
       '9':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'};
     return months[m] ?? 'Todos';
   }
 
-  String _geoLabel(String g) {
+  static String _geoLabel(String g) {
     const labels = {'all':'Todos','high':'Confianza alta','med':'Confianza media',
       'low':'Confianza baja','failed':'Fallo'};
     return labels[g] ?? 'Todos';
@@ -2636,11 +2636,29 @@ class _MobileFilterBar extends StatelessWidget {
                 onTap: state.toggleLast30Days,
               ),
               const SizedBox(width: 6),
-              _Chip(label: 'Año ${state._year == 'all' ? 'Todos' : state._year}', onTap: () {}),
+              _MenuChip(
+                label: 'Año ${state._year == 'all' ? 'Todos' : state._year}',
+                active: state._year != 'all',
+                items: const [('all','Todos'),('2026','2026'),('2025','2025'),('2024','2024')],
+                onSelected: state.setYear,
+              ),
               const SizedBox(width: 6),
-              _Chip(label: 'Mes ${state._month == 'all' ? 'Todos' : state._month}', onTap: () {}),
+              _MenuChip(
+                label: 'Mes ${_Sidebar._monthLabel(state._month)}',
+                active: state._month != 'all',
+                items: const [('all','Todos'),('1','Enero'),('2','Febrero'),('3','Marzo'),('4','Abril'),
+                       ('5','Mayo'),('6','Junio'),('7','Julio'),('8','Agosto'),
+                       ('9','Septiembre'),('10','Octubre'),('11','Noviembre'),('12','Diciembre')],
+                onSelected: state.setMonth,
+              ),
               const SizedBox(width: 6),
-              _Chip(label: 'Geo ${state._geo == 'all' ? 'Todos' : state._geo}', onTap: () {}),
+              _MenuChip(
+                label: 'Geo ${_Sidebar._geoLabel(state._geo)}',
+                active: state._geo != 'all',
+                items: const [('all','Todos'),('high','Confianza alta'),('med','Confianza media'),
+                       ('low','Confianza baja'),('failed','Fallo')],
+                onSelected: state.setGeo,
+              ),
               const SizedBox(width: 6),
               _MenuChip(
                 label: 'Tipo ${state._tipoFilter == 'all' ? 'Todos' : state._tipoFilter}',

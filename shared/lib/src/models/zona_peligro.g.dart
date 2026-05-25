@@ -6,8 +6,7 @@ part of 'zona_peligro.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$ZonaPeligroImpl _$$ZonaPeligroImplFromJson(Map<String, dynamic> json) =>
-    _$ZonaPeligroImpl(
+_ZonaPeligro _$ZonaPeligroFromJson(Map<String, dynamic> json) => _ZonaPeligro(
       id: json['id'] as String,
       nombre: json['nombre'] as String?,
       polygonCoords: (json['polygonCoords'] as List<dynamic>)
@@ -33,7 +32,7 @@ _$ZonaPeligroImpl _$$ZonaPeligroImplFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['updated_at'] as String),
     );
 
-Map<String, dynamic> _$$ZonaPeligroImplToJson(_$ZonaPeligroImpl instance) =>
+Map<String, dynamic> _$ZonaPeligroToJson(_ZonaPeligro instance) =>
     <String, dynamic>{
       'id': instance.id,
       'nombre': instance.nombre,

@@ -25,7 +25,7 @@ class SyncService {
   final Connectivity _connectivity;
   final FlutterSecureStorage _storage;
 
-  StreamSubscription<ConnectivityResult>? _connSub;
+  StreamSubscription<List<ConnectivityResult>>? _connSub;
 
   SyncService(this._db, this._connectivity, this._storage) {
     _initConnectivityListener();
@@ -41,8 +41,8 @@ class SyncService {
 
   void _initConnectivityListener() {
     _connSub?.cancel();
-    _connSub = _connectivity.onConnectivityChanged.listen((ConnectivityResult result) {
-      if (result != ConnectivityResult.none) {
+    _connSub = _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      if (results.any((r) => r != ConnectivityResult.none)) {
         _log.info('Conexión recuperada. Iniciando sincronización...');
         syncPendingQueue();
       }
@@ -75,7 +75,7 @@ class SyncService {
 
     // Intentar sync inmediato si hay red
     final status = await _connectivity.checkConnectivity();
-    if (status != ConnectivityResult.none) {
+    if (status.any((r) => r != ConnectivityResult.none)) {
       syncPendingQueue();
     }
   }
@@ -149,7 +149,7 @@ class SyncService {
 
     // Procesar inmediatamente si hay red.
     final status = await _connectivity.checkConnectivity();
-    if (status != ConnectivityResult.none) {
+    if (status.any((r) => r != ConnectivityResult.none)) {
       syncPendingQueue();
     }
   }

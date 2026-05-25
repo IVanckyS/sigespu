@@ -4,7 +4,7 @@ part 'sismo_dto.freezed.dart';
 part 'sismo_dto.g.dart';
 
 @freezed
-class SismoDto with _$SismoDto {
+abstract class SismoDto with _$SismoDto {
   const factory SismoDto({
     required String id,
     required double magnitude,

@@ -55,6 +55,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _isRegisterMode = false;
   bool _obscurePass = true;
   bool _obscureConfirm = true;
+  bool _rememberMe = false;
 
   static const _allowedDomains = ['lota.cl', 'munilota.cl'];
 
@@ -107,6 +108,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       ref.read(authProvider.notifier).login(
             _emailCtrl.text.trim(),
             _passwordCtrl.text,
+            rememberMe: _rememberMe,
           );
     }
   }
@@ -121,6 +123,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   void togglePass() => setState(() => _obscurePass = !_obscurePass);
   void toggleConfirm() => setState(() => _obscureConfirm = !_obscureConfirm);
+  void toggleRememberMe() => setState(() => _rememberMe = !_rememberMe);
 
   void _enterOffline() {
     // Acceso solo a datos cacheados (seed + cache local). Auth lo trata como
@@ -692,7 +695,13 @@ class _LoginCard extends StatelessWidget {
                 ],
 
                 if (!isRegister) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  _RememberMeRow(
+                    value: state._rememberMe,
+                    onTap: state.toggleRememberMe,
+                    compact: compact,
+                  ),
+                  const SizedBox(height: 2),
                   Align(
                     alignment: Alignment.centerRight,
                     child: InkWell(
@@ -1134,6 +1143,70 @@ class _OfflineButton extends StatelessWidget {
               const Icon(Icons.arrow_forward, size: 16, color: _C.terracota),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RememberMeRow extends StatelessWidget {
+  final bool value;
+  final VoidCallback onTap;
+  final bool compact;
+  const _RememberMeRow({
+    required this.value,
+    required this.onTap,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: Checkbox(
+                value: value,
+                onChanged: (_) => onTap(),
+                activeColor: _C.accent,
+                checkColor: Colors.white,
+                side: const BorderSide(color: _C.cardBorder, width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Recordarme',
+                  style: TextStyle(
+                    fontSize: compact ? 12.5 : 13,
+                    color: _C.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  'Mantener sesión por 30 días',
+                  style: TextStyle(
+                    fontSize: compact ? 10 : 10.5,
+                    color: _C.muted,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

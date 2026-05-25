@@ -4,7 +4,7 @@ part 'patente_comercial.freezed.dart';
 part 'patente_comercial.g.dart';
 
 @freezed
-class PatenteComercial with _$PatenteComercial {
+abstract class PatenteComercial with _$PatenteComercial {
   const factory PatenteComercial({
     required String id,
     @JsonKey(name: 'numero_decreto') int? numeroDecreto,

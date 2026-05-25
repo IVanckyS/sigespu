@@ -29,7 +29,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(BottomNavigationBar), findsNothing);
+    // El shell móvil usa un widget propio (_MobileBottomTabs), no el
+    // BottomNavigationBar de Material — se busca por runtimeType al ser privado.
+    expect(_findMobileTabs(), findsNothing);
     expect(find.text('Mapa'), findsWidgets);
   });
 
@@ -45,6 +47,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(BottomNavigationBar), findsOneWidget);
+    expect(_findMobileTabs(), findsOneWidget);
   });
 }
+
+/// La barra inferior móvil es un widget privado (`_MobileBottomTabs`); se
+/// localiza por nombre de runtimeType ya que no es accesible por tipo.
+Finder _findMobileTabs() => find.byWidgetPredicate(
+      (w) => w.runtimeType.toString() == '_MobileBottomTabs',
+    );

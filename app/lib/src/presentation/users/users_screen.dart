@@ -60,7 +60,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
                 ),
                 Tab(
                   child: Consumer(builder: (_, ref, __) {
-                    final count = ref.watch(solicitudesProvider).valueOrNull
+                    final count = ref.watch(solicitudesProvider).value
                         ?.where((s) => s.estado == 'pendiente').length ?? 0;
                     return Row(mainAxisSize: MainAxisSize.min, children: [
                       const Icon(Icons.inbox_outlined, size: 14),
@@ -1224,9 +1224,9 @@ class _UsersSidebarConsumer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final users = ref.watch(usersProvider).valueOrNull ?? const <UsuarioItem>[];
+    final users = ref.watch(usersProvider).value ?? const <UsuarioItem>[];
     final solicitudes =
-        ref.watch(solicitudesProvider).valueOrNull ?? const <Solicitud>[];
+        ref.watch(solicitudesProvider).value ?? const <Solicitud>[];
     final directors = users.where((u) => u.nivelAcceso == 'director').length;
     final operativos = users.where((u) => u.nivelAcceso == 'operativo').length;
     final visitantes = users.where((u) => u.nivelAcceso == 'visitante').length;
@@ -2249,7 +2249,7 @@ class _UsersHeader extends ConsumerWidget {
     // los conteos, no en cada keystroke de búsqueda o filtro.
     final counts = ref.watch(
       usersProvider.select((async) {
-        final list = async.valueOrNull ?? const <UsuarioItem>[];
+        final list = async.value ?? const <UsuarioItem>[];
         final activos = list.where((u) => u.activo).length;
         return (
           activos: activos,
@@ -2260,7 +2260,7 @@ class _UsersHeader extends ConsumerWidget {
     );
     final pendientes = ref.watch(
       solicitudesProvider.select(
-        (async) => (async.valueOrNull ?? const [])
+        (async) => (async.value ?? const [])
             .where((s) => s.estado == 'pendiente')
             .length,
       ),

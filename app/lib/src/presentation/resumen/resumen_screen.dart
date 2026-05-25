@@ -28,18 +28,6 @@ class ResumenScreen extends StatelessWidget {
     final acopios = kElementosSeed.where((e) => e.tipo == 'centro_acopio').length;
     final sedes = kElementosSeed.where((e) => e.tipo == 'sede_comunitaria').length;
 
-    // Reportes por tipo para gráfico (últimos 30 días)
-    final limite30 = now.subtract(const Duration(days: 30));
-    bool enUltimos30(ElementoMapa e) {
-      final d = DateTime.tryParse(e.fecha);
-      return d != null && d.isAfter(limite30);
-    }
-    final reportesPorTipo = <String, int>{
-      'Robo':       kElementosSeed.where((e) => e.tipo == 'reporte_robo'       && enUltimos30(e)).length,
-      'Vandalismo': kElementosSeed.where((e) => e.tipo == 'reporte_vandalismo' && enUltimos30(e)).length,
-      'Accidente':  kElementosSeed.where((e) => e.tipo == 'reporte_accidente'  && enUltimos30(e)).length,
-    };
-
     // Tendencia semanal (últimas 8 semanas)
     final weeklyData = _weeklyReportCounts(now);
 
@@ -75,11 +63,7 @@ class ResumenScreen extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final isMobile = constraints.maxWidth < 768;
-              final card1 = _DashCard(
-                title: 'Reportes por tipo',
-                subtitle: 'últimos 30 días',
-                child: SizedBox(height: 220, child: _DoughnutChartTipos(data: reportesPorTipo)),
-              );
+              const card1 = _PieChartCard();
               final card2 = _DashCard(
                 title: 'Zonas por sector',
                 subtitle: 'Plan Regulador',
@@ -93,7 +77,7 @@ class ResumenScreen extends StatelessWidget {
                 ]);
               }
               return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(flex: 2, child: card1),
+                const Expanded(flex: 2, child: card1),
                 const SizedBox(width: 12),
                 Expanded(child: card2),
               ]);
@@ -431,77 +415,259 @@ class _DashCard extends StatelessWidget {
   }
 }
 
-// ── Doughnut chart: reportes por tipo ────────────────────────────────────────
+// ── Pie chart card with view selector ────────────────────────────────────────
 
-class _DoughnutChartTipos extends StatelessWidget {
-  final Map<String, int> data;
-  const _DoughnutChartTipos({required this.data});
+enum _PieView {
+  reportesTipo,
+  reportesSector,
+  reportesEstado,
+  reportesSeveridad,
+  zonasTipoRiesgo,
+}
+
+class _PieChartCard extends StatefulWidget {
+  const _PieChartCard();
+
+  @override
+  State<_PieChartCard> createState() => _PieChartCardState();
+}
+
+class _PieChartCardState extends State<_PieChartCard> {
+  _PieView _selected = _PieView.reportesTipo;
+
+  static bool _after(String fecha, DateTime limit) {
+    final d = DateTime.tryParse(fecha);
+    return d != null && d.isAfter(limit);
+  }
+
+  ({String title, String subtitle, Map<String, int> data, List<Color> colors}) _compute() {
+    final now = DateTime.now();
+    switch (_selected) {
+      case _PieView.reportesTipo:
+        final lim = now.subtract(const Duration(days: 30));
+        return (
+          title: 'Reportes por tipo',
+          subtitle: 'últimos 30 días',
+          data: {
+            'Robo':       kElementosSeed.where((e) => e.tipo == 'reporte_robo'       && _after(e.fecha, lim)).length,
+            'Vandalismo': kElementosSeed.where((e) => e.tipo == 'reporte_vandalismo' && _after(e.fecha, lim)).length,
+            'Accidente':  kElementosSeed.where((e) => e.tipo == 'reporte_accidente'  && _after(e.fecha, lim)).length,
+          },
+          colors: [AppTheme.redDanger, const Color(0xFFA855F7), AppTheme.orange600],
+        );
+
+      case _PieView.reportesSector:
+        final rs = kElementosSeed.where((e) => e.tipo.startsWith('reporte_'));
+        return (
+          title: 'Reportes por sector',
+          subtitle: 'todos los registros',
+          data: {
+            'Centro': rs.where((e) => e.sector == 'Centro').length,
+            'S-2':    rs.where((e) => e.sector == 'S-2').length,
+            'S-3':    rs.where((e) => e.sector == 'S-3').length,
+            'S-4':    rs.where((e) => e.sector == 'S-4').length,
+            'S-5':    rs.where((e) => e.sector == 'S-5').length,
+          },
+          colors: [
+            AppTheme.orange600, AppTheme.amberWarning,
+            AppTheme.blue800, AppTheme.redDanger, AppTheme.greenSuccess,
+          ],
+        );
+
+      case _PieView.reportesEstado:
+        final rs = kElementosSeed.where((e) => e.tipo.startsWith('reporte_'));
+        return (
+          title: 'Reportes por estado',
+          subtitle: 'estado actual',
+          data: {
+            'Activo':      rs.where((e) => e.estado == 'activo').length,
+            'Cerrado':     rs.where((e) => e.estado == 'cerrado').length,
+            'En revisión': rs.where((e) => e.estado == 'en_revision').length,
+          },
+          colors: [AppTheme.redDanger, AppTheme.greenSuccess, AppTheme.amberWarning],
+        );
+
+      case _PieView.reportesSeveridad:
+        final rs = kElementosSeed.where((e) => e.tipo.startsWith('reporte_'));
+        return (
+          title: 'Reportes por severidad',
+          subtitle: 'niveles de riesgo',
+          data: {
+            'Alta (4-5)': rs.where((e) => (e.nivel ?? 0) >= 4).length,
+            'Media (3)':  rs.where((e) => e.nivel == 3).length,
+            'Baja (1-2)': rs.where((e) => e.nivel != null && (e.nivel ?? 0) <= 2).length,
+          },
+          colors: [AppTheme.redDanger, AppTheme.amberWarning, AppTheme.greenSuccess],
+        );
+
+      case _PieView.zonasTipoRiesgo:
+        final zs = kElementosSeed.where((e) => e.tipo == 'zona_peligro');
+        return (
+          title: 'Zonas por tipo de riesgo',
+          subtitle: 'zonas activas',
+          data: {
+            'Drogas':          zs.where((e) => e.tipoPeligro == 'drogas').length,
+            'Robos':           zs.where((e) => e.tipoPeligro == 'robos').length,
+            'Vandalismo':      zs.where((e) => e.tipoPeligro == 'vandalismo').length,
+            'Riña':            zs.where((e) => e.tipoPeligro == 'riña').length,
+            'Vivienda ilegal': zs.where((e) => e.tipoPeligro == 'vivienda_ilegal').length,
+          },
+          colors: [
+            const Color(0xFF7C3AED), AppTheme.orange600,
+            const Color(0xFFA855F7), AppTheme.amberWarning, AppTheme.redDanger,
+          ],
+        );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final entries = data.entries.toList();
-    final colors = [
-      AppTheme.redDanger,
-      const Color(0xFFA855F7),
-      AppTheme.orange600
-    ];
+    final (:title, :subtitle, :data, :colors) = _compute();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.stone200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.stone900),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            _PieViewDropdown(
+              selected: _selected,
+              onChanged: (v) => setState(() => _selected = v),
+            ),
+          ]),
+          const SizedBox(height: 2),
+          Text(subtitle, style: const TextStyle(fontSize: 11, color: AppTheme.stone500, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 12),
+          SizedBox(height: 220, child: _DoughnutChart(data: data, colors: colors)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PieViewDropdown extends StatelessWidget {
+  final _PieView selected;
+  final ValueChanged<_PieView> onChanged;
+  const _PieViewDropdown({required this.selected, required this.onChanged});
+
+  static const _items = [
+    (_PieView.reportesTipo,      'Por tipo'),
+    (_PieView.reportesSector,    'Por sector'),
+    (_PieView.reportesEstado,    'Por estado'),
+    (_PieView.reportesSeveridad, 'Por severidad'),
+    (_PieView.zonasTipoRiesgo,   'Zonas · riesgo'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppTheme.stone200),
+        borderRadius: BorderRadius.circular(6),
+        color: AppTheme.stone50,
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<_PieView>(
+          value: selected,
+          isDense: true,
+          icon: const Icon(Icons.expand_more, size: 14, color: AppTheme.stone500),
+          style: const TextStyle(fontSize: 11, color: AppTheme.stone700, fontWeight: FontWeight.w500),
+          dropdownColor: Colors.white,
+          onChanged: (v) { if (v != null) onChanged(v); },
+          items: _items.map((rec) => DropdownMenuItem(
+            value: rec.$1,
+            child: Text(rec.$2),
+          )).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _DoughnutChart extends StatelessWidget {
+  final Map<String, int> data;
+  final List<Color> colors;
+  const _DoughnutChart({required this.data, required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = data.entries.where((e) => e.value > 0).toList();
     final total = data.values.fold(0, (a, b) => a + b);
 
     return Row(
       children: [
         Expanded(
-          child: PieChart(
-            PieChartData(
-              sectionsSpace: 2,
-              centerSpaceRadius: 40,
-              sections: List.generate(entries.length, (i) {
-                final value = entries[i].value.toDouble();
-                final percentage = total > 0
-                    ? (value / total * 100).toStringAsFixed(0)
-                    : '0';
-                return PieChartSectionData(
-                  color: colors[i % colors.length],
-                  value: value,
-                  title: '$percentage%',
-                  radius: 50,
-                  titleStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+          child: total == 0
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.pie_chart_outline, size: 48, color: AppTheme.stone300),
+                      SizedBox(height: 8),
+                      Text(
+                        'Sin datos\npara el período',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: AppTheme.stone400),
+                      ),
+                    ],
                   ),
-                );
-              }),
-            ),
-          ),
+                )
+              : PieChart(
+                  PieChartData(
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 40,
+                    sections: List.generate(entries.length, (i) {
+                      final value = entries[i].value.toDouble();
+                      final pct = (value / total * 100).toStringAsFixed(0);
+                      return PieChartSectionData(
+                        color: colors[i % colors.length],
+                        value: value,
+                        title: '$pct%',
+                        radius: 50,
+                        titleStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      );
+                    }),
+                  ),
+                ),
         ),
         const SizedBox(width: 16),
-        // Leyenda
         Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: List.generate(entries.length, (i) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: colors[i % colors.length],
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${entries[i].key}: ${entries[i].value}',
-                    style:
-                        const TextStyle(fontSize: 11, color: AppTheme.stone600),
-                  ),
-                ],
+          children: List.generate(entries.length, (i) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(children: [
+              Container(
+                width: 10, height: 10,
+                decoration: BoxDecoration(
+                  color: colors[i % colors.length],
+                  shape: BoxShape.circle,
+                ),
               ),
-            );
-          }),
+              const SizedBox(width: 7),
+              Text(
+                '${entries[i].key}: ${entries[i].value}',
+                style: const TextStyle(fontSize: 11, color: AppTheme.stone600),
+              ),
+            ]),
+          )),
         ),
       ],
     );

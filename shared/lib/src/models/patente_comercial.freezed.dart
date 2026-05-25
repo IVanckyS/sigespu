@@ -1,5 +1,5 @@
-// coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// coverage:ignore-file
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
@@ -9,236 +9,146 @@ part of 'patente_comercial.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// dart format off
 T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
-
-PatenteComercial _$PatenteComercialFromJson(Map<String, dynamic> json) {
-  return _PatenteComercial.fromJson(json);
-}
 
 /// @nodoc
 mixin _$PatenteComercial {
-  String get id => throw _privateConstructorUsedError;
+  String get id;
   @JsonKey(name: 'numero_decreto')
-  int? get numeroDecreto => throw _privateConstructorUsedError;
+  int? get numeroDecreto;
   @JsonKey(name: 'fecha_decreto')
-  DateTime? get fechaDecreto => throw _privateConstructorUsedError;
+  DateTime? get fechaDecreto;
   @JsonKey(name: 'fecha_publicacion')
-  DateTime? get fechaPublicacion => throw _privateConstructorUsedError;
+  DateTime? get fechaPublicacion;
   @JsonKey(name: 'tipo_patente')
-  String? get tipoPatente => throw _privateConstructorUsedError;
-  String? get rut => throw _privateConstructorUsedError;
+  String? get tipoPatente;
+  String? get rut;
   @JsonKey(name: 'razon_social')
-  String? get razonSocial => throw _privateConstructorUsedError;
-  String? get giro => throw _privateConstructorUsedError;
+  String? get razonSocial;
+  String? get giro;
   @JsonKey(name: 'direccion_raw')
-  String? get direccionRaw => throw _privateConstructorUsedError;
+  String? get direccionRaw;
   @JsonKey(name: 'direccion_normalizada')
-  String? get direccionNormalizada => throw _privateConstructorUsedError;
-  double get lat => throw _privateConstructorUsedError;
-  double get lng => throw _privateConstructorUsedError;
+  String? get direccionNormalizada;
+  double get lat;
+  double get lng;
   @JsonKey(name: 'geocoding_confianza')
-  String? get geocodingConfianza => throw _privateConstructorUsedError;
+  String? get geocodingConfianza;
   @JsonKey(name: 'estado_inferido')
-  String get estadoInferido => throw _privateConstructorUsedError;
+  String get estadoInferido;
   @JsonKey(name: 'ultima_verificacion_terreno')
-  DateTime? get ultimaVerificacionTerreno => throw _privateConstructorUsedError;
+  DateTime? get ultimaVerificacionTerreno;
   @JsonKey(name: 'verificado_por')
-  String? get verificadoPor => throw _privateConstructorUsedError;
-  String? get observaciones => throw _privateConstructorUsedError;
+  String? get verificadoPor;
+  String? get observaciones;
   @JsonKey(name: 'url_fuente')
-  String? get urlFuente => throw _privateConstructorUsedError;
+  String? get urlFuente;
   @JsonKey(name: 'scraped_at')
-  DateTime? get scrapedAt => throw _privateConstructorUsedError;
+  DateTime? get scrapedAt;
   @JsonKey(name: 'raw_data')
-  Map<String, dynamic>? get rawData => throw _privateConstructorUsedError;
+  Map<String, dynamic>? get rawData;
   @JsonKey(name: 'created_at')
-  DateTime? get createdAt => throw _privateConstructorUsedError;
+  DateTime? get createdAt;
   @JsonKey(name: 'updated_at')
-  DateTime? get updatedAt => throw _privateConstructorUsedError;
-
-  /// Serializes this PatenteComercial to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  DateTime? get updatedAt;
 
   /// Create a copy of PatenteComercial
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
-  $PatenteComercialCopyWith<PatenteComercial> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $PatenteComercialCopyWith<$Res> {
-  factory $PatenteComercialCopyWith(
-          PatenteComercial value, $Res Function(PatenteComercial) then) =
-      _$PatenteComercialCopyWithImpl<$Res, PatenteComercial>;
-  @useResult
-  $Res call(
-      {String id,
-      @JsonKey(name: 'numero_decreto') int? numeroDecreto,
-      @JsonKey(name: 'fecha_decreto') DateTime? fechaDecreto,
-      @JsonKey(name: 'fecha_publicacion') DateTime? fechaPublicacion,
-      @JsonKey(name: 'tipo_patente') String? tipoPatente,
-      String? rut,
-      @JsonKey(name: 'razon_social') String? razonSocial,
-      String? giro,
-      @JsonKey(name: 'direccion_raw') String? direccionRaw,
-      @JsonKey(name: 'direccion_normalizada') String? direccionNormalizada,
-      double lat,
-      double lng,
-      @JsonKey(name: 'geocoding_confianza') String? geocodingConfianza,
-      @JsonKey(name: 'estado_inferido') String estadoInferido,
-      @JsonKey(name: 'ultima_verificacion_terreno')
-      DateTime? ultimaVerificacionTerreno,
-      @JsonKey(name: 'verificado_por') String? verificadoPor,
-      String? observaciones,
-      @JsonKey(name: 'url_fuente') String? urlFuente,
-      @JsonKey(name: 'scraped_at') DateTime? scrapedAt,
-      @JsonKey(name: 'raw_data') Map<String, dynamic>? rawData,
-      @JsonKey(name: 'created_at') DateTime? createdAt,
-      @JsonKey(name: 'updated_at') DateTime? updatedAt});
-}
-
-/// @nodoc
-class _$PatenteComercialCopyWithImpl<$Res, $Val extends PatenteComercial>
-    implements $PatenteComercialCopyWith<$Res> {
-  _$PatenteComercialCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of PatenteComercial
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
+  $PatenteComercialCopyWith<PatenteComercial> get copyWith =>
+      _$PatenteComercialCopyWithImpl<PatenteComercial>(
+          this as PatenteComercial, _$identity);
+
+  /// Serializes this PatenteComercial to a JSON map.
+  Map<String, dynamic> toJson();
+
   @override
-  $Res call({
-    Object? id = null,
-    Object? numeroDecreto = freezed,
-    Object? fechaDecreto = freezed,
-    Object? fechaPublicacion = freezed,
-    Object? tipoPatente = freezed,
-    Object? rut = freezed,
-    Object? razonSocial = freezed,
-    Object? giro = freezed,
-    Object? direccionRaw = freezed,
-    Object? direccionNormalizada = freezed,
-    Object? lat = null,
-    Object? lng = null,
-    Object? geocodingConfianza = freezed,
-    Object? estadoInferido = null,
-    Object? ultimaVerificacionTerreno = freezed,
-    Object? verificadoPor = freezed,
-    Object? observaciones = freezed,
-    Object? urlFuente = freezed,
-    Object? scrapedAt = freezed,
-    Object? rawData = freezed,
-    Object? createdAt = freezed,
-    Object? updatedAt = freezed,
-  }) {
-    return _then(_value.copyWith(
-      id: null == id
-          ? _value.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as String,
-      numeroDecreto: freezed == numeroDecreto
-          ? _value.numeroDecreto
-          : numeroDecreto // ignore: cast_nullable_to_non_nullable
-              as int?,
-      fechaDecreto: freezed == fechaDecreto
-          ? _value.fechaDecreto
-          : fechaDecreto // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-      fechaPublicacion: freezed == fechaPublicacion
-          ? _value.fechaPublicacion
-          : fechaPublicacion // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-      tipoPatente: freezed == tipoPatente
-          ? _value.tipoPatente
-          : tipoPatente // ignore: cast_nullable_to_non_nullable
-              as String?,
-      rut: freezed == rut
-          ? _value.rut
-          : rut // ignore: cast_nullable_to_non_nullable
-              as String?,
-      razonSocial: freezed == razonSocial
-          ? _value.razonSocial
-          : razonSocial // ignore: cast_nullable_to_non_nullable
-              as String?,
-      giro: freezed == giro
-          ? _value.giro
-          : giro // ignore: cast_nullable_to_non_nullable
-              as String?,
-      direccionRaw: freezed == direccionRaw
-          ? _value.direccionRaw
-          : direccionRaw // ignore: cast_nullable_to_non_nullable
-              as String?,
-      direccionNormalizada: freezed == direccionNormalizada
-          ? _value.direccionNormalizada
-          : direccionNormalizada // ignore: cast_nullable_to_non_nullable
-              as String?,
-      lat: null == lat
-          ? _value.lat
-          : lat // ignore: cast_nullable_to_non_nullable
-              as double,
-      lng: null == lng
-          ? _value.lng
-          : lng // ignore: cast_nullable_to_non_nullable
-              as double,
-      geocodingConfianza: freezed == geocodingConfianza
-          ? _value.geocodingConfianza
-          : geocodingConfianza // ignore: cast_nullable_to_non_nullable
-              as String?,
-      estadoInferido: null == estadoInferido
-          ? _value.estadoInferido
-          : estadoInferido // ignore: cast_nullable_to_non_nullable
-              as String,
-      ultimaVerificacionTerreno: freezed == ultimaVerificacionTerreno
-          ? _value.ultimaVerificacionTerreno
-          : ultimaVerificacionTerreno // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-      verificadoPor: freezed == verificadoPor
-          ? _value.verificadoPor
-          : verificadoPor // ignore: cast_nullable_to_non_nullable
-              as String?,
-      observaciones: freezed == observaciones
-          ? _value.observaciones
-          : observaciones // ignore: cast_nullable_to_non_nullable
-              as String?,
-      urlFuente: freezed == urlFuente
-          ? _value.urlFuente
-          : urlFuente // ignore: cast_nullable_to_non_nullable
-              as String?,
-      scrapedAt: freezed == scrapedAt
-          ? _value.scrapedAt
-          : scrapedAt // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-      rawData: freezed == rawData
-          ? _value.rawData
-          : rawData // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
-      createdAt: freezed == createdAt
-          ? _value.createdAt
-          : createdAt // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-      updatedAt: freezed == updatedAt
-          ? _value.updatedAt
-          : updatedAt // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-    ) as $Val);
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is PatenteComercial &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.numeroDecreto, numeroDecreto) ||
+                other.numeroDecreto == numeroDecreto) &&
+            (identical(other.fechaDecreto, fechaDecreto) ||
+                other.fechaDecreto == fechaDecreto) &&
+            (identical(other.fechaPublicacion, fechaPublicacion) ||
+                other.fechaPublicacion == fechaPublicacion) &&
+            (identical(other.tipoPatente, tipoPatente) ||
+                other.tipoPatente == tipoPatente) &&
+            (identical(other.rut, rut) || other.rut == rut) &&
+            (identical(other.razonSocial, razonSocial) ||
+                other.razonSocial == razonSocial) &&
+            (identical(other.giro, giro) || other.giro == giro) &&
+            (identical(other.direccionRaw, direccionRaw) ||
+                other.direccionRaw == direccionRaw) &&
+            (identical(other.direccionNormalizada, direccionNormalizada) ||
+                other.direccionNormalizada == direccionNormalizada) &&
+            (identical(other.lat, lat) || other.lat == lat) &&
+            (identical(other.lng, lng) || other.lng == lng) &&
+            (identical(other.geocodingConfianza, geocodingConfianza) ||
+                other.geocodingConfianza == geocodingConfianza) &&
+            (identical(other.estadoInferido, estadoInferido) ||
+                other.estadoInferido == estadoInferido) &&
+            (identical(other.ultimaVerificacionTerreno,
+                    ultimaVerificacionTerreno) ||
+                other.ultimaVerificacionTerreno == ultimaVerificacionTerreno) &&
+            (identical(other.verificadoPor, verificadoPor) ||
+                other.verificadoPor == verificadoPor) &&
+            (identical(other.observaciones, observaciones) ||
+                other.observaciones == observaciones) &&
+            (identical(other.urlFuente, urlFuente) ||
+                other.urlFuente == urlFuente) &&
+            (identical(other.scrapedAt, scrapedAt) ||
+                other.scrapedAt == scrapedAt) &&
+            const DeepCollectionEquality().equals(other.rawData, rawData) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        id,
+        numeroDecreto,
+        fechaDecreto,
+        fechaPublicacion,
+        tipoPatente,
+        rut,
+        razonSocial,
+        giro,
+        direccionRaw,
+        direccionNormalizada,
+        lat,
+        lng,
+        geocodingConfianza,
+        estadoInferido,
+        ultimaVerificacionTerreno,
+        verificadoPor,
+        observaciones,
+        urlFuente,
+        scrapedAt,
+        const DeepCollectionEquality().hash(rawData),
+        createdAt,
+        updatedAt
+      ]);
+
+  @override
+  String toString() {
+    return 'PatenteComercial(id: $id, numeroDecreto: $numeroDecreto, fechaDecreto: $fechaDecreto, fechaPublicacion: $fechaPublicacion, tipoPatente: $tipoPatente, rut: $rut, razonSocial: $razonSocial, giro: $giro, direccionRaw: $direccionRaw, direccionNormalizada: $direccionNormalizada, lat: $lat, lng: $lng, geocodingConfianza: $geocodingConfianza, estadoInferido: $estadoInferido, ultimaVerificacionTerreno: $ultimaVerificacionTerreno, verificadoPor: $verificadoPor, observaciones: $observaciones, urlFuente: $urlFuente, scrapedAt: $scrapedAt, rawData: $rawData, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 }
 
 /// @nodoc
-abstract class _$$PatenteComercialImplCopyWith<$Res>
-    implements $PatenteComercialCopyWith<$Res> {
-  factory _$$PatenteComercialImplCopyWith(_$PatenteComercialImpl value,
-          $Res Function(_$PatenteComercialImpl) then) =
-      __$$PatenteComercialImplCopyWithImpl<$Res>;
-  @override
+abstract mixin class $PatenteComercialCopyWith<$Res> {
+  factory $PatenteComercialCopyWith(
+          PatenteComercial value, $Res Function(PatenteComercial) _then) =
+      _$PatenteComercialCopyWithImpl;
   @useResult
   $Res call(
       {String id,
@@ -267,12 +177,12 @@ abstract class _$$PatenteComercialImplCopyWith<$Res>
 }
 
 /// @nodoc
-class __$$PatenteComercialImplCopyWithImpl<$Res>
-    extends _$PatenteComercialCopyWithImpl<$Res, _$PatenteComercialImpl>
-    implements _$$PatenteComercialImplCopyWith<$Res> {
-  __$$PatenteComercialImplCopyWithImpl(_$PatenteComercialImpl _value,
-      $Res Function(_$PatenteComercialImpl) _then)
-      : super(_value, _then);
+class _$PatenteComercialCopyWithImpl<$Res>
+    implements $PatenteComercialCopyWith<$Res> {
+  _$PatenteComercialCopyWithImpl(this._self, this._then);
+
+  final PatenteComercial _self;
+  final $Res Function(PatenteComercial) _then;
 
   /// Create a copy of PatenteComercial
   /// with the given fields replaced by the non-null parameter values.
@@ -302,103 +212,401 @@ class __$$PatenteComercialImplCopyWithImpl<$Res>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
-    return _then(_$PatenteComercialImpl(
+    return _then(_self.copyWith(
       id: null == id
-          ? _value.id
+          ? _self.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
       numeroDecreto: freezed == numeroDecreto
-          ? _value.numeroDecreto
+          ? _self.numeroDecreto
           : numeroDecreto // ignore: cast_nullable_to_non_nullable
               as int?,
       fechaDecreto: freezed == fechaDecreto
-          ? _value.fechaDecreto
+          ? _self.fechaDecreto
           : fechaDecreto // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       fechaPublicacion: freezed == fechaPublicacion
-          ? _value.fechaPublicacion
+          ? _self.fechaPublicacion
           : fechaPublicacion // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       tipoPatente: freezed == tipoPatente
-          ? _value.tipoPatente
+          ? _self.tipoPatente
           : tipoPatente // ignore: cast_nullable_to_non_nullable
               as String?,
       rut: freezed == rut
-          ? _value.rut
+          ? _self.rut
           : rut // ignore: cast_nullable_to_non_nullable
               as String?,
       razonSocial: freezed == razonSocial
-          ? _value.razonSocial
+          ? _self.razonSocial
           : razonSocial // ignore: cast_nullable_to_non_nullable
               as String?,
       giro: freezed == giro
-          ? _value.giro
+          ? _self.giro
           : giro // ignore: cast_nullable_to_non_nullable
               as String?,
       direccionRaw: freezed == direccionRaw
-          ? _value.direccionRaw
+          ? _self.direccionRaw
           : direccionRaw // ignore: cast_nullable_to_non_nullable
               as String?,
       direccionNormalizada: freezed == direccionNormalizada
-          ? _value.direccionNormalizada
+          ? _self.direccionNormalizada
           : direccionNormalizada // ignore: cast_nullable_to_non_nullable
               as String?,
       lat: null == lat
-          ? _value.lat
+          ? _self.lat
           : lat // ignore: cast_nullable_to_non_nullable
               as double,
       lng: null == lng
-          ? _value.lng
+          ? _self.lng
           : lng // ignore: cast_nullable_to_non_nullable
               as double,
       geocodingConfianza: freezed == geocodingConfianza
-          ? _value.geocodingConfianza
+          ? _self.geocodingConfianza
           : geocodingConfianza // ignore: cast_nullable_to_non_nullable
               as String?,
       estadoInferido: null == estadoInferido
-          ? _value.estadoInferido
+          ? _self.estadoInferido
           : estadoInferido // ignore: cast_nullable_to_non_nullable
               as String,
       ultimaVerificacionTerreno: freezed == ultimaVerificacionTerreno
-          ? _value.ultimaVerificacionTerreno
+          ? _self.ultimaVerificacionTerreno
           : ultimaVerificacionTerreno // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       verificadoPor: freezed == verificadoPor
-          ? _value.verificadoPor
+          ? _self.verificadoPor
           : verificadoPor // ignore: cast_nullable_to_non_nullable
               as String?,
       observaciones: freezed == observaciones
-          ? _value.observaciones
+          ? _self.observaciones
           : observaciones // ignore: cast_nullable_to_non_nullable
               as String?,
       urlFuente: freezed == urlFuente
-          ? _value.urlFuente
+          ? _self.urlFuente
           : urlFuente // ignore: cast_nullable_to_non_nullable
               as String?,
       scrapedAt: freezed == scrapedAt
-          ? _value.scrapedAt
+          ? _self.scrapedAt
           : scrapedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       rawData: freezed == rawData
-          ? _value._rawData
+          ? _self.rawData
           : rawData // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
       createdAt: freezed == createdAt
-          ? _value.createdAt
+          ? _self.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       updatedAt: freezed == updatedAt
-          ? _value.updatedAt
+          ? _self.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
     ));
   }
 }
 
+/// Adds pattern-matching-related methods to [PatenteComercial].
+extension PatenteComercialPatterns on PatenteComercial {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_PatenteComercial value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _PatenteComercial() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_PatenteComercial value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PatenteComercial():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_PatenteComercial value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PatenteComercial() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            String id,
+            @JsonKey(name: 'numero_decreto') int? numeroDecreto,
+            @JsonKey(name: 'fecha_decreto') DateTime? fechaDecreto,
+            @JsonKey(name: 'fecha_publicacion') DateTime? fechaPublicacion,
+            @JsonKey(name: 'tipo_patente') String? tipoPatente,
+            String? rut,
+            @JsonKey(name: 'razon_social') String? razonSocial,
+            String? giro,
+            @JsonKey(name: 'direccion_raw') String? direccionRaw,
+            @JsonKey(name: 'direccion_normalizada')
+            String? direccionNormalizada,
+            double lat,
+            double lng,
+            @JsonKey(name: 'geocoding_confianza') String? geocodingConfianza,
+            @JsonKey(name: 'estado_inferido') String estadoInferido,
+            @JsonKey(name: 'ultima_verificacion_terreno')
+            DateTime? ultimaVerificacionTerreno,
+            @JsonKey(name: 'verificado_por') String? verificadoPor,
+            String? observaciones,
+            @JsonKey(name: 'url_fuente') String? urlFuente,
+            @JsonKey(name: 'scraped_at') DateTime? scrapedAt,
+            @JsonKey(name: 'raw_data') Map<String, dynamic>? rawData,
+            @JsonKey(name: 'created_at') DateTime? createdAt,
+            @JsonKey(name: 'updated_at') DateTime? updatedAt)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _PatenteComercial() when $default != null:
+        return $default(
+            _that.id,
+            _that.numeroDecreto,
+            _that.fechaDecreto,
+            _that.fechaPublicacion,
+            _that.tipoPatente,
+            _that.rut,
+            _that.razonSocial,
+            _that.giro,
+            _that.direccionRaw,
+            _that.direccionNormalizada,
+            _that.lat,
+            _that.lng,
+            _that.geocodingConfianza,
+            _that.estadoInferido,
+            _that.ultimaVerificacionTerreno,
+            _that.verificadoPor,
+            _that.observaciones,
+            _that.urlFuente,
+            _that.scrapedAt,
+            _that.rawData,
+            _that.createdAt,
+            _that.updatedAt);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            String id,
+            @JsonKey(name: 'numero_decreto') int? numeroDecreto,
+            @JsonKey(name: 'fecha_decreto') DateTime? fechaDecreto,
+            @JsonKey(name: 'fecha_publicacion') DateTime? fechaPublicacion,
+            @JsonKey(name: 'tipo_patente') String? tipoPatente,
+            String? rut,
+            @JsonKey(name: 'razon_social') String? razonSocial,
+            String? giro,
+            @JsonKey(name: 'direccion_raw') String? direccionRaw,
+            @JsonKey(name: 'direccion_normalizada')
+            String? direccionNormalizada,
+            double lat,
+            double lng,
+            @JsonKey(name: 'geocoding_confianza') String? geocodingConfianza,
+            @JsonKey(name: 'estado_inferido') String estadoInferido,
+            @JsonKey(name: 'ultima_verificacion_terreno')
+            DateTime? ultimaVerificacionTerreno,
+            @JsonKey(name: 'verificado_por') String? verificadoPor,
+            String? observaciones,
+            @JsonKey(name: 'url_fuente') String? urlFuente,
+            @JsonKey(name: 'scraped_at') DateTime? scrapedAt,
+            @JsonKey(name: 'raw_data') Map<String, dynamic>? rawData,
+            @JsonKey(name: 'created_at') DateTime? createdAt,
+            @JsonKey(name: 'updated_at') DateTime? updatedAt)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PatenteComercial():
+        return $default(
+            _that.id,
+            _that.numeroDecreto,
+            _that.fechaDecreto,
+            _that.fechaPublicacion,
+            _that.tipoPatente,
+            _that.rut,
+            _that.razonSocial,
+            _that.giro,
+            _that.direccionRaw,
+            _that.direccionNormalizada,
+            _that.lat,
+            _that.lng,
+            _that.geocodingConfianza,
+            _that.estadoInferido,
+            _that.ultimaVerificacionTerreno,
+            _that.verificadoPor,
+            _that.observaciones,
+            _that.urlFuente,
+            _that.scrapedAt,
+            _that.rawData,
+            _that.createdAt,
+            _that.updatedAt);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            String id,
+            @JsonKey(name: 'numero_decreto') int? numeroDecreto,
+            @JsonKey(name: 'fecha_decreto') DateTime? fechaDecreto,
+            @JsonKey(name: 'fecha_publicacion') DateTime? fechaPublicacion,
+            @JsonKey(name: 'tipo_patente') String? tipoPatente,
+            String? rut,
+            @JsonKey(name: 'razon_social') String? razonSocial,
+            String? giro,
+            @JsonKey(name: 'direccion_raw') String? direccionRaw,
+            @JsonKey(name: 'direccion_normalizada')
+            String? direccionNormalizada,
+            double lat,
+            double lng,
+            @JsonKey(name: 'geocoding_confianza') String? geocodingConfianza,
+            @JsonKey(name: 'estado_inferido') String estadoInferido,
+            @JsonKey(name: 'ultima_verificacion_terreno')
+            DateTime? ultimaVerificacionTerreno,
+            @JsonKey(name: 'verificado_por') String? verificadoPor,
+            String? observaciones,
+            @JsonKey(name: 'url_fuente') String? urlFuente,
+            @JsonKey(name: 'scraped_at') DateTime? scrapedAt,
+            @JsonKey(name: 'raw_data') Map<String, dynamic>? rawData,
+            @JsonKey(name: 'created_at') DateTime? createdAt,
+            @JsonKey(name: 'updated_at') DateTime? updatedAt)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _PatenteComercial() when $default != null:
+        return $default(
+            _that.id,
+            _that.numeroDecreto,
+            _that.fechaDecreto,
+            _that.fechaPublicacion,
+            _that.tipoPatente,
+            _that.rut,
+            _that.razonSocial,
+            _that.giro,
+            _that.direccionRaw,
+            _that.direccionNormalizada,
+            _that.lat,
+            _that.lng,
+            _that.geocodingConfianza,
+            _that.estadoInferido,
+            _that.ultimaVerificacionTerreno,
+            _that.verificadoPor,
+            _that.observaciones,
+            _that.urlFuente,
+            _that.scrapedAt,
+            _that.rawData,
+            _that.createdAt,
+            _that.updatedAt);
+      case _:
+        return null;
+    }
+  }
+}
+
 /// @nodoc
 @JsonSerializable()
-class _$PatenteComercialImpl implements _PatenteComercial {
-  const _$PatenteComercialImpl(
+class _PatenteComercial implements PatenteComercial {
+  const _PatenteComercial(
       {required this.id,
       @JsonKey(name: 'numero_decreto') this.numeroDecreto,
       @JsonKey(name: 'fecha_decreto') this.fechaDecreto,
@@ -424,9 +632,8 @@ class _$PatenteComercialImpl implements _PatenteComercial {
       @JsonKey(name: 'created_at') this.createdAt,
       @JsonKey(name: 'updated_at') this.updatedAt})
       : _rawData = rawData;
-
-  factory _$PatenteComercialImpl.fromJson(Map<String, dynamic> json) =>
-      _$$PatenteComercialImplFromJson(json);
+  factory _PatenteComercial.fromJson(Map<String, dynamic> json) =>
+      _$PatenteComercialFromJson(json);
 
   @override
   final String id;
@@ -497,16 +704,26 @@ class _$PatenteComercialImpl implements _PatenteComercial {
   @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
 
+  /// Create a copy of PatenteComercial
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  String toString() {
-    return 'PatenteComercial(id: $id, numeroDecreto: $numeroDecreto, fechaDecreto: $fechaDecreto, fechaPublicacion: $fechaPublicacion, tipoPatente: $tipoPatente, rut: $rut, razonSocial: $razonSocial, giro: $giro, direccionRaw: $direccionRaw, direccionNormalizada: $direccionNormalizada, lat: $lat, lng: $lng, geocodingConfianza: $geocodingConfianza, estadoInferido: $estadoInferido, ultimaVerificacionTerreno: $ultimaVerificacionTerreno, verificadoPor: $verificadoPor, observaciones: $observaciones, urlFuente: $urlFuente, scrapedAt: $scrapedAt, rawData: $rawData, createdAt: $createdAt, updatedAt: $updatedAt)';
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  _$PatenteComercialCopyWith<_PatenteComercial> get copyWith =>
+      __$PatenteComercialCopyWithImpl<_PatenteComercial>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$PatenteComercialToJson(
+      this,
+    );
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$PatenteComercialImpl &&
+            other is _PatenteComercial &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.numeroDecreto, numeroDecreto) ||
                 other.numeroDecreto == numeroDecreto) &&
@@ -576,119 +793,173 @@ class _$PatenteComercialImpl implements _PatenteComercial {
         updatedAt
       ]);
 
-  /// Create a copy of PatenteComercial
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  @pragma('vm:prefer-inline')
-  _$$PatenteComercialImplCopyWith<_$PatenteComercialImpl> get copyWith =>
-      __$$PatenteComercialImplCopyWithImpl<_$PatenteComercialImpl>(
-          this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$PatenteComercialImplToJson(
-      this,
-    );
+  String toString() {
+    return 'PatenteComercial(id: $id, numeroDecreto: $numeroDecreto, fechaDecreto: $fechaDecreto, fechaPublicacion: $fechaPublicacion, tipoPatente: $tipoPatente, rut: $rut, razonSocial: $razonSocial, giro: $giro, direccionRaw: $direccionRaw, direccionNormalizada: $direccionNormalizada, lat: $lat, lng: $lng, geocodingConfianza: $geocodingConfianza, estadoInferido: $estadoInferido, ultimaVerificacionTerreno: $ultimaVerificacionTerreno, verificadoPor: $verificadoPor, observaciones: $observaciones, urlFuente: $urlFuente, scrapedAt: $scrapedAt, rawData: $rawData, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 }
 
-abstract class _PatenteComercial implements PatenteComercial {
-  const factory _PatenteComercial(
-      {required final String id,
-      @JsonKey(name: 'numero_decreto') final int? numeroDecreto,
-      @JsonKey(name: 'fecha_decreto') final DateTime? fechaDecreto,
-      @JsonKey(name: 'fecha_publicacion') final DateTime? fechaPublicacion,
-      @JsonKey(name: 'tipo_patente') final String? tipoPatente,
-      final String? rut,
-      @JsonKey(name: 'razon_social') final String? razonSocial,
-      final String? giro,
-      @JsonKey(name: 'direccion_raw') final String? direccionRaw,
-      @JsonKey(name: 'direccion_normalizada')
-      final String? direccionNormalizada,
-      required final double lat,
-      required final double lng,
-      @JsonKey(name: 'geocoding_confianza') final String? geocodingConfianza,
-      @JsonKey(name: 'estado_inferido') final String estadoInferido,
+/// @nodoc
+abstract mixin class _$PatenteComercialCopyWith<$Res>
+    implements $PatenteComercialCopyWith<$Res> {
+  factory _$PatenteComercialCopyWith(
+          _PatenteComercial value, $Res Function(_PatenteComercial) _then) =
+      __$PatenteComercialCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {String id,
+      @JsonKey(name: 'numero_decreto') int? numeroDecreto,
+      @JsonKey(name: 'fecha_decreto') DateTime? fechaDecreto,
+      @JsonKey(name: 'fecha_publicacion') DateTime? fechaPublicacion,
+      @JsonKey(name: 'tipo_patente') String? tipoPatente,
+      String? rut,
+      @JsonKey(name: 'razon_social') String? razonSocial,
+      String? giro,
+      @JsonKey(name: 'direccion_raw') String? direccionRaw,
+      @JsonKey(name: 'direccion_normalizada') String? direccionNormalizada,
+      double lat,
+      double lng,
+      @JsonKey(name: 'geocoding_confianza') String? geocodingConfianza,
+      @JsonKey(name: 'estado_inferido') String estadoInferido,
       @JsonKey(name: 'ultima_verificacion_terreno')
-      final DateTime? ultimaVerificacionTerreno,
-      @JsonKey(name: 'verificado_por') final String? verificadoPor,
-      final String? observaciones,
-      @JsonKey(name: 'url_fuente') final String? urlFuente,
-      @JsonKey(name: 'scraped_at') final DateTime? scrapedAt,
-      @JsonKey(name: 'raw_data') final Map<String, dynamic>? rawData,
-      @JsonKey(name: 'created_at') final DateTime? createdAt,
-      @JsonKey(name: 'updated_at')
-      final DateTime? updatedAt}) = _$PatenteComercialImpl;
+      DateTime? ultimaVerificacionTerreno,
+      @JsonKey(name: 'verificado_por') String? verificadoPor,
+      String? observaciones,
+      @JsonKey(name: 'url_fuente') String? urlFuente,
+      @JsonKey(name: 'scraped_at') DateTime? scrapedAt,
+      @JsonKey(name: 'raw_data') Map<String, dynamic>? rawData,
+      @JsonKey(name: 'created_at') DateTime? createdAt,
+      @JsonKey(name: 'updated_at') DateTime? updatedAt});
+}
 
-  factory _PatenteComercial.fromJson(Map<String, dynamic> json) =
-      _$PatenteComercialImpl.fromJson;
+/// @nodoc
+class __$PatenteComercialCopyWithImpl<$Res>
+    implements _$PatenteComercialCopyWith<$Res> {
+  __$PatenteComercialCopyWithImpl(this._self, this._then);
 
-  @override
-  String get id;
-  @override
-  @JsonKey(name: 'numero_decreto')
-  int? get numeroDecreto;
-  @override
-  @JsonKey(name: 'fecha_decreto')
-  DateTime? get fechaDecreto;
-  @override
-  @JsonKey(name: 'fecha_publicacion')
-  DateTime? get fechaPublicacion;
-  @override
-  @JsonKey(name: 'tipo_patente')
-  String? get tipoPatente;
-  @override
-  String? get rut;
-  @override
-  @JsonKey(name: 'razon_social')
-  String? get razonSocial;
-  @override
-  String? get giro;
-  @override
-  @JsonKey(name: 'direccion_raw')
-  String? get direccionRaw;
-  @override
-  @JsonKey(name: 'direccion_normalizada')
-  String? get direccionNormalizada;
-  @override
-  double get lat;
-  @override
-  double get lng;
-  @override
-  @JsonKey(name: 'geocoding_confianza')
-  String? get geocodingConfianza;
-  @override
-  @JsonKey(name: 'estado_inferido')
-  String get estadoInferido;
-  @override
-  @JsonKey(name: 'ultima_verificacion_terreno')
-  DateTime? get ultimaVerificacionTerreno;
-  @override
-  @JsonKey(name: 'verificado_por')
-  String? get verificadoPor;
-  @override
-  String? get observaciones;
-  @override
-  @JsonKey(name: 'url_fuente')
-  String? get urlFuente;
-  @override
-  @JsonKey(name: 'scraped_at')
-  DateTime? get scrapedAt;
-  @override
-  @JsonKey(name: 'raw_data')
-  Map<String, dynamic>? get rawData;
-  @override
-  @JsonKey(name: 'created_at')
-  DateTime? get createdAt;
-  @override
-  @JsonKey(name: 'updated_at')
-  DateTime? get updatedAt;
+  final _PatenteComercial _self;
+  final $Res Function(_PatenteComercial) _then;
 
   /// Create a copy of PatenteComercial
   /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$PatenteComercialImplCopyWith<_$PatenteComercialImpl> get copyWith =>
-      throw _privateConstructorUsedError;
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? id = null,
+    Object? numeroDecreto = freezed,
+    Object? fechaDecreto = freezed,
+    Object? fechaPublicacion = freezed,
+    Object? tipoPatente = freezed,
+    Object? rut = freezed,
+    Object? razonSocial = freezed,
+    Object? giro = freezed,
+    Object? direccionRaw = freezed,
+    Object? direccionNormalizada = freezed,
+    Object? lat = null,
+    Object? lng = null,
+    Object? geocodingConfianza = freezed,
+    Object? estadoInferido = null,
+    Object? ultimaVerificacionTerreno = freezed,
+    Object? verificadoPor = freezed,
+    Object? observaciones = freezed,
+    Object? urlFuente = freezed,
+    Object? scrapedAt = freezed,
+    Object? rawData = freezed,
+    Object? createdAt = freezed,
+    Object? updatedAt = freezed,
+  }) {
+    return _then(_PatenteComercial(
+      id: null == id
+          ? _self.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      numeroDecreto: freezed == numeroDecreto
+          ? _self.numeroDecreto
+          : numeroDecreto // ignore: cast_nullable_to_non_nullable
+              as int?,
+      fechaDecreto: freezed == fechaDecreto
+          ? _self.fechaDecreto
+          : fechaDecreto // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      fechaPublicacion: freezed == fechaPublicacion
+          ? _self.fechaPublicacion
+          : fechaPublicacion // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      tipoPatente: freezed == tipoPatente
+          ? _self.tipoPatente
+          : tipoPatente // ignore: cast_nullable_to_non_nullable
+              as String?,
+      rut: freezed == rut
+          ? _self.rut
+          : rut // ignore: cast_nullable_to_non_nullable
+              as String?,
+      razonSocial: freezed == razonSocial
+          ? _self.razonSocial
+          : razonSocial // ignore: cast_nullable_to_non_nullable
+              as String?,
+      giro: freezed == giro
+          ? _self.giro
+          : giro // ignore: cast_nullable_to_non_nullable
+              as String?,
+      direccionRaw: freezed == direccionRaw
+          ? _self.direccionRaw
+          : direccionRaw // ignore: cast_nullable_to_non_nullable
+              as String?,
+      direccionNormalizada: freezed == direccionNormalizada
+          ? _self.direccionNormalizada
+          : direccionNormalizada // ignore: cast_nullable_to_non_nullable
+              as String?,
+      lat: null == lat
+          ? _self.lat
+          : lat // ignore: cast_nullable_to_non_nullable
+              as double,
+      lng: null == lng
+          ? _self.lng
+          : lng // ignore: cast_nullable_to_non_nullable
+              as double,
+      geocodingConfianza: freezed == geocodingConfianza
+          ? _self.geocodingConfianza
+          : geocodingConfianza // ignore: cast_nullable_to_non_nullable
+              as String?,
+      estadoInferido: null == estadoInferido
+          ? _self.estadoInferido
+          : estadoInferido // ignore: cast_nullable_to_non_nullable
+              as String,
+      ultimaVerificacionTerreno: freezed == ultimaVerificacionTerreno
+          ? _self.ultimaVerificacionTerreno
+          : ultimaVerificacionTerreno // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      verificadoPor: freezed == verificadoPor
+          ? _self.verificadoPor
+          : verificadoPor // ignore: cast_nullable_to_non_nullable
+              as String?,
+      observaciones: freezed == observaciones
+          ? _self.observaciones
+          : observaciones // ignore: cast_nullable_to_non_nullable
+              as String?,
+      urlFuente: freezed == urlFuente
+          ? _self.urlFuente
+          : urlFuente // ignore: cast_nullable_to_non_nullable
+              as String?,
+      scrapedAt: freezed == scrapedAt
+          ? _self.scrapedAt
+          : scrapedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      rawData: freezed == rawData
+          ? _self._rawData
+          : rawData // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
+      createdAt: freezed == createdAt
+          ? _self.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _self.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ));
+  }
 }
+
+// dart format on

@@ -6,9 +6,8 @@ part of 'patente_comercial.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$PatenteComercialImpl _$$PatenteComercialImplFromJson(
-        Map<String, dynamic> json) =>
-    _$PatenteComercialImpl(
+_PatenteComercial _$PatenteComercialFromJson(Map<String, dynamic> json) =>
+    _PatenteComercial(
       id: json['id'] as String,
       numeroDecreto: (json['numero_decreto'] as num?)?.toInt(),
       fechaDecreto: json['fecha_decreto'] == null
@@ -45,8 +44,7 @@ _$PatenteComercialImpl _$$PatenteComercialImplFromJson(
           : DateTime.parse(json['updated_at'] as String),
     );
 
-Map<String, dynamic> _$$PatenteComercialImplToJson(
-        _$PatenteComercialImpl instance) =>
+Map<String, dynamic> _$PatenteComercialToJson(_PatenteComercial instance) =>
     <String, dynamic>{
       'id': instance.id,
       'numero_decreto': instance.numeroDecreto,

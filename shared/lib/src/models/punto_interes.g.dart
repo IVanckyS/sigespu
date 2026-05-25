@@ -6,8 +6,8 @@ part of 'punto_interes.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$PuntoInteresImpl _$$PuntoInteresImplFromJson(Map<String, dynamic> json) =>
-    _$PuntoInteresImpl(
+_PuntoInteres _$PuntoInteresFromJson(Map<String, dynamic> json) =>
+    _PuntoInteres(
       id: json['id'] as String,
       tipo: json['tipo'] as String,
       nombre: json['nombre'] as String?,
@@ -28,7 +28,7 @@ _$PuntoInteresImpl _$$PuntoInteresImplFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['updated_at'] as String),
     );
 
-Map<String, dynamic> _$$PuntoInteresImplToJson(_$PuntoInteresImpl instance) =>
+Map<String, dynamic> _$PuntoInteresToJson(_PuntoInteres instance) =>
     <String, dynamic>{
       'id': instance.id,
       'tipo': instance.tipo,

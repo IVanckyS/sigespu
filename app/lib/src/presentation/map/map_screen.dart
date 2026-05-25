@@ -140,47 +140,43 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     },
                     onPositionChanged: (camera, hasGesture) {
                       final c = camera.center;
-                      if (c != null) {
-                        // Debounce coordinate display updates to ~4fps during
-                        // gestures — avoids rebuilding the info panel 60×/s.
-                        if (hasGesture) {
-                          _coordDebounce?.cancel();
-                          _coordDebounce = Timer(
-                            const Duration(milliseconds: 120),
-                            () => ref.read(mapCenterCoordsProvider.notifier).state =
-                                (c.latitude, c.longitude),
-                          );
-                        } else {
-                          ref.read(mapCenterCoordsProvider.notifier).state =
-                              (c.latitude, c.longitude);
-                        }
+                      // Debounce coordinate display updates to ~4fps during
+                      // gestures — avoids rebuilding the info panel 60×/s.
+                      if (hasGesture) {
+                        _coordDebounce?.cancel();
+                        _coordDebounce = Timer(
+                          const Duration(milliseconds: 120),
+                          () => ref.read(mapCenterCoordsProvider.notifier).state =
+                              (c.latitude, c.longitude),
+                        );
+                      } else {
+                        ref.read(mapCenterCoordsProvider.notifier).state =
+                            (c.latitude, c.longitude);
                       }
 
                       // Actualizar límites para filtrado espacial (lazy loading)
-                      final bounds = camera.bounds;
-                      if (bounds != null) {
-                        final next = <double>[
-                          bounds.west,
-                          bounds.south,
-                          bounds.east,
-                          bounds.north
-                        ];
+                      final bounds = camera.visibleBounds;
+                      final next = <double>[
+                        bounds.west,
+                        bounds.south,
+                        bounds.east,
+                        bounds.north
+                      ];
 
-                        // Solo actualizamos si el cambio es significativo (ej. > 0.005 grados)
-                        final current = ref.read(mapBoundsProvider);
-                        bool significant = current == null;
-                        if (current != null) {
-                          for (int i = 0; i < 4; i++) {
-                            if ((current[i] - next[i]).abs() > 0.005) {
-                              significant = true;
-                              break;
-                            }
+                      // Solo actualizamos si el cambio es significativo (ej. > 0.005 grados)
+                      final current = ref.read(mapBoundsProvider);
+                      bool significant = current == null;
+                      if (current != null) {
+                        for (int i = 0; i < 4; i++) {
+                          if ((current[i] - next[i]).abs() > 0.005) {
+                            significant = true;
+                            break;
                           }
                         }
+                      }
 
-                        if (significant) {
-                          ref.read(mapBoundsProvider.notifier).state = next;
-                        }
+                      if (significant) {
+                        ref.read(mapBoundsProvider.notifier).state = next;
                       }
                     },
                   ),
@@ -1845,7 +1841,7 @@ class _FabGroup extends StatelessWidget {
         return;
       }
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       ).timeout(const Duration(seconds: 6));
       final latLng = LatLng(pos.latitude, pos.longitude);
       ref.read(userLocationProvider.notifier).state = latLng;

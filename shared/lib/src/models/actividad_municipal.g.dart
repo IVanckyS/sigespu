@@ -6,9 +6,8 @@ part of 'actividad_municipal.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$ActividadMunicipalImpl _$$ActividadMunicipalImplFromJson(
-        Map<String, dynamic> json) =>
-    _$ActividadMunicipalImpl(
+_ActividadMunicipal _$ActividadMunicipalFromJson(Map<String, dynamic> json) =>
+    _ActividadMunicipal(
       id: json['id'] as String,
       tipo: $enumDecode(_$TipoActividadEnumMap, json['tipo']),
       estado: $enumDecode(_$EstadoActividadEnumMap, json['estado']),
@@ -42,8 +41,7 @@ _$ActividadMunicipalImpl _$$ActividadMunicipalImplFromJson(
           const [],
     );
 
-Map<String, dynamic> _$$ActividadMunicipalImplToJson(
-        _$ActividadMunicipalImpl instance) =>
+Map<String, dynamic> _$ActividadMunicipalToJson(_ActividadMunicipal instance) =>
     <String, dynamic>{
       'id': instance.id,
       'tipo': _$TipoActividadEnumMap[instance.tipo]!,
@@ -80,8 +78,8 @@ const _$EstadoActividadEnumMap = {
   EstadoActividad.archivado: 'archivado',
 };
 
-_$ActaActividadImpl _$$ActaActividadImplFromJson(Map<String, dynamic> json) =>
-    _$ActaActividadImpl(
+_ActaActividad _$ActaActividadFromJson(Map<String, dynamic> json) =>
+    _ActaActividad(
       contenido: json['contenido'] as String?,
       asistentes: (json['asistentes'] as List<dynamic>?)
               ?.map((e) => AsistenteActa.fromJson(e as Map<String, dynamic>))
@@ -96,7 +94,7 @@ _$ActaActividadImpl _$$ActaActividadImplFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['fechaFirma'] as String),
     );
 
-Map<String, dynamic> _$$ActaActividadImplToJson(_$ActaActividadImpl instance) =>
+Map<String, dynamic> _$ActaActividadToJson(_ActaActividad instance) =>
     <String, dynamic>{
       'contenido': instance.contenido,
       'asistentes': instance.asistentes,
@@ -104,15 +102,15 @@ Map<String, dynamic> _$$ActaActividadImplToJson(_$ActaActividadImpl instance) =>
       'fechaFirma': instance.fechaFirma?.toIso8601String(),
     };
 
-_$AsistenteActaImpl _$$AsistenteActaImplFromJson(Map<String, dynamic> json) =>
-    _$AsistenteActaImpl(
+_AsistenteActa _$AsistenteActaFromJson(Map<String, dynamic> json) =>
+    _AsistenteActa(
       nombre: json['nombre'] as String,
       cargo: json['cargo'] as String,
       rut: json['rut'] as String?,
       asistio: json['asistio'] as bool? ?? true,
     );
 
-Map<String, dynamic> _$$AsistenteActaImplToJson(_$AsistenteActaImpl instance) =>
+Map<String, dynamic> _$AsistenteActaToJson(_AsistenteActa instance) =>
     <String, dynamic>{
       'nombre': instance.nombre,
       'cargo': instance.cargo,
@@ -120,8 +118,7 @@ Map<String, dynamic> _$$AsistenteActaImplToJson(_$AsistenteActaImpl instance) =>
       'asistio': instance.asistio,
     };
 
-_$AcuerdoActaImpl _$$AcuerdoActaImplFromJson(Map<String, dynamic> json) =>
-    _$AcuerdoActaImpl(
+_AcuerdoActa _$AcuerdoActaFromJson(Map<String, dynamic> json) => _AcuerdoActa(
       id: json['id'] as String,
       descripcion: json['descripcion'] as String,
       responsable: json['responsable'] as String,
@@ -129,7 +126,7 @@ _$AcuerdoActaImpl _$$AcuerdoActaImplFromJson(Map<String, dynamic> json) =>
       completado: json['completado'] as bool? ?? false,
     );
 
-Map<String, dynamic> _$$AcuerdoActaImplToJson(_$AcuerdoActaImpl instance) =>
+Map<String, dynamic> _$AcuerdoActaToJson(_AcuerdoActa instance) =>
     <String, dynamic>{
       'id': instance.id,
       'descripcion': instance.descripcion,

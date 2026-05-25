@@ -4,7 +4,7 @@ part 'punto_interes.freezed.dart';
 part 'punto_interes.g.dart';
 
 @freezed
-class PuntoInteres with _$PuntoInteres {
+abstract class PuntoInteres with _$PuntoInteres {
   const factory PuntoInteres({
     required String id,
     required String tipo,

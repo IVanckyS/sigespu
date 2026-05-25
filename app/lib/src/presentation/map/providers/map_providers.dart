@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_heatmap/flutter_map_heatmap.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:logging/logging.dart';
 import 'package:shared/shared.dart';
@@ -571,16 +572,31 @@ class _CachedHeatMapDataSource extends HeatMapDataSource {
 
 final heatmapDataSourceProvider = Provider<HeatMapDataSource>((ref) {
   final all = ref.watch(allElementsProvider);
+  // El mapa de calor es filtrable por tipo y rango de fechas (CLAUDE.md §8),
+  // igual que las capas de marcadores.
+  final dangerFilter = ref.watch(dangerFilterProvider);
+  final dateLimit = ref.watch(dateLimitProvider);
+
   final data = <WeightedLatLng>[];
   for (final e in all) {
-    if (e.tipo.startsWith('reporte_') || e.tipo == 'zona_peligro') {
-      data.add(WeightedLatLng(
-        e.latLng,
-        e.tipo == 'zona_peligro'
-            ? ((e.nivel ?? 3) * 0.2).clamp(0.2, 1.0)
-            : 0.7,
-      ));
+    final isZona = e.tipo == 'zona_peligro';
+    if (!isZona && !e.tipo.startsWith('reporte_')) continue;
+
+    // Filtro de fecha: solo a elementos transitorios (reportes/incidentes).
+    if (dateLimit != null && _isTransient(e.tipo)) {
+      final d = DateTime.tryParse(e.fecha);
+      if (d != null && d.isBefore(dateLimit)) continue;
     }
+    // Filtro por tipo de peligro: aplica a las zonas de peligro.
+    if (isZona && dangerFilter != 'all' && e.tipoPeligro != dangerFilter) {
+      continue;
+    }
+
+    // Peso por nivel de riesgo/severidad (1-5 normalizado a 0.2-1.0), CLAUDE.md §8.
+    data.add(WeightedLatLng(
+      e.latLng,
+      ((e.nivel ?? 3) * 0.2).clamp(0.2, 1.0),
+    ));
   }
   return _CachedHeatMapDataSource(data);
 });
@@ -606,7 +622,7 @@ final _pendingSyncIdsStreamProvider = StreamProvider<Set<String>>((ref) {
 /// Lee del syncQueueTable (fuente de verdad), no del cache local — así un
 /// elemento creado y sincronizado deja de aparecer como "Pendiente sync".
 final pendingElementIdsProvider = Provider<Set<String>>((ref) {
-  return ref.watch(_pendingSyncIdsStreamProvider).valueOrNull ?? const {};
+  return ref.watch(_pendingSyncIdsStreamProvider).value ?? const {};
 });
 
 /// Geometrías parseadas de una capa personalizada (markers/polygons/polylines).

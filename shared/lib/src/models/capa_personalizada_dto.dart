@@ -4,7 +4,7 @@ part 'capa_personalizada_dto.freezed.dart';
 part 'capa_personalizada_dto.g.dart';
 
 @freezed
-class CapaPersonalizadaDto with _$CapaPersonalizadaDto {
+abstract class CapaPersonalizadaDto with _$CapaPersonalizadaDto {
   const factory CapaPersonalizadaDto({
     required String id,
     required String nombre,

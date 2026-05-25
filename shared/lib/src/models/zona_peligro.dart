@@ -4,7 +4,7 @@ part 'zona_peligro.freezed.dart';
 part 'zona_peligro.g.dart';
 
 @freezed
-class ZonaPeligro with _$ZonaPeligro {
+abstract class ZonaPeligro with _$ZonaPeligro {
   const factory ZonaPeligro({
     required String id,
     String? nombre,

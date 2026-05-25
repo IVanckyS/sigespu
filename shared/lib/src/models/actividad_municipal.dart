@@ -8,7 +8,7 @@ enum TipoActividad { reunion, operativo, evento, capacitacion }
 enum EstadoActividad { planificado, enCurso, completado, archivado }
 
 @freezed
-class ActividadMunicipal with _$ActividadMunicipal {
+abstract class ActividadMunicipal with _$ActividadMunicipal {
   const factory ActividadMunicipal({
     required String id,
     required TipoActividad tipo,
@@ -36,7 +36,7 @@ class ActividadMunicipal with _$ActividadMunicipal {
 }
 
 @freezed
-class ActaActividad with _$ActaActividad {
+abstract class ActaActividad with _$ActaActividad {
   const factory ActaActividad({
     String? contenido,
     @Default([]) List<AsistenteActa> asistentes,
@@ -49,7 +49,7 @@ class ActaActividad with _$ActaActividad {
 }
 
 @freezed
-class AsistenteActa with _$AsistenteActa {
+abstract class AsistenteActa with _$AsistenteActa {
   const factory AsistenteActa({
     required String nombre,
     required String cargo,
@@ -62,7 +62,7 @@ class AsistenteActa with _$AsistenteActa {
 }
 
 @freezed
-class AcuerdoActa with _$AcuerdoActa {
+abstract class AcuerdoActa with _$AcuerdoActa {
   const factory AcuerdoActa({
     required String id,
     required String descripcion,

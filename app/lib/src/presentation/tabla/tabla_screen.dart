@@ -92,8 +92,10 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
         final d = DateTime.tryParse(e.fecha);
         if (d != null) {
           if (_filterDateFrom != null && d.isBefore(_filterDateFrom!)) return false;
+          // Excluir lo que caiga en o después del inicio del día siguiente al "hasta",
+          // de modo que el rango incluya el día "hasta" completo sin colar el día posterior.
           if (_filterDateTo != null &&
-              d.isAfter(_filterDateTo!.add(const Duration(days: 1)))) return false;
+              !d.isBefore(_filterDateTo!.add(const Duration(days: 1)))) return false;
         }
       }
       return true;

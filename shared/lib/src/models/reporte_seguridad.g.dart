@@ -6,9 +6,8 @@ part of 'reporte_seguridad.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$ReporteSeguridadImpl _$$ReporteSeguridadImplFromJson(
-        Map<String, dynamic> json) =>
-    _$ReporteSeguridadImpl(
+_ReporteSeguridad _$ReporteSeguridadFromJson(Map<String, dynamic> json) =>
+    _ReporteSeguridad(
       id: json['id'] as String,
       tipo: json['tipo'] as String,
       lat: (json['lat'] as num).toDouble(),
@@ -34,8 +33,7 @@ _$ReporteSeguridadImpl _$$ReporteSeguridadImplFromJson(
           : DateTime.parse(json['updated_at'] as String),
     );
 
-Map<String, dynamic> _$$ReporteSeguridadImplToJson(
-        _$ReporteSeguridadImpl instance) =>
+Map<String, dynamic> _$ReporteSeguridadToJson(_ReporteSeguridad instance) =>
     <String, dynamic>{
       'id': instance.id,
       'tipo': instance.tipo,

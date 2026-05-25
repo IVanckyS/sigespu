@@ -18,7 +18,7 @@ import 'sigespu_emblem.dart';
 
 // ── Connectivity provider ─────────────────────────────────────────────────────
 
-final connectivityProvider = StreamProvider<ConnectivityResult>((ref) {
+final connectivityProvider = StreamProvider<List<ConnectivityResult>>((ref) {
   return Connectivity().onConnectivityChanged;
 });
 
@@ -46,10 +46,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     final location      = GoRouterState.of(context).uri.path;
     final connectAsync  = ref.watch(connectivityProvider);
     final auth          = ref.watch(authProvider);
-    final avatarBytes   = ref.watch(avatarBytesProvider).valueOrNull;
+    final avatarBytes   = ref.watch(avatarBytesProvider).value;
 
     final isOnline = connectAsync.when(
-      data:    (r) => r != ConnectivityResult.none,
+      data:    (r) => r.any((c) => c != ConnectivityResult.none),
       loading: ()  => true,
       error:   (_, __) => true,
     );
@@ -210,7 +210,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           ref.read(filteredActividadesProvider), userName);
       } else if (location == '/users') {
         bytes = await PdfExportService.generateUsuariosReport(
-          userName, usuarios: ref.read(usersProvider).valueOrNull ?? []);
+          userName, usuarios: ref.read(usersProvider).value ?? []);
       } else {
         bytes = await PdfExportService.generateReport(
           ref.read(filteredElementsProvider), userName,
@@ -897,7 +897,7 @@ class _ExportBtn extends ConsumerWidget {
           ref.read(filteredActividadesProvider), userName);
       } else if (location == '/users') {
         bytes = await PdfExportService.generateUsuariosReport(userName,
-          usuarios: ref.read(usersProvider).valueOrNull ?? []);
+          usuarios: ref.read(usersProvider).value ?? []);
       } else {
         final activeLayers = ref.read(activeLayersProvider);
         final dateRange    = ref.read(dateRangeProvider);

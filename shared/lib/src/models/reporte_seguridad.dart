@@ -4,7 +4,7 @@ part 'reporte_seguridad.freezed.dart';
 part 'reporte_seguridad.g.dart';
 
 @freezed
-class ReporteSeguridad with _$ReporteSeguridad {
+abstract class ReporteSeguridad with _$ReporteSeguridad {
   const factory ReporteSeguridad({
     required String id,
     required String tipo,

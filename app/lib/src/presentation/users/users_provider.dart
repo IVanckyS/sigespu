@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:excel/excel.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -268,7 +269,7 @@ class UsersNotifier extends AsyncNotifier<List<UsuarioItem>> {
     }
 
     // Validación de duplicado
-    final current = state.valueOrNull ?? [];
+    final current = state.value ?? [];
     if (current.any((u) => u.email.toLowerCase() == emailNorm)) {
       return (ok: false, error: 'Ya existe un usuario con ese email.');
     }
@@ -353,7 +354,7 @@ class UsersNotifier extends AsyncNotifier<List<UsuarioItem>> {
       }
     }
 
-    final current = state.valueOrNull ?? [];
+    final current = state.value ?? [];
     final next = current
         .map((u) => u.id == id
             ? u.copyWith(
@@ -370,14 +371,14 @@ class UsersNotifier extends AsyncNotifier<List<UsuarioItem>> {
   }
 
   Future<void> eliminar(String id) async {
-    final current = state.valueOrNull ?? [];
+    final current = state.value ?? [];
     final next = current.where((u) => u.id != id).toList();
     state = AsyncData(next);
     await _saveLocal(next);
   }
 
   Future<void> toggleActivo(String id) async {
-    final current = state.valueOrNull ?? [];
+    final current = state.value ?? [];
     final next = current
         .map((u) => u.id == id ? u.copyWith(activo: !u.activo) : u)
         .toList();
@@ -397,7 +398,7 @@ final usersUnidadFilterProvider = StateProvider<String>((ref) => 'all');
 final usersEstadoFilterProvider = StateProvider<String>((ref) => 'activos');
 
 final usersFiltradosProvider = Provider<List<UsuarioItem>>((ref) {
-  final all = ref.watch(usersProvider).valueOrNull ?? [];
+  final all = ref.watch(usersProvider).value ?? [];
   final q = ref.watch(usersSearchProvider).trim().toLowerCase();
   final rol = ref.watch(usersRolFilterProvider);
   final unidad = ref.watch(usersUnidadFilterProvider);

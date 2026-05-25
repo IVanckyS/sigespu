@@ -4,7 +4,7 @@ part 'sector_plan_regulador.freezed.dart';
 part 'sector_plan_regulador.g.dart';
 
 @freezed
-class SectorPlanRegulador with _$SectorPlanRegulador {
+abstract class SectorPlanRegulador with _$SectorPlanRegulador {
   const factory SectorPlanRegulador({
     required String id,
     String? codigo,

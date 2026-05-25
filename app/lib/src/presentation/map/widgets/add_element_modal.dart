@@ -57,7 +57,7 @@ class _AddElementModalState extends ConsumerState<AddElementModal> {
         await Geolocator.requestPermission();
       }
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       ).timeout(const Duration(seconds: 5));
       if (mounted) {
         setState(() {

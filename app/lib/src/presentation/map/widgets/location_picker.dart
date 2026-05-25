@@ -48,9 +48,9 @@ class _PickLocationPageState extends State<PickLocationPage> {
               initialCenter: widget.initialLocation,
               initialZoom: 16,
               onPositionChanged: (position, hasGesture) {
-                if (hasGesture && position.center != null) {
+                if (hasGesture) {
                   setState(() {
-                    _currentCenter = position.center!;
+                    _currentCenter = position.center;
                   });
                 }
               },

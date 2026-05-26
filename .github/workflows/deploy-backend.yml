@@ -18,7 +18,8 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Redeploy sigespu en Railway
-        run: railway redeploy --service sigespu --yes
+      - name: Deploy backend a Railway
+        working-directory: backend
+        run: railway up --service sigespu --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

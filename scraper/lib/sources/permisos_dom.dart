@@ -54,24 +54,22 @@ Future<void> scrapePermisosDom(
 
   for (final url in selected) {
     await ProgressTracker.throwIfCancelled(redis);
-    await _processMes(db, url, tracker);
+    await _processMes(db, redis, url, tracker);
     await Future.delayed(const Duration(milliseconds: 600));
   }
 
   print('[permisos_dom] Scraping completo');
 }
 
-Future<void> _processMes(Session db, String url, ProgressTracker? tracker) async {
+Future<void> _processMes(Session db, Command redis, String url, ProgressTracker? tracker) async {
   final body = await _get(url);
   if (body == null) return;
 
   final doc = html.parse(body);
   int ok = 0, err = 0;
 
-  // Necesitamos el cliente Redis para el cancel check — está disponible vía
-  // el scope del scrape principal, pero _processMes no lo recibe. Lo dejamos
-  // como ack del cancel a nivel de "mes": entre meses scraper.dart ya checkea.
   for (final row in doc.querySelectorAll('table tr')) {
+    await ProgressTracker.throwIfCancelled(redis);
     final cells = row.querySelectorAll('td');
     if (cells.length < 13) continue; // saltar encabezados y filas incompletas
 

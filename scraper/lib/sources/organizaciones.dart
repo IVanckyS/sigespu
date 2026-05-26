@@ -88,6 +88,7 @@ Future<void> _processCategoria(Session db, Command redis,
   );
 
   for (final row in doc.querySelectorAll('table tr')) {
+    await ProgressTracker.throwIfCancelled(redis);
     final cells = row.querySelectorAll('td');
     if (cells.length < 10) continue; // saltar encabezados y filas incompletas
 

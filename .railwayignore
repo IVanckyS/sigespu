@@ -1,0 +1,9 @@
+app/
+qgis/
+docs/
+nginx/
+design_handoff_scraping/
+design_handoff_sigespu_movil/
+.github/
+.claude/
+*.md

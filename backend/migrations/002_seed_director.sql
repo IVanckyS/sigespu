@@ -5,7 +5,7 @@ INSERT INTO usuarios (
   uuid_generate_v4(),
   'director@lota.cl',
   'Director Seguridad Pública',
-  '$2a$12$REEMPLAZAR_CON_HASH_BCRYPT_REAL_VER_DOCS', -- REEMPLAZAR: genera con BCrypt.hashpw('TuPasswordSeguro', BCrypt.gensalt(logRounds: 12))
+  '$2b$12$9askwZyhIVcL.FHnfbEIhekCptnOgaGQNNX2cA90dCsLikAhCv9g6',
   'director',
   NULL,
   true,
@@ -19,7 +19,7 @@ INSERT INTO usuarios (
   uuid_generate_v4(),
   'admin@lota.cl',
   'Administrador del Sistema',
-  '$2a$12$REEMPLAZAR_CON_HASH_BCRYPT_REAL_VER_DOCS', -- REEMPLAZAR: genera con BCrypt.hashpw('TuPasswordSeguro', BCrypt.gensalt(logRounds: 12))
+  '$2b$12$9askwZyhIVcL.FHnfbEIhekCptnOgaGQNNX2cA90dCsLikAhCv9g6',
   'director',
   NULL,
   true,

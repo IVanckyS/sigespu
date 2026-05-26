@@ -42,17 +42,26 @@ jobs:
             exit 1
           fi
 
+      # Genera _redirects para que Cloudflare proxye /auth/* y /api/* a Railway.
+      # La app web llama a su propio dominio → Cloudflare reenvía a Railway →
+      # el browser nunca ve una petición cross-origin → CORS eliminado.
+      - name: Generar _redirects (proxy Cloudflare → Railway)
+        run: |
+          printf '/auth/* %s/auth/:splat 200\n/api/* %s/api/:splat 200\n' \
+            "${{ vars.BACKEND_URL }}" "${{ vars.BACKEND_URL }}" \
+            > app/web/_redirects
+          echo ">>> _redirects:"
+          cat app/web/_redirects
+
       - name: Build Flutter Web
         working-directory: app
-        env:
-          API_BASE_URL: ${{ vars.BACKEND_URL }}
         run: |
-          echo ">>> API_BASE_URL=$API_BASE_URL"
+          echo ">>> API_BASE_URL=https://sigespu-web.pages.dev (Cloudflare proxy)"
           flutter pub get
           flutter build web --release \
-            "--dart-define=API_BASE_URL=$API_BASE_URL"
+            "--dart-define=API_BASE_URL=https://sigespu-web.pages.dev"
           echo ">>> Verificando URL en build:"
-          grep -o "sigespu-production\|localhost:8080" build/web/main.dart.js | head -5 || echo "No se encontró ninguna URL"
+          grep -o "sigespu-web\.pages\.dev\|localhost:8080" build/web/main.dart.js | head -5 || echo "No match"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

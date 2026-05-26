@@ -48,13 +48,13 @@ Future<void> runScrapingActual({
     await tracker.finish();
   } on ScrapingCancelledException {
     print('[scraper] runScrapingActual cancelado por usuario');
-    await tracker.finish(error: 'Cancelado por usuario');
+    try { await tracker.finish(error: 'Cancelado por usuario'); } catch (_) {}
   } catch (e, st) {
     print('[scraper] Error en runScrapingActual: $e\n$st');
-    await tracker.finish(error: e.toString());
+    try { await tracker.finish(error: e.toString()); } catch (_) {}
     rethrow;
   } finally {
-    await ProgressTracker.clearCancel(redis);
+    try { await ProgressTracker.clearCancel(redis); } catch (_) {}
   }
 }
 
@@ -105,12 +105,12 @@ Future<void> runScrapingHistorico({
     await tracker.finish();
   } on ScrapingCancelledException {
     print('[scraper] runScrapingHistorico cancelado por usuario');
-    await tracker.finish(error: 'Cancelado por usuario');
+    try { await tracker.finish(error: 'Cancelado por usuario'); } catch (_) {}
   } catch (e, st) {
     print('[scraper] Error en runScrapingHistorico: $e\n$st');
-    await tracker.finish(error: e.toString());
+    try { await tracker.finish(error: e.toString()); } catch (_) {}
     rethrow;
   } finally {
-    await ProgressTracker.clearCancel(redis);
+    try { await ProgressTracker.clearCancel(redis); } catch (_) {}
   }
 }

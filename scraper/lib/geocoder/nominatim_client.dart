@@ -24,7 +24,8 @@ class NominatimClient {
     });
 
     try {
-      final response = await http.get(uri, headers: {'User-Agent': _userAgent});
+      final response = await http.get(uri, headers: {'User-Agent': _userAgent})
+          .timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List;
         if (data.isNotEmpty) {

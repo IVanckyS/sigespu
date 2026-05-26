@@ -78,7 +78,7 @@ Future<void> _processCategoria(Session db, Command redis,
   if (body == null) return;
 
   final doc = html.parse(body);
-  int ok = 0, err = 0;
+  int ok = 0, err = 0, rowNum = 0;
 
   // Reemplazar registros del sector para mantener datos frescos
   // Se hace por lotes: delete + insert en la misma transacción conceptual
@@ -89,6 +89,8 @@ Future<void> _processCategoria(Session db, Command redis,
 
   for (final row in doc.querySelectorAll('table tr')) {
     await ProgressTracker.throwIfCancelled(redis);
+    rowNum++;
+    if (rowNum % 10 == 0) await tracker?.tick();
     final cells = row.querySelectorAll('td');
     if (cells.length < 10) continue; // saltar encabezados y filas incompletas
 
@@ -289,7 +291,8 @@ String _isoDate(DateTime d) =>
 
 Future<String?> _get(String url) async {
   try {
-    final r = await http.get(Uri.parse(url), headers: {'User-Agent': _ua});
+    final r = await http.get(Uri.parse(url), headers: {'User-Agent': _ua})
+        .timeout(const Duration(seconds: 30));
     if (r.statusCode == 200) return r.body;
     print('[organizaciones] HTTP ${r.statusCode} — $url');
     return null;

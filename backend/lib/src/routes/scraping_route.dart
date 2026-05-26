@@ -76,8 +76,13 @@ Future<Response> _getStatus(DatabaseService db) async {
 // ── Run actual / histórico ────────────────────────────────────────────────────
 
 Future<Response> _runActual(DatabaseService db) async {
-  if (await scraper.ProgressTracker.isRunning(db.redis)) {
-    return Response(409, body: jsonEncode({'error': 'Ya hay un scraping en curso'}));
+  try {
+    if (await scraper.ProgressTracker.isRunning(db.redis)) {
+      return Response(409, body: jsonEncode({'error': 'Ya hay un scraping en curso'}),
+          headers: {'content-type': 'application/json'});
+    }
+  } catch (_) {
+    // Redis caído — asumir que no hay scraping en curso
   }
   unawaited(scraper.runScrapingActual(db: db.db, redis: db.scrapingRedis).catchError((e) {
     print('[scraping/run] $e');
@@ -86,8 +91,13 @@ Future<Response> _runActual(DatabaseService db) async {
 }
 
 Future<Response> _runHistorico(DatabaseService db, Request req) async {
-  if (await scraper.ProgressTracker.isRunning(db.redis)) {
-    return Response(409, body: jsonEncode({'error': 'Ya hay un scraping en curso'}));
+  try {
+    if (await scraper.ProgressTracker.isRunning(db.redis)) {
+      return Response(409, body: jsonEncode({'error': 'Ya hay un scraping en curso'}),
+          headers: {'content-type': 'application/json'});
+    }
+  } catch (_) {
+    // Redis caído — asumir que no hay scraping en curso
   }
 
   int patentesYearFrom = 2022;

@@ -13,7 +13,13 @@ Middleware authMiddleware(JwtService jwtService) {
       
       final token = authHeader.substring(7);
       
-      if (await jwtService.isBlacklisted(token)) {
+      bool blacklisted = false;
+      try {
+        blacklisted = await jwtService.isBlacklisted(token);
+      } catch (_) {
+        // Redis caído — fail-open: la firma JWT sigue validándose abajo
+      }
+      if (blacklisted) {
         return Response.unauthorized(jsonEncode({'error': 'Token has been revoked'}));
       }
       

@@ -71,11 +71,12 @@ Future<void> _processPagina(Session db, Command redis, String url, ProgressTrack
   if (body == null) return;
 
   final doc = html.parse(body);
-  int ok = 0, err = 0;
+  int ok = 0, err = 0, rowNum = 0;
 
   for (final row in doc.querySelectorAll('table tr')) {
     final cells = row.querySelectorAll('td');
     if (cells.length < 13) continue; // saltar encabezados y filas incompletas
+    rowNum++;
 
     // Columnas (índice 0-based):
     // 0:N°  1:Año  2:Mes  3:Tipología  4:Tipo_acto  5:Denominación
@@ -146,6 +147,7 @@ Future<void> _processPagina(Session db, Command redis, String url, ProgressTrack
     }
 
     await ProgressTracker.throwIfCancelled(redis);
+    if (rowNum % 100 == 0) await tracker?.tick();
 
     // Dedup: verificar si ya existe por UNIQUE(numero_decreto, fecha_decreto)
     final existing = await db.execute(
@@ -243,7 +245,8 @@ String _isoDate(DateTime d) =>
 
 Future<String?> _get(String url) async {
   try {
-    final r = await http.get(Uri.parse(url), headers: {'User-Agent': _ua});
+    final r = await http.get(Uri.parse(url), headers: {'User-Agent': _ua})
+        .timeout(const Duration(seconds: 30));
     if (r.statusCode == 200) return r.body;
     print('[patentes_ig164] HTTP ${r.statusCode} — $url');
     return null;

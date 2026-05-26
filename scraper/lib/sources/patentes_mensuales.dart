@@ -86,11 +86,12 @@ Future<void> _processCategoria(
   if (body == null) return;
 
   final doc = html.parse(body);
-  int ok = 0, err = 0;
+  int ok = 0, err = 0, rowNum = 0;
 
   for (final row in doc.querySelectorAll('table tr')) {
     final cells = row.querySelectorAll('td');
     if (cells.length < 7) continue; // saltar encabezados (th) y filas vacías
+    rowNum++;
 
     final rolStr = cells[1].text.trim();
     final rol = int.tryParse(rolStr.replaceAll(RegExp(r'[^\d]'), ''));
@@ -159,8 +160,9 @@ Future<void> _processCategoria(
 
     final fechaIso = _isoDate(fechaDecretoDate);
 
-    // ─── Cancel cooperativo ──────────────────────────────────────────────────
+    // ─── Cancel cooperativo + keepalive Redis TTL ────────────────────────────
     await ProgressTracker.throwIfCancelled(redis);
+    if (rowNum % 20 == 0) await tracker?.tick();
 
     // ─── Dedup pre-flight ────────────────────────────────────────────────────
     // Si la patente ya está en BD con geocoding exitoso, saltarla.
@@ -356,7 +358,8 @@ String _isoDate(DateTime d) =>
 
 Future<String?> _get(String url) async {
   try {
-    final r = await http.get(Uri.parse(url), headers: {'User-Agent': _ua});
+    final r = await http.get(Uri.parse(url), headers: {'User-Agent': _ua})
+        .timeout(const Duration(seconds: 30));
     if (r.statusCode == 200) return r.body;
     print('[patentes] HTTP ${r.statusCode} — $url');
     return null;

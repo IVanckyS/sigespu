@@ -66,10 +66,12 @@ Future<void> _processMes(Session db, Command redis, String url, ProgressTracker?
   if (body == null) return;
 
   final doc = html.parse(body);
-  int ok = 0, err = 0;
+  int ok = 0, err = 0, rowNum = 0;
 
   for (final row in doc.querySelectorAll('table tr')) {
     await ProgressTracker.throwIfCancelled(redis);
+    rowNum++;
+    if (rowNum % 100 == 0) await tracker?.tick();
     final cells = row.querySelectorAll('td');
     if (cells.length < 13) continue; // saltar encabezados y filas incompletas
 
@@ -191,7 +193,8 @@ String _isoDate(DateTime d) =>
 
 Future<String?> _get(String url) async {
   try {
-    final r = await http.get(Uri.parse(url), headers: {'User-Agent': _ua});
+    final r = await http.get(Uri.parse(url), headers: {'User-Agent': _ua})
+        .timeout(const Duration(seconds: 30));
     if (r.statusCode == 200) return r.body;
     print('[permisos_dom] HTTP ${r.statusCode} — $url');
     return null;

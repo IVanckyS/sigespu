@@ -1,8 +1,12 @@
 import 'dart:io';
+import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart';
+
+final _log = Logger('CORS');
 
 /// Orígenes permitidos: localhost en dev, más el dominio de producción si se
 /// configura mediante ALLOWED_ORIGIN (ej. https://sigespu.lota.cl).
+/// Soporta múltiples orígenes separados por coma.
 Set<String> _buildAllowedOrigins() {
   final origins = <String>{
     'http://localhost',
@@ -12,8 +16,13 @@ Set<String> _buildAllowedOrigins() {
   };
   final envOrigin = Platform.environment['ALLOWED_ORIGIN'];
   if (envOrigin != null && envOrigin.isNotEmpty) {
-    origins.add(envOrigin.trim());
+    // Soporta "https://a.com,https://b.com" y normaliza trailing slash
+    for (final raw in envOrigin.split(',')) {
+      final cleaned = raw.trim().replaceAll(RegExp(r'/$'), '');
+      if (cleaned.isNotEmpty) origins.add(cleaned);
+    }
   }
+  _log.info('Orígenes CORS permitidos: $origins');
   return origins;
 }
 
@@ -59,15 +68,21 @@ Middleware corsMiddleware() {
         return Response.ok('', headers: corsHeaders);
       }
 
-      if (!allowed) {
-        // Devuelve la respuesta real pero con Access-Control-Allow-Origin: null
-        // para que el navegador bloquee el acceso desde ese origen no permitido.
+      // Siempre añadir headers CORS, incluso si el handler lanza excepción.
+      // Sin este try-catch, un 500 de Shelf no pasa por response.change()
+      // y el navegador recibe la respuesta sin Access-Control-Allow-Origin.
+      try {
         final response = await handler(request);
         return response.change(headers: corsHeaders);
+      } catch (_) {
+        return Response.internalServerError(
+          body: '{"error":"Internal server error"}',
+          headers: {
+            ...corsHeaders,
+            'content-type': 'application/json',
+          },
+        );
       }
-
-      final response = await handler(request);
-      return response.change(headers: corsHeaders);
     };
   };
 }

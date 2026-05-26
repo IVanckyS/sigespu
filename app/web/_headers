@@ -1,0 +1,11 @@
+/drift_worker.js
+  Content-Type: application/javascript; charset=utf-8
+
+/sqlite3.wasm
+  Content-Type: application/wasm
+
+/*.js
+  Content-Type: application/javascript; charset=utf-8
+
+/*.wasm
+  Content-Type: application/wasm

@@ -44,9 +44,10 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Drift web assets (generated — run `dart compile js -O2 -o web/drift_worker.js web/drift_worker.dart`)
-/web/drift_worker.js
-/web/sqlite3.wasm
+# Drift web assets: son assets estáticos que deben estar en git.
+# Regenerar solo al hacer upgrade de drift:
+#   dart compile js -O2 -o web/drift_worker.js \
+#     $(dart pub cache dir)/hosted/pub.dev/drift-VERSION/web/drift_worker.dart
 
 # Firebase — contiene claves del proyecto. No commitear.
 android/app/google-services.json

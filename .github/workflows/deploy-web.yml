@@ -44,10 +44,15 @@ jobs:
 
       - name: Build Flutter Web
         working-directory: app
+        env:
+          API_BASE_URL: ${{ vars.BACKEND_URL }}
         run: |
+          echo ">>> API_BASE_URL=$API_BASE_URL"
           flutter pub get
           flutter build web --release \
-            --dart-define=API_BASE_URL=${{ vars.BACKEND_URL }}
+            "--dart-define=API_BASE_URL=$API_BASE_URL"
+          echo ">>> Verificando URL en build:"
+          grep -o "sigespu-production\|localhost:8080" build/web/main.dart.js | head -5 || echo "No se encontró ninguna URL"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

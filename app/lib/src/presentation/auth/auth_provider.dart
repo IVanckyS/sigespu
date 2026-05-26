@@ -3,8 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import '../../config/constants.dart';
 
-final secureStorageProvider = Provider((ref) => const FlutterSecureStorage());
+final secureStorageProvider = Provider(
+  (ref) => const FlutterSecureStorage(
+    aOptions: AndroidOptions(resetOnError: true),
+  ),
+);
 
 const _absent = Object();
 
@@ -42,8 +47,7 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final FlutterSecureStorage _storage;
-  // TODO: Use env variable for base URL in production
-  final String baseUrl = 'http://localhost:8080/auth';
+  final String baseUrl = '${AppConstants.apiBaseUrl}/auth';
 
   AuthNotifier(this._storage) : super(AuthState()) {
     _checkAuth();

@@ -29,7 +29,8 @@ void _setupLogging() {
   });
 }
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   _setupLogging();
   runApp(
     const ProviderScope(

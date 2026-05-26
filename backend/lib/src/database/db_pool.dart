@@ -8,16 +8,27 @@ class DatabaseService {
 
   Pool? _db;
   Command? _redis;
+  Command? _scrapingRedis;
   RedisConnection? _redisConn;
+  RedisConnection? _scrapingRedisConn;
 
   Pool get db {
     if (_db == null) throw StateError('DatabaseService: initPostgres() no fue llamado');
     return _db!;
   }
 
+  /// Conexión Redis para handlers HTTP (rate limit, JWT blacklist, status reads).
   Command get redis {
     if (_redis == null) throw StateError('DatabaseService: initRedis() no fue llamado');
     return _redis!;
+  }
+
+  /// Conexión Redis dedicada al scraper (progress writes).
+  /// El paquete redis/Dart no es safe para uso concurrente en una sola conexión,
+  /// por eso el scraper necesita su propio Command independiente.
+  Command get scrapingRedis {
+    if (_scrapingRedis == null) throw StateError('DatabaseService: initRedis() no fue llamado');
+    return _scrapingRedis!;
   }
 
   /// Inicializa Postgres. Llamar antes de runMigrations().
@@ -67,7 +78,9 @@ class DatabaseService {
     }
   }
 
-  /// Inicializa Redis. Llamar después de runMigrations().
+  /// Inicializa Redis. Crea dos conexiones independientes: una para los
+  /// handlers HTTP y otra exclusiva para el scraper. El paquete redis/Dart
+  /// no soporta comandos concurrentes en la misma conexión TCP.
   Future<void> initRedis() async {
     final redisUrl = Platform.environment['REDIS_URL'];
     final String host;
@@ -82,16 +95,23 @@ class DatabaseService {
       password = null;
     }
 
+    Future<(RedisConnection, Command)> _connect() async {
+      final conn = RedisConnection();
+      final cmd = await conn.connect(host, port);
+      if (password != null && password.isNotEmpty) {
+        await cmd.send_object(['AUTH', password]);
+      }
+      return (conn, cmd);
+    }
+
     int retries = 5;
     while (retries > 0) {
       try {
-        final conn = RedisConnection();
-        _redisConn = conn;
-        _redis = await conn.connect(host, port);
-        if (password != null && password.isNotEmpty) {
-          await _redis!.send_object(['AUTH', password]);
-        }
-        _log.info('Redis ready on $host:$port');
+        final r1 = await _connect();
+        _redisConn = r1.$1; _redis = r1.$2;
+        final r2 = await _connect();
+        _scrapingRedisConn = r2.$1; _scrapingRedis = r2.$2;
+        _log.info('Redis ready (2 conexiones) en $host:$port');
         break;
       } catch (e) {
         retries--;
@@ -112,6 +132,7 @@ class DatabaseService {
   Future<void> close() async {
     await _db?.close();
     await _redisConn?.close();
+    await _scrapingRedisConn?.close();
   }
 
   // ── URL parsers (static, expuestos para tests) ──────────────────────────────

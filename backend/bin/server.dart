@@ -54,7 +54,7 @@ void main(List<String> args) async {
   await dbService.initPostgres();
   await runMigrations(dbService.db);
   await dbService.initRedis();
-  startScraperCron(dbService.db, dbService.redis);
+  startScraperCron(dbService.db, dbService.scrapingRedis);
 
   final jwtService = JwtService(dbService);
   final emailService = EmailService();

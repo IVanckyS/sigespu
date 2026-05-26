@@ -34,29 +34,43 @@ Router buildScrapingRouter(DatabaseService db) {
 /// y categorías, y lanza ScrapingCancelledException para terminar limpiamente.
 /// Es idempotente — llamarlo dos veces no cambia el resultado.
 Future<Response> _stop(DatabaseService db) async {
-  if (!(await scraper.ProgressTracker.isRunning(db.redis))) {
-    return Response(409,
-        body: jsonEncode({'error': 'No hay scraping en curso'}),
-        headers: {'content-type': 'application/json'});
+  try {
+    if (!(await scraper.ProgressTracker.isRunning(db.redis))) {
+      return Response(409,
+          body: jsonEncode({'error': 'No hay scraping en curso'}),
+          headers: {'content-type': 'application/json'});
+    }
+    await scraper.ProgressTracker.requestCancel(db.redis);
+    return Response.ok(
+      jsonEncode({'message': 'Cancelación solicitada'}),
+      headers: {'content-type': 'application/json'},
+    );
+  } catch (_) {
+    return Response.internalServerError(
+      body: jsonEncode({'error': 'Error al detener el scraping'}),
+      headers: {'content-type': 'application/json'},
+    );
   }
-  await scraper.ProgressTracker.requestCancel(db.redis);
-  return Response.ok(
-    jsonEncode({'message': 'Cancelación solicitada'}),
-    headers: {'content-type': 'application/json'},
-  );
 }
 
 // ── Status ────────────────────────────────────────────────────────────────────
 
 Future<Response> _getStatus(DatabaseService db) async {
-  final raw = await db.redis.send_object(['GET', 'scraping:status']);
-  if (raw is! String) {
+  try {
+    final raw = await db.redis.send_object(['GET', 'scraping:status']);
+    if (raw is! String) {
+      return Response.ok(
+        jsonEncode({'running': false}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+    return Response.ok(raw, headers: {'content-type': 'application/json'});
+  } catch (_) {
     return Response.ok(
       jsonEncode({'running': false}),
       headers: {'content-type': 'application/json'},
     );
   }
-  return Response.ok(raw, headers: {'content-type': 'application/json'});
 }
 
 // ── Run actual / histórico ────────────────────────────────────────────────────
@@ -65,8 +79,7 @@ Future<Response> _runActual(DatabaseService db) async {
   if (await scraper.ProgressTracker.isRunning(db.redis)) {
     return Response(409, body: jsonEncode({'error': 'Ya hay un scraping en curso'}));
   }
-  // Fire-and-forget: el handler responde de inmediato, el scraping corre en background.
-  unawaited(scraper.runScrapingActual(db: db.db, redis: db.redis).catchError((e) {
+  unawaited(scraper.runScrapingActual(db: db.db, redis: db.scrapingRedis).catchError((e) {
     print('[scraping/run] $e');
   }));
   return Response.ok(jsonEncode({'message': 'Scraping iniciado'}));
@@ -90,7 +103,7 @@ Future<Response> _runHistorico(DatabaseService db, Request req) async {
 
   unawaited(scraper.runScrapingHistorico(
     db: db.db,
-    redis: db.redis,
+    redis: db.scrapingRedis,
     patentesYearFrom: patentesYearFrom,
     organizacionesYearFrom: orgsYearFrom,
   ).catchError((e) {

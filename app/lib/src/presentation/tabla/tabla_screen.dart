@@ -286,6 +286,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
                             SizedBox(
                               width: 360,
                               child: _DetailPanel(
+                                key: ValueKey(_selected!.id),
                                 elemento: _selected!,
                                 onClose: () => setState(() => _selected = null),
                               ),
@@ -668,7 +669,7 @@ class _DetailPanel extends StatelessWidget {
   final ElementoMapa elemento;
   final VoidCallback onClose;
 
-  const _DetailPanel({required this.elemento, required this.onClose});
+  const _DetailPanel({super.key, required this.elemento, required this.onClose});
 
   @override
   Widget build(BuildContext context) {

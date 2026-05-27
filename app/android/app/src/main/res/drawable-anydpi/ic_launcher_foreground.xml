@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SIGESPU Horizonte emblem — foreground layer for adaptive icon.
+  Colocado en drawable-anydpi/ para tener máxima prioridad sobre los
+  PNG de densidad específica (drawable-hdpi/, drawable-xxhdpi/, etc.).
+  Geometría espeja _HorizonteEmblemPainter escalado de 64×64 a 108×108.
+  El fondo (#1C1917) lo provee ic_launcher_background en colors.xml.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Sol — círculo en (54, 37.125), radio 10.125 -->
+    <path
+        android:fillColor="#F97316"
+        android:pathData="M43.875,37.125
+                          A10.125,10.125 0 1 0 64.125,37.125
+                          A10.125,10.125 0 1 0 43.875,37.125 Z" />
+
+    <!-- Arco 1 — arena, 55% opacidad -->
+    <path
+        android:strokeColor="#8CFED7AA"
+        android:strokeWidth="3.7"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M16.875,70.875 Q54,50.625 91.125,70.875" />
+
+    <!-- Arco 2 — arena, 80% opacidad -->
+    <path
+        android:strokeColor="#CCFED7AA"
+        android:strokeWidth="4.4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M16.875,81 Q54,57.375 91.125,81" />
+
+    <!-- Arco 3 — naranja acento -->
+    <path
+        android:strokeColor="#EA580C"
+        android:strokeWidth="5.1"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M10.125,91.125 Q54,64.125 97.875,91.125" />
+
+</vector>

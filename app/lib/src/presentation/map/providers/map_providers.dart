@@ -249,20 +249,34 @@ class UserElementsNotifier extends Notifier<List<ElementoMapa>> {
     }
   }
 
+  Map<String, String>? _authHeaders(String? token) =>
+      token != null ? {'Authorization': 'Bearer $token'} : null;
+
   Future<void> _loadFromBackend() async {
     try {
       final storage = ref.read(secureStorageProvider);
-      final token = await storage.read(key: 'access_token');
+      var token = await storage.read(key: 'access_token');
       const apiBase = AppConstants.apiBaseUrl;
-      final headers = token != null ? {'Authorization': 'Bearer $token'} : null;
       final api = ref.read(cachedApiProvider);
 
-      // 1. Puntos de Interés — cache-first
-      final puntosResp = await api.get(
+      // 1. Puntos de Interés
+      var puntosResp = await api.get(
         Uri.parse('$apiBase/api/elementos'),
-        headers: headers,
+        headers: _authHeaders(token),
         cacheKey: 'api:/api/elementos',
       );
+
+      // Auto-refresh on 401 y reintentar ambos endpoints
+      if (puntosResp.statusCode == 401) {
+        final refreshed = await ref.read(authProvider.notifier).tryRefresh();
+        if (!refreshed) return;
+        token = await storage.read(key: 'access_token');
+        puntosResp = await api.get(
+          Uri.parse('$apiBase/api/elementos'),
+          headers: _authHeaders(token),
+          cacheKey: 'api:/api/elementos',
+        );
+      }
 
       final backendElements = <ElementoMapa>[];
 
@@ -303,7 +317,7 @@ class UserElementsNotifier extends Notifier<List<ElementoMapa>> {
       // 2. Zonas — cache-first
       final zonasResp = await api.get(
         Uri.parse('$apiBase/api/zonas'),
-        headers: headers,
+        headers: _authHeaders(token),
         cacheKey: 'api:/api/zonas',
       );
 

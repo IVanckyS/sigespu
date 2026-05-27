@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -29,14 +31,39 @@ void _setupLogging() {
   });
 }
 
+// Pantalla de diagnóstico temporal — muestra el error en pantalla sin ADB.
+// TODO: eliminar cuando se confirme la causa del crash.
+void _showCrashScreen(Object error, StackTrace? stack) {
+  runApp(MaterialApp(
+    home: Scaffold(
+      backgroundColor: const Color(0xFFFFF3CD),
+      appBar: AppBar(
+        title: const Text('SIGESPU — Error de inicio'),
+        backgroundColor: const Color(0xFFEA580C),
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: SelectableText(
+          'ERROR:\n$error\n\nSTACK:\n$stack',
+          style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+        ),
+      ),
+    ),
+  ));
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _setupLogging();
-  runApp(
-    const ProviderScope(
-      child: SigespuApp(),
-    ),
-  );
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    _showCrashScreen(details.exception, details.stack);
+  };
+
+  await runZonedGuarded(() async {
+    runApp(const ProviderScope(child: SigespuApp()));
+  }, _showCrashScreen);
 }
 
 class SigespuApp extends ConsumerWidget {

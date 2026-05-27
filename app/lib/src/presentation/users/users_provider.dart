@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../config/constants.dart';
 import '../auth/auth_provider.dart';
 
 // ── Modelo de usuario ─────────────────────────────────────────────────────────
@@ -142,7 +143,7 @@ const _kSeedUsers = [
 ];
 
 class UsersNotifier extends AsyncNotifier<List<UsuarioItem>> {
-  static const _baseUrl = 'http://localhost:8080/auth';
+  static String get _baseUrl => '${AppConstants.apiBaseUrl}/auth';
   static const _localKey = 'sigespu_local_users_v1';
 
   @override

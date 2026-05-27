@@ -52,18 +52,25 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
 
   List<ElementoMapa> get _filtered {
     if (_filteredCache != null) return _filteredCache!;
-    // TODO(sprint-3): reemplazar kElementosSeed por ref.read(allElementsProvider)
-    // cuando los endpoints GET /api/elementos y GET /api/zonas estén disponibles.
-    final list = kElementosSeed.where((e) {
+    final source = ref.read(allElementsProvider);
+    final list = source.where((e) {
       if (_filterCat == 'zonas' && e.layerKey != 'zona_peligro') return false;
       if (_filterCat == 'patente' && e.layerKey != 'patente') return false;
       if (_filterCat == 'infra' &&
-          !const ['centro_acopio', 'sede_comunitaria', 'infraestructura']
+          !const {'centro_acopio', 'sede_comunitaria', 'infraestructura'}
               .contains(e.layerKey)) return false;
-      if (_filterCat == 'otros' &&
-          const ['zona_peligro', 'patente', 'centro_acopio', 'sede_comunitaria', 'infraestructura']
-              .contains(e.layerKey)) return false;
-      if (_filterTipo != 'all' && e.layerKey != _filterTipo) return false;
+      if (_filterCat == 'reportes' && !e.layerKey.startsWith('reporte_')) return false;
+      if (_filterCat == 'otros' && (
+          const {'zona_peligro', 'patente', 'centro_acopio', 'sede_comunitaria', 'infraestructura'}
+              .contains(e.layerKey) ||
+          e.layerKey.startsWith('reporte_'))) return false;
+      if (_filterTipo != 'all') {
+        if (_filterTipo == 'reporte') {
+          if (!e.layerKey.startsWith('reporte_')) { return false; }
+        } else {
+          if (e.layerKey != _filterTipo) { return false; }
+        }
+      }
       if (_filterSector != 'all' && e.sector != _filterSector) return false;
       if (_filterEstado != 'all' && e.estado != _filterEstado) return false;
       if (_search.isNotEmpty) {
@@ -173,6 +180,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final allElements = ref.watch(allElementsProvider);
     final filtered = _filtered;
 
     return LayoutBuilder(
@@ -186,8 +194,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // TODO(sprint-3): pasar total real desde allElementsProvider.
-              _TablaBanner(total: kElementosSeed.length),
+              _TablaBanner(allElements: allElements),
               const SizedBox(height: 16),
 
               // Filtros
@@ -248,6 +255,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
               const SizedBox(height: 12),
 
               _CategoryChips(
+                allElements: allElements,
                 active: _filterCat,
                 onChanged: (cat) => _applyFilter(() => _filterCat = cat),
               ),
@@ -1267,28 +1275,19 @@ class _MobileFilters extends StatelessWidget {
 // ── Banner ────────────────────────────────────────────────────────────────────
 
 class _TablaBanner extends StatelessWidget {
-  final int total;
-  const _TablaBanner({required this.total});
-
-  // Estos valores se calculan una sola vez porque kElementosSeed es constante.
-  // Evita recomputar en cada rebuild del padre (hover de fila, cambio de filtro, etc.)
-  static final int _sectors = kElementosSeed.map((e) => e.sector).toSet().length;
-  static final int _activos = kElementosSeed.where((e) => e.estado == 'activo').length;
-  // "Esta semana" depende de DateTime.now() — se recalcula en cada build() pero
-  // solo llega aquí cuando el padre se reconstruye, que es infrecuente.
-  static int _estaSemana() {
-    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-    return kElementosSeed.where((e) {
-      final d = DateTime.tryParse(e.fecha);
-      return d != null && d.isAfter(sevenDaysAgo);
-    }).length;
-  }
+  final List<ElementoMapa> allElements;
+  const _TablaBanner({required this.allElements});
 
   @override
   Widget build(BuildContext context) {
-    final sectors = _sectors;
-    final activos = _activos;
-    final estaSemana = _estaSemana();
+    final total = allElements.length;
+    final sectors = allElements.map((e) => e.sector).toSet().length;
+    final activos = allElements.where((e) => e.estado == 'activo').length;
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+    final estaSemana = allElements.where((e) {
+      final d = DateTime.tryParse(e.fecha);
+      return d != null && d.isAfter(sevenDaysAgo);
+    }).length;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -1468,60 +1467,70 @@ class _TableDecoPainter extends CustomPainter {
 // ── Category chips ────────────────────────────────────────────────────────────
 
 class _CategoryChips extends StatelessWidget {
+  final List<ElementoMapa> allElements;
   final String active;
   final ValueChanged<String> onChanged;
 
-  const _CategoryChips({required this.active, required this.onChanged});
+  const _CategoryChips({
+    required this.allElements,
+    required this.active,
+    required this.onChanged,
+  });
 
-  // Conteos calculados una sola vez desde la lista constante.
-  // Evita repetir 5 iteraciones sobre kElementosSeed en cada rebuild
-  // (hover, cambio de filtro, selección de fila, etc.)
-  static final _countZonas =
-      kElementosSeed.where((e) => e.layerKey == 'zona_peligro').length;
-  static final _countPatentes =
-      kElementosSeed.where((e) => e.layerKey == 'patente').length;
   static const _infraKeys = {'centro_acopio', 'sede_comunitaria', 'infraestructura'};
-  static final _countInfra =
-      kElementosSeed.where((e) => _infraKeys.contains(e.layerKey)).length;
-  static final _countOtros =
-      kElementosSeed.where((e) => !_infraKeys.contains(e.layerKey) &&
-          e.layerKey != 'zona_peligro' && e.layerKey != 'patente').length;
 
   @override
   Widget build(BuildContext context) {
+    final countZonas = allElements.where((e) => e.layerKey == 'zona_peligro').length;
+    final countPatentes = allElements.where((e) => e.layerKey == 'patente').length;
+    final countInfra = allElements.where((e) => _infraKeys.contains(e.layerKey)).length;
+    final countReportes = allElements.where((e) => e.layerKey.startsWith('reporte_')).length;
+    final countOtros = allElements.where((e) =>
+        !_infraKeys.contains(e.layerKey) &&
+        e.layerKey != 'zona_peligro' &&
+        e.layerKey != 'patente' &&
+        !e.layerKey.startsWith('reporte_')).length;
+
     final chips = [
       (
         id: 'todos',
         label: 'Total',
-        count: kElementosSeed.length,
+        count: allElements.length,
         fg: AppTheme.stone600,
         bg: AppTheme.stone100,
       ),
       (
         id: 'zonas',
         label: 'Zonas peligro',
-        count: _countZonas,
+        count: countZonas,
         fg: AppTheme.redDanger,
+        bg: const Color(0xFFFEE2E2),
+      ),
+      (
+        id: 'reportes',
+        label: 'Reportes',
+        count: countReportes,
+        fg: const Color(0xFFDC2626),
         bg: const Color(0xFFFEE2E2),
       ),
       (
         id: 'patente',
         label: 'Patentes',
-        count: _countPatentes,
+        count: countPatentes,
         fg: AppTheme.amberWarning,
         bg: const Color(0xFFFEF3C7),
       ),
       (
         id: 'infra',
         label: 'Infraestructura',
-        count: _countInfra,
+        count: countInfra,
         fg: AppTheme.greenSuccess,
         bg: const Color(0xFFDCFCE7),
       ),
       (
         id: 'otros',
         label: 'Otros',
-        count: _countOtros,
+        count: countOtros,
         fg: AppTheme.stone500,
         bg: AppTheme.stone100,
       ),

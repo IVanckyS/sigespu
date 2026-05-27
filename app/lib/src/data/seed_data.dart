@@ -361,6 +361,12 @@ String nombreParaTipo(String tipo) {
     'reporte_robo': 'Robo',
     'reporte_vandalismo': 'Vandalismo',
     'reporte_accidente': 'Accidente',
+    'reporte_violencia': 'Violencia',
+    'reporte_drogas': 'Tráfico drogas',
+    'reporte_riña': 'Riña',
+    'reporte_emergencia_medica': 'Emergencia médica',
+    'reporte_incendio': 'Incendio',
+    'reporte_otro': 'Otro reporte',
     'zona_peligro': 'Zona de peligro',
     'patente': 'Patente comercial',
     'luminaria': 'Luminaria',
@@ -380,7 +386,12 @@ String nombreParaTipo(String tipo) {
 
 String categoriaParaTipo(String tipo) {
   const cat1 = {'centro_acopio', 'sede_comunitaria', 'infraestructura'};
-  const cat2 = {'zona_peligro', 'reporte_robo', 'reporte_vandalismo', 'reporte_accidente'};
+  const cat2 = {
+    'zona_peligro',
+    'reporte_robo', 'reporte_vandalismo', 'reporte_accidente',
+    'reporte_violencia', 'reporte_drogas', 'reporte_riña',
+    'reporte_emergencia_medica', 'reporte_incendio', 'reporte_otro',
+  };
   const cat3 = {'arbol_caido', 'poste_caido', 'sector_sin_luz', 'cable_colgando', 'semaforo_dañado', 'socavon', 'fuga_agua', 'microbasural'};
   const cat4 = {'patente', 'luminaria', 'camara', 'camara_cctv'};
 

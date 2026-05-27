@@ -15,6 +15,9 @@ const _tiposValidos = {
   'luminaria', 'camara_cctv',
   'arbol_caido', 'poste_caido', 'sector_sin_luz', 'cable_colgando',
   'semaforo_dañado', 'socavon', 'fuga_agua', 'microbasural', 'otro',
+  'reporte_robo', 'reporte_vandalismo', 'reporte_accidente',
+  'reporte_violencia', 'reporte_drogas', 'reporte_riña',
+  'reporte_emergencia_medica', 'reporte_incendio', 'reporte_otro',
 };
 
 Router buildElementosRouter(DatabaseService db) {

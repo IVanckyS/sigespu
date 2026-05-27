@@ -61,7 +61,12 @@ class MapLayerConfig {
     ),
     (
       'Seguridad pública',
-      ['zona_peligro', 'reporte_robo', 'reporte_vandalismo', 'reporte_accidente'],
+      [
+        'zona_peligro',
+        'reporte_robo', 'reporte_vandalismo', 'reporte_accidente',
+        'reporte_violencia', 'reporte_drogas', 'reporte_riña',
+        'reporte_emergencia_medica', 'reporte_incendio', 'reporte_otro',
+      ],
     ),
     (
       'Incidentes urbanos',

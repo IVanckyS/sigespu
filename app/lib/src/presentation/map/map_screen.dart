@@ -1675,61 +1675,83 @@ class _DrawHintPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: AppTheme.orange600,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 4))],
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.edit, size: 16, color: Colors.white),
-        const SizedBox(width: 8),
-        const Text('Toca el mapa para agregar vértices',
-            style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w500)),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(10)),
-          child: Text('$pointCount pts',
-              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          onPressed: pointCount > 0 ? onUndo : null,
-          tooltip: 'Deshacer último vértice',
-          icon: const Icon(Icons.undo, size: 16),
-          color: Colors.white,
-          disabledColor: Colors.white38,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-        ),
-        const SizedBox(width: 2),
-        TextButton(
-          onPressed: onFinish,
-          style: TextButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: AppTheme.orange700,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Row 1: hint text + pts badge
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.edit, size: 15, color: Colors.white),
+              const SizedBox(width: 6),
+              const Text(
+                'Toca el mapa para agregar vértices',
+                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$pointCount pts',
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ),
-          child: const Text('Cerrar figura', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-        ),
-        const SizedBox(width: 4),
-        TextButton(
-          onPressed: onCancel,
-          style: TextButton.styleFrom(
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            side: const BorderSide(color: Colors.white38),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          const SizedBox(height: 8),
+          // Row 2: action buttons
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: pointCount > 0 ? onUndo : null,
+                tooltip: 'Deshacer último vértice',
+                icon: const Icon(Icons.undo, size: 16),
+                color: Colors.white,
+                disabledColor: Colors.white38,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              ),
+              const SizedBox(width: 6),
+              TextButton(
+                onPressed: onFinish,
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppTheme.orange700,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Cerrar figura', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(width: 6),
+              TextButton(
+                onPressed: onCancel,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  side: const BorderSide(color: Colors.white54),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Cancelar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+              ),
+            ],
           ),
-          child: const Text('Cancelar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }

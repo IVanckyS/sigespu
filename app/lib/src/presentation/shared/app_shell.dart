@@ -125,7 +125,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                       onClose:     () => setState(() => _avatarOpen = false),
                       onNavigate:  (route) {
                         setState(() => _avatarOpen = false);
-                        context.go(route);
+                        if (route == '/profile') {
+                          context.push(route);
+                        } else {
+                          context.go(route);
+                        }
                       },
                       onLogout: () {
                         setState(() => _avatarOpen = false);

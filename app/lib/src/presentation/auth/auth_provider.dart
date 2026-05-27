@@ -15,6 +15,7 @@ const _absent = Object();
 
 class AuthState {
   final bool isAuthenticated;
+  final bool isOffline;
   final bool isLoading;
   final String? error;
   final Map<String, dynamic>? user;
@@ -22,6 +23,7 @@ class AuthState {
 
   AuthState({
     this.isAuthenticated = false,
+    this.isOffline = false,
     this.isLoading = false,
     this.error,
     this.user,
@@ -30,6 +32,7 @@ class AuthState {
 
   AuthState copyWith({
     bool? isAuthenticated,
+    bool? isOffline,
     bool? isLoading,
     Object? error = _absent,
     Map<String, dynamic>? user,
@@ -37,6 +40,7 @@ class AuthState {
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+      isOffline: isOffline ?? this.isOffline,
       isLoading: isLoading ?? this.isLoading,
       error: identical(error, _absent) ? this.error : error as String?,
       user: user ?? this.user,
@@ -88,6 +92,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _storage.delete(key: 'user_info');
     await _storage.delete(key: 'session_expiry');
     await _storage.delete(key: 'remember_me');
+  }
+
+  void enterOffline() {
+    state = state.copyWith(isOffline: true);
   }
 
   Future<bool> login(String email, String password, {bool rememberMe = false}) async {

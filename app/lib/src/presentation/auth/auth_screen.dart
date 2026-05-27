@@ -126,8 +126,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   void toggleRememberMe() => setState(() => _rememberMe = !_rememberMe);
 
   void _enterOffline() {
-    // Acceso solo a datos cacheados (seed + cache local). Auth lo trata como
-    // "visitante anónimo" — sin sync ni acciones que requieran token.
+    ref.read(authProvider.notifier).enterOffline();
     context.go('/map');
   }
 

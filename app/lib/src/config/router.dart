@@ -20,13 +20,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/map',
     redirect: (context, state) {
       final isGoingToLogin = state.uri.path == '/login';
-      
-      if (!authState.isAuthenticated && !isGoingToLogin) {
-        return '/login';
-      }
-      if (authState.isAuthenticated && isGoingToLogin) {
-        return '/map';
-      }
+      final allowed = authState.isAuthenticated || authState.isOffline;
+
+      if (!allowed && !isGoingToLogin) return '/login';
+      if (allowed && isGoingToLogin) return '/map';
       return null;
     },
     routes: [

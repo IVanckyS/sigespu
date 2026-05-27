@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared/shared.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../config/constants.dart';
 import '../../../data/remote/cached_api.dart';
 import '../../auth/auth_provider.dart';
@@ -18,7 +19,32 @@ final activePanelProvider = StateProvider<VisorPanel>((ref) => VisorPanel.none);
 
 enum MapaBase { cartoVoyager, osm, esriSatelite }
 
-final mapaBaseProvider = StateProvider<MapaBase>((ref) => MapaBase.cartoVoyager);
+class _MapaBaseNotifier extends Notifier<MapaBase> {
+  static const _key = 'sigespu_mapa_base_v1';
+  @override
+  MapaBase build() { _load(); return MapaBase.cartoVoyager; }
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_key);
+      if (raw != null) {
+        state = MapaBase.values.firstWhere(
+          (e) => e.name == raw,
+          orElse: () => MapaBase.cartoVoyager,
+        );
+      }
+    } catch (_) {}
+  }
+  void set(MapaBase v) { state = v; _persist(v); }
+  Future<void> _persist(MapaBase v) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_key, v.name);
+    } catch (_) {}
+  }
+}
+final mapaBaseProvider =
+    NotifierProvider<_MapaBaseNotifier, MapaBase>(_MapaBaseNotifier.new);
 
 const mapaBaseUrls = {
   // {r} se resuelve como "@2x" en pantallas de alta densidad cuando
@@ -45,10 +71,55 @@ const mapaBaseSubdomains = {
 final mapBoundsProvider = StateProvider<List<double>?>((ref) => null);
 
 /// Whether the sismos layer is toggled on
-final sismosVisibleProvider = StateProvider<bool>((ref) => false);
+class _SismosVisibleNotifier extends Notifier<bool> {
+  static const _key = 'sigespu_sismos_visible_v1';
+  @override
+  bool build() { _load(); return false; }
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final v = prefs.getBool(_key);
+      if (v != null) state = v;
+    } catch (_) {}
+  }
+  void toggle() { state = !state; _persist(); }
+  void set(bool v) { state = v; _persist(); }
+  Future<void> _persist() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_key, state);
+    } catch (_) {}
+  }
+}
+final sismosVisibleProvider =
+    NotifierProvider<_SismosVisibleNotifier, bool>(_SismosVisibleNotifier.new);
 
 /// Map of custom capa id → visible override (null = use capa.visible default)
-final customLayersVisibleProvider = StateProvider<Map<String, bool>>((ref) => {});
+class _CustomLayersVisibleNotifier extends Notifier<Map<String, bool>> {
+  static const _key = 'sigespu_custom_layers_v1';
+  @override
+  Map<String, bool> build() { _load(); return {}; }
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_key);
+      if (raw != null && raw.isNotEmpty) {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        state = map.map((k, v) => MapEntry(k, v as bool));
+      }
+    } catch (_) {}
+  }
+  void set(Map<String, bool> v) { state = v; _persist(v); }
+  Future<void> _persist(Map<String, bool> v) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_key, jsonEncode(v));
+    } catch (_) {}
+  }
+}
+final customLayersVisibleProvider =
+    NotifierProvider<_CustomLayersVisibleNotifier, Map<String, bool>>(
+        _CustomLayersVisibleNotifier.new);
 
 /// ID of the last interacted or explicitly selected layer for actions like Download
 final selectedCapaIdProvider = StateProvider<String?>((ref) => null);

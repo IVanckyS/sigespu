@@ -307,7 +307,7 @@ class _PanelFiltrosIzquierdoState
               ('sin_iluminacion', 'Sin iluminación'),
             ],
             onChanged: (v) =>
-                ref.read(dangerFilterProvider.notifier).state = v,
+                ref.read(dangerFilterProvider.notifier).set(v),
           ),
           const SizedBox(height: 6),
           _FilterRow(
@@ -320,7 +320,7 @@ class _PanelFiltrosIzquierdoState
               ('90', 'Últimos 90 días'),
             ],
             onChanged: (v) =>
-                ref.read(dateRangeProvider.notifier).state = v,
+                ref.read(dateRangeProvider.notifier).set(v),
           ),
         ],
       ),

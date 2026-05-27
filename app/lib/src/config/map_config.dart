@@ -12,9 +12,15 @@ class MapLayerConfig {
     ('infraestructura',    'Infraestructura',         Color(0xFFC2410C)),
     // Seguridad pública
     ('zona_peligro',       'Zona de peligro',         Color(0xFFB91C1C)),
-    ('reporte_robo',       'Robo',                    Color(0xFFEF4444)),
-    ('reporte_vandalismo', 'Vandalismo',              Color(0xFF7C3AED)),
-    ('reporte_accidente',  'Accidente',               Color(0xFFEA580C)),
+    ('reporte_robo',             'Robo',                    Color(0xFFEF4444)),
+    ('reporte_vandalismo',       'Vandalismo',              Color(0xFF7C3AED)),
+    ('reporte_accidente',        'Accidente',               Color(0xFFEA580C)),
+    ('reporte_violencia',        'Violencia',               Color(0xFFDC2626)),
+    ('reporte_drogas',           'Tráfico drogas',           Color(0xFF7C3AED)),
+    ('reporte_riña',             'Riña',                    Color(0xFFEF4444)),
+    ('reporte_emergencia_medica','Emergencia médica',         Color(0xFF0891B2)),
+    ('reporte_incendio',         'Incendio',                 Color(0xFFDC2626)),
+    ('reporte_otro',             'Otro reporte',             Color(0xFF78716C)),
     // Incidentes urbanos
     ('arbol_caido',        'Árbol caído',             Color(0xFF16A34A)),
     ('poste_caido',        'Poste caído',             Color(0xFFEA580C)),

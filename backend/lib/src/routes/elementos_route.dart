@@ -47,12 +47,12 @@ Router buildElementosRouter(DatabaseService db) {
       'direccion': r[4],
       'lng': r[5],
       'lat': r[6],
-      'metadata': r[7],
+      'metadata': r[7] is String ? jsonDecode(r[7] as String) : r[7],
       'estado': r[8],
       'origen': r[9],
-      'fuenteOrigen': r[10],
-      'createdBy': r[11]?.toString(),
-      'createdAt': (r[12] as DateTime).toIso8601String(),
+      'fuente_origen': r[10],
+      'created_by': r[11]?.toString(),
+      'created_at': (r[12] as DateTime?)?.toIso8601String(),
     }).toList();
 
     return ok(items);

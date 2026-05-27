@@ -88,9 +88,73 @@ final drawingTargetProvider = StateProvider<String?>((ref) => null);
 // ── Estado UI del mapa ────────────────────────────────────────────────────────
 
 final sidebarCollapsedProvider = StateProvider<bool>((ref) => false);
-final dangerFilterProvider = StateProvider<String>((ref) => 'all');
-final heatmapOnProvider = StateProvider<bool>((ref) => false);
-final dateRangeProvider = StateProvider<String>((ref) => '30');
+
+class _DangerFilterNotifier extends Notifier<String> {
+  static const _key = 'sigespu_danger_filter_v1';
+  @override
+  String build() { _load(); return 'all'; }
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final v = prefs.getString(_key);
+      if (v != null) state = v;
+    } catch (_) {}
+  }
+  void set(String v) { state = v; _persist(v); }
+  Future<void> _persist(String v) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_key, v);
+    } catch (_) {}
+  }
+}
+final dangerFilterProvider =
+    NotifierProvider<_DangerFilterNotifier, String>(_DangerFilterNotifier.new);
+
+class _HeatmapOnNotifier extends Notifier<bool> {
+  static const _key = 'sigespu_heatmap_on_v1';
+  @override
+  bool build() { _load(); return false; }
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final v = prefs.getBool(_key);
+      if (v != null) state = v;
+    } catch (_) {}
+  }
+  void toggle() { state = !state; _persist(); }
+  void set(bool v) { state = v; _persist(); }
+  Future<void> _persist() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_key, state);
+    } catch (_) {}
+  }
+}
+final heatmapOnProvider =
+    NotifierProvider<_HeatmapOnNotifier, bool>(_HeatmapOnNotifier.new);
+
+class _DateRangeNotifier extends Notifier<String> {
+  static const _key = 'sigespu_date_range_v1';
+  @override
+  String build() { _load(); return '30'; }
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final v = prefs.getString(_key);
+      if (v != null) state = v;
+    } catch (_) {}
+  }
+  void set(String v) { state = v; _persist(v); }
+  Future<void> _persist(String v) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_key, v);
+    } catch (_) {}
+  }
+}
+final dateRangeProvider =
+    NotifierProvider<_DateRangeNotifier, String>(_DateRangeNotifier.new);
 final mapCenterCoordsProvider =
     StateProvider<(double, double)>((ref) => (-37.0896, -73.1584));
 
@@ -205,30 +269,34 @@ class UserElementsNotifier extends Notifier<List<ElementoMapa>> {
       if (puntosResp.hasData) {
         try {
           final List list = jsonDecode(puntosResp.body!);
-          backendElements.addAll(list.map((j) {
-            final p = PuntoInteres.fromJson(j);
-            return ElementoMapa(
-              id: p.id,
-              tipo: p.tipo,
-              nombre: p.nombre ?? '',
-              direccion: p.direccion ?? '',
-              sector: p.metadata?['sector'] ?? 'Centro',
-              lat: p.lat,
-              lng: p.lng,
-              estado: p.estado,
-              fecha: p.createdAt?.toIso8601String().substring(0, 10) ?? '',
-              by: p.createdBy ?? 'Sistema',
-              notas: p.descripcion ?? '',
-              capacidad: p.metadata?['capacidad'],
-              rut: p.metadata?['rut'],
-              giro: p.metadata?['giro'],
-              tipoPeligro: p.metadata?['tipoPeligro'],
-              nivel: p.metadata?['nivel'],
-              horario: p.metadata?['horario'],
-            );
-          }));
+          for (final j in list) {
+            try {
+              final p = PuntoInteres.fromJson(j as Map<String, dynamic>);
+              backendElements.add(ElementoMapa(
+                id: p.id,
+                tipo: p.tipo,
+                nombre: p.nombre ?? '',
+                direccion: p.direccion ?? '',
+                sector: p.metadata?['sector'] ?? 'Centro',
+                lat: p.lat,
+                lng: p.lng,
+                estado: p.estado,
+                fecha: p.createdAt?.toIso8601String().substring(0, 10) ?? '',
+                by: p.createdBy ?? 'Sistema',
+                notas: p.descripcion ?? '',
+                capacidad: p.metadata?['capacidad'],
+                rut: p.metadata?['rut'],
+                giro: p.metadata?['giro'],
+                tipoPeligro: p.metadata?['tipoPeligro'],
+                nivel: p.metadata?['nivel'],
+                horario: p.metadata?['horario'],
+              ));
+            } catch (e) {
+              _logElems.fine('Elemento mal formado del backend: $e');
+            }
+          }
         } catch (e) {
-          _logElems.fine('Elemento mal formado del backend: $e');
+          _logElems.warning('Error decodificando respuesta de elementos: $e');
         }
       }
 

@@ -32,10 +32,16 @@ class _PanelCapasState extends ConsumerState<PanelCapas> {
     'centro_acopio':      (Icons.home_outlined,        Color(0xFFEA580C), 'Centro de acopio'),
     'sede_comunitaria':   (Icons.people_outline,       Color(0xFF16A34A), 'Sede comunitaria'),
     'infraestructura':    (Icons.domain,               Color(0xFFC2410C), 'Infraestructura'),
-    'zona_peligro':       (Icons.shield,               Color(0xFFB91C1C), 'Zona de peligro'),
-    'reporte_robo':       (Icons.warning_amber,        Color(0xFFEF4444), 'Robo'),
-    'reporte_vandalismo': (Icons.science,              Color(0xFF7C3AED), 'Vandalismo'),
-    'reporte_accidente':  (Icons.directions_car,       Color(0xFFEA580C), 'Accidente'),
+    'zona_peligro':              (Icons.shield,               Color(0xFFB91C1C), 'Zona de peligro'),
+    'reporte_robo':              (Icons.warning_amber,        Color(0xFFEF4444), 'Robo'),
+    'reporte_vandalismo':        (Icons.science,              Color(0xFF7C3AED), 'Vandalismo'),
+    'reporte_accidente':         (Icons.directions_car,       Color(0xFFEA580C), 'Accidente'),
+    'reporte_violencia':         (Icons.person_off,           Color(0xFFDC2626), 'Violencia'),
+    'reporte_drogas':            (Icons.medication_outlined,  Color(0xFF7C3AED), 'Tráfico drogas'),
+    'reporte_riña':              (Icons.warning_amber,        Color(0xFFEF4444), 'Riña'),
+    'reporte_emergencia_medica': (Icons.local_hospital,       Color(0xFF0891B2), 'Emergencia médica'),
+    'reporte_incendio':          (Icons.local_fire_department,Color(0xFFDC2626), 'Incendio'),
+    'reporte_otro':              (Icons.report_problem,       Color(0xFF78716C), 'Otro reporte'),
     'arbol_caido':        (Icons.forest,               Color(0xFF16A34A), 'Árbol caído'),
     'poste_caido':        (Icons.bolt,                 Color(0xFFEA580C), 'Poste caído'),
     'sector_sin_luz':     (Icons.nightlight,           Color(0xFF78716C), 'Sector sin luz'),
@@ -54,7 +60,9 @@ class _PanelCapasState extends ConsumerState<PanelCapas> {
     ('infra', 'Infraestructura comunitaria',
       ['centro_acopio', 'sede_comunitaria', 'infraestructura']),
     ('seguridad', 'Seguridad pública',
-      ['zona_peligro', 'reporte_robo', 'reporte_vandalismo', 'reporte_accidente']),
+      ['zona_peligro', 'reporte_robo', 'reporte_vandalismo', 'reporte_accidente',
+       'reporte_violencia', 'reporte_drogas', 'reporte_riña',
+       'reporte_emergencia_medica', 'reporte_incendio', 'reporte_otro']),
     ('incidentes', 'Incidentes urbanos',
       ['arbol_caido', 'poste_caido', 'sector_sin_luz', 'cable_colgando',
        'semaforo_dañado', 'socavon', 'fuga_agua', 'microbasural']),
@@ -149,9 +157,8 @@ class _PanelCapasState extends ConsumerState<PanelCapas> {
                     _TypeRow(
                       meta: (Icons.sensors, const Color(0xFFE53935), 'Sismos recientes'),
                       isActive: sismosVisible,
-                      onToggle: () => ref
-                          .read(sismosVisibleProvider.notifier)
-                          .state = !sismosVisible,
+                      onToggle: () =>
+                          ref.read(sismosVisibleProvider.notifier).toggle(),
                     ),
                     _TypeRow(
                       meta: (Icons.map_outlined, const Color(0xFFCA8A04), 'Plan Regulador'),
@@ -230,7 +237,7 @@ class _PanelCapasState extends ConsumerState<PanelCapas> {
                                     ref
                                         .read(customLayersVisibleProvider
                                             .notifier)
-                                        .state = next;
+                                        .set(next);
                                     if (!isActive) {
                                       ref
                                           .read(selectedCapaIdProvider.notifier)

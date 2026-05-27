@@ -77,10 +77,16 @@ class CustomMarkers {
       case 'sede_comunitaria':   return LucideIcons.users;
       case 'infraestructura':    return LucideIcons.building;
       // Seguridad pública
-      case 'zona_peligro':       return LucideIcons.shieldAlert;
-      case 'reporte_robo':       return LucideIcons.alertTriangle;
-      case 'reporte_vandalismo': return LucideIcons.flaskConical;
-      case 'reporte_accidente':  return LucideIcons.car;
+      case 'zona_peligro':              return LucideIcons.shieldAlert;
+      case 'reporte_robo':              return LucideIcons.alertTriangle;
+      case 'reporte_vandalismo':        return LucideIcons.flaskConical;
+      case 'reporte_accidente':         return LucideIcons.car;
+      case 'reporte_violencia':         return LucideIcons.alertOctagon;
+      case 'reporte_drogas':            return LucideIcons.flaskConical;
+      case 'reporte_riña':              return LucideIcons.users;
+      case 'reporte_emergencia_medica': return LucideIcons.zap;
+      case 'reporte_incendio':          return LucideIcons.flame;
+      case 'reporte_otro':              return LucideIcons.alertTriangle;
       // Incidentes urbanos
       case 'arbol_caido':        return LucideIcons.treePine;
       case 'poste_caido':        return LucideIcons.zap;
@@ -121,6 +127,12 @@ class CustomMarkers {
       case 'reporte_robo': return AppTheme.tRobo;
       case 'reporte_vandalismo': return AppTheme.tVandalismo;
       case 'reporte_accidente': return AppTheme.orange500;
+      case 'reporte_violencia': return const Color(0xFFDC2626);
+      case 'reporte_drogas': return const Color(0xFF7C3AED);
+      case 'reporte_riña': return AppTheme.redDanger;
+      case 'reporte_emergencia_medica': return const Color(0xFF0891B2);
+      case 'reporte_incendio': return const Color(0xFFDC2626);
+      case 'reporte_otro': return AppTheme.stone600;
       case 'luminaria': return AppTheme.tLuminaria;
       case 'camara_cctv': return AppTheme.tCamara;
       case 'arbol_caido': return AppTheme.tArbol;

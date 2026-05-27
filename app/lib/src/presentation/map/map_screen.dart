@@ -1000,7 +1000,9 @@ class _MapSidebarState extends ConsumerState<_MapSidebar> {
 
   static const _groups = <(String, String, List<String>)>[
     ('seguridad', 'Seguridad pública',
-        ['zona_peligro', 'reporte_robo', 'reporte_vandalismo', 'reporte_accidente']),
+        ['zona_peligro', 'reporte_robo', 'reporte_vandalismo', 'reporte_accidente',
+         'reporte_violencia', 'reporte_drogas', 'reporte_riña',
+         'reporte_emergencia_medica', 'reporte_incendio', 'reporte_otro']),
     ('infra', 'Infraestructura',
         ['centro_acopio', 'sede_comunitaria', 'infraestructura']),
     ('incidentes', 'Incidentes urbanos',
@@ -1142,9 +1144,8 @@ class _MapSidebarState extends ConsumerState<_MapSidebar> {
                     color: const Color(0xFFE53935),
                     isActive: sismosVisible,
                     count: 0,
-                    onTap: () => ref
-                        .read(sismosVisibleProvider.notifier)
-                        .state = !sismosVisible,
+                    onTap: () =>
+                        ref.read(sismosVisibleProvider.notifier).toggle(),
                   ),
                 for (final tipo in tipos)
                   _LayerToggle(
@@ -1218,7 +1219,7 @@ class _MapSidebarState extends ConsumerState<_MapSidebar> {
                   final isActive = dangerFilter == key;
                   return GestureDetector(
                     onTap: () =>
-                        ref.read(dangerFilterProvider.notifier).state = key,
+                        ref.read(dangerFilterProvider.notifier).set(key),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 120),
                       padding: const EdgeInsets.symmetric(
@@ -1249,7 +1250,7 @@ class _MapSidebarState extends ConsumerState<_MapSidebar> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
               child: GestureDetector(
                 onTap: () =>
-                    ref.read(heatmapOnProvider.notifier).state = !heatmapOn,
+                    ref.read(heatmapOnProvider.notifier).toggle(),
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1269,7 +1270,7 @@ class _MapSidebarState extends ConsumerState<_MapSidebar> {
                     Switch(
                       value: heatmapOn,
                       onChanged: (v) =>
-                          ref.read(heatmapOnProvider.notifier).state = v,
+                          ref.read(heatmapOnProvider.notifier).set(v),
                       activeTrackColor: AppTheme.orange600,
                       activeThumbColor: Colors.white,
                       inactiveTrackColor: AppTheme.stone300,
@@ -1318,7 +1319,7 @@ class _MapSidebarState extends ConsumerState<_MapSidebar> {
                 ],
                 onChanged: (v) {
                   if (v != null) {
-                    ref.read(dateRangeProvider.notifier).state = v;
+                    ref.read(dateRangeProvider.notifier).set(v);
                   }
                 },
               ),

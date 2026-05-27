@@ -47,7 +47,7 @@ class PanelMapaBase extends ConsumerWidget {
               final (base, label, icon) = b;
               final isActive = current == base;
               return GestureDetector(
-                onTap: () => ref.read(mapaBaseProvider.notifier).state = base,
+                onTap: () => ref.read(mapaBaseProvider.notifier).set(base),
                 child: Column(
                   children: [
                     AnimatedContainer(

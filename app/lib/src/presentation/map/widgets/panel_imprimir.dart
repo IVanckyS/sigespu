@@ -156,9 +156,11 @@ class _PanelImprimirState extends ConsumerState<PanelImprimir> {
           '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}  '
           '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-      final pageFormat = _layout == 'A4'
-          ? PdfPageFormat.a4.landscape
-          : PdfPageFormat.letter.landscape;
+      // Auto-detectar orientación según proporciones del mapa capturado.
+      // En móvil el mapa es portrait → PDF portrait para evitar márgenes blancos.
+      final isPortraitCapture = image.height > image.width;
+      final baseFormat = _layout == 'A4' ? PdfPageFormat.a4 : PdfPageFormat.letter;
+      final pageFormat = isPortraitCapture ? baseFormat : baseFormat.landscape;
 
       // ── Fuente Unicode (soporta español y símbolos especiales) ────────────
       pw.Font fontRegular;

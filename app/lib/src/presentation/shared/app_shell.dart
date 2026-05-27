@@ -110,28 +110,31 @@ class _AppShellState extends ConsumerState<AppShell> {
           bottomNavigationBar: isMobile
               ? _MobileBottomTabs(location: location, role: userRole)
               : null,
-          body: Stack(
-            children: [
-              bodyContent,
-              if (_avatarOpen && isMobile)
-                Positioned.fill(
-                  child: _AvatarMenuOverlay(
-                    userName:    userName,
-                    userRole:    userRole,
-                    initials:    initials,
-                    avatarBytes: avatarBytes,
-                    onClose:     () => setState(() => _avatarOpen = false),
-                    onNavigate:  (route) {
-                      setState(() => _avatarOpen = false);
-                      context.go(route);
-                    },
-                    onLogout: () {
-                      setState(() => _avatarOpen = false);
-                      ref.read(authProvider.notifier).logout();
-                    },
+          body: SafeArea(
+            bottom: false,
+            child: Stack(
+              children: [
+                bodyContent,
+                if (_avatarOpen && isMobile)
+                  Positioned.fill(
+                    child: _AvatarMenuOverlay(
+                      userName:    userName,
+                      userRole:    userRole,
+                      initials:    initials,
+                      avatarBytes: avatarBytes,
+                      onClose:     () => setState(() => _avatarOpen = false),
+                      onNavigate:  (route) {
+                        setState(() => _avatarOpen = false);
+                        context.go(route);
+                      },
+                      onLogout: () {
+                        setState(() => _avatarOpen = false);
+                        ref.read(authProvider.notifier).logout();
+                      },
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         );
       },

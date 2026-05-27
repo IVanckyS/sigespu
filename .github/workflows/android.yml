@@ -48,6 +48,16 @@ jobs:
       - name: Escribir google-services.json
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/android/app/google-services.json
 
+      # ── Validar BACKEND_URL ──────────────────────────────────────────────────
+      - name: Validar BACKEND_URL
+        run: |
+          if [ -z "${{ vars.BACKEND_URL }}" ]; then
+            echo "ERROR: BACKEND_URL no está configurado."
+            echo "Ir a: Settings → Variables → New repository variable"
+            echo "Nombre: BACKEND_URL  Valor: https://TU-SERVICIO.up.railway.app"
+            exit 1
+          fi
+
       # ── Build APK release ────────────────────────────────────────────────────
       - name: Build APK
         working-directory: app

@@ -63,9 +63,7 @@ class _PanelCapasState extends ConsumerState<PanelCapas> {
   ];
 
   void _toggleLayer(String tipo, Set<String> current) {
-    final next = Set<String>.from(current);
-    current.contains(tipo) ? next.remove(tipo) : next.add(tipo);
-    ref.read(activeLayersProvider.notifier).state = next;
+    ref.read(activeLayersProvider.notifier).toggle(tipo);
   }
 
   @override

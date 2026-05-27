@@ -214,9 +214,7 @@ class _PanelFiltrosIzquierdoState
                 count: count,
                 active: active,
                 onToggle: (v) {
-                  final next = Set<String>.from(activeLayers);
-                  v ? next.add(tipo) : next.remove(tipo);
-                  ref.read(activeLayersProvider.notifier).state = next;
+                  ref.read(activeLayersProvider.notifier).toggle(tipo);
                 },
               );
             }),
@@ -244,9 +242,7 @@ class _PanelFiltrosIzquierdoState
             count: polygons.length,
             active: allActive,
             onToggle: (v) {
-              final next = Set<String>.from(activeLayers);
-              v ? next.add('zona_custom') : next.remove('zona_custom');
-              ref.read(activeLayersProvider.notifier).state = next;
+              ref.read(activeLayersProvider.notifier).toggle('zona_custom');
             },
             trailing: polygons.isNotEmpty
                 ? GestureDetector(

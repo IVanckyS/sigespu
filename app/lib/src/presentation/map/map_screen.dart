@@ -1013,10 +1013,7 @@ class _MapSidebarState extends ConsumerState<_MapSidebar> {
   ];
 
   void _toggleLayer(String tipo) {
-    final current = ref.read(activeLayersProvider);
-    final next = Set<String>.from(current);
-    current.contains(tipo) ? next.remove(tipo) : next.add(tipo);
-    ref.read(activeLayersProvider.notifier).state = next;
+    ref.read(activeLayersProvider.notifier).toggle(tipo);
   }
 
   static Color _colorFor(String tipo) => MapLayerConfig.layers

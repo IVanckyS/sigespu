@@ -16,9 +16,58 @@ import '../../actividades/actividades_provider.dart';
 import '../layers/plan_regulador_layer.dart';
 import 'visor_provider.dart';
 
-// ── Capas activas ─────────────────────────────────────────────────────────────
+// ── Capas activas (persistidas en SharedPreferences) ─────────────────────────
 
-final activeLayersProvider = StateProvider<Set<String>>((ref) => {});
+class ActiveLayersNotifier extends Notifier<Set<String>> {
+  static const _storageKey = 'sigespu_active_layers_v1';
+
+  @override
+  Set<String> build() {
+    _load();
+    return {};
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getStringList(_storageKey);
+      if (raw != null && raw.isNotEmpty) {
+        state = raw.toSet();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _save() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_storageKey, state.toList());
+    } catch (_) {}
+  }
+
+  void toggle(String key) {
+    state = state.contains(key)
+        ? (Set<String>.from(state)..remove(key))
+        : {...state, key};
+    _save();
+  }
+
+  void enable(String key) {
+    if (state.contains(key)) return;
+    state = {...state, key};
+    _save();
+  }
+
+  /// Reemplaza el conjunto completo (usado por PanelCapas que ya construye
+  /// el nuevo Set externamente).
+  void replace(Set<String> next) {
+    state = next;
+    _save();
+  }
+}
+
+final activeLayersProvider =
+    NotifierProvider<ActiveLayersNotifier, Set<String>>(
+        ActiveLayersNotifier.new);
 
 // ── Ubicación del usuario (GPS) ───────────────────────────────────────────────
 

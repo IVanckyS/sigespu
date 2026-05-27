@@ -617,6 +617,7 @@ class _AddElementModalState extends ConsumerState<AddElementModal> {
     );
 
     ref.read(userElementsProvider.notifier).update((s) => [...s, nuevo]);
+    ref.read(activeLayersProvider.notifier).enable(nuevo.tipo);
 
     // POST directo al backend (sin pasar por la cola Drift)
     bool sincronizado = false;

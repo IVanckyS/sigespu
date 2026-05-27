@@ -1,45 +1,121 @@
+import 'dart:convert';
 import 'dart:io';
-import 'package:mailer/mailer.dart';
-import 'package:mailer/smtp_server/gmail.dart';
+import 'package:http/http.dart' as http;
 
+/// Envía correos usando la Gmail REST API (HTTPS) en lugar de SMTP.
+/// Railway bloquea los puertos 25/465/587, pero HTTPS funciona normalmente.
+///
+/// Variables de entorno requeridas:
+///   GMAIL_CLIENT_ID      — OAuth2 client ID de Google Cloud Console
+///   GMAIL_CLIENT_SECRET  — OAuth2 client secret
+///   GMAIL_REFRESH_TOKEN  — refresh token obtenido en el setup inicial
+///   SMTP_USER            — dirección Gmail del remitente (sigespulota@gmail.com)
 class EmailService {
-  final String _user;
-  final String _pass;
+  final String _clientId;
+  final String _clientSecret;
+  final String _refreshToken;
+  final String _fromEmail;
 
   EmailService()
-      : _user = Platform.environment['SMTP_USER'] ?? '',
-        _pass = Platform.environment['SMTP_PASS'] ?? '';
+      : _clientId = Platform.environment['GMAIL_CLIENT_ID'] ?? '',
+        _clientSecret = Platform.environment['GMAIL_CLIENT_SECRET'] ?? '',
+        _refreshToken = Platform.environment['GMAIL_REFRESH_TOKEN'] ?? '',
+        _fromEmail =
+            Platform.environment['SMTP_USER'] ?? 'sigespulota@gmail.com';
 
-  Future<void> sendVerificationCode(
-      String toEmail, String nombre, String codigo) async {
-    final smtpServer = gmail(_user, _pass);
-    final message = Message()
-      ..from = Address(_user, 'SIGESPU Lota')
-      ..recipients.add(toEmail)
-      ..subject = 'Activa tu cuenta SIGESPU · Código de verificación'
-      ..html = buildHtml(nombre, codigo);
+  Future<String?> _getAccessToken() async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('https://oauth2.googleapis.com/token'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: {
+              'client_id': _clientId,
+              'client_secret': _clientSecret,
+              'refresh_token': _refreshToken,
+              'grant_type': 'refresh_token',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return data['access_token'] as String?;
+      }
+      print(
+          '[EmailService] Error obteniendo access token (${response.statusCode}): ${response.body}');
+    } catch (e) {
+      print('[EmailService] Error al obtener access token: $e');
+    }
+    return null;
+  }
+
+  Future<void> _send({
+    required String toEmail,
+    required String subject,
+    required String html,
+  }) async {
+    if (_clientId.isEmpty || _refreshToken.isEmpty) {
+      print('[EmailService] Gmail OAuth no configurado — correo omitido');
+      return;
+    }
+
+    final accessToken = await _getAccessToken();
+    if (accessToken == null) return;
+
+    // RFC 2822 con subject en Base64 para soportar tildes/ñ/·
+    final subjectEncoded =
+        '=?UTF-8?B?${base64.encode(utf8.encode(subject))}?=';
+    final raw = [
+      'From: SIGESPU Lota <$_fromEmail>',
+      'To: $toEmail',
+      'Subject: $subjectEncoded',
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      '',
+      html,
+    ].join('\r\n');
+
+    final encoded = base64Url.encode(utf8.encode(raw));
 
     try {
-      await send(message, smtpServer);
+      final response = await http
+          .post(
+            Uri.parse(
+                'https://gmail.googleapis.com/gmail/v1/users/me/messages/send'),
+            headers: {
+              'Authorization': 'Bearer $accessToken',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({'raw': encoded}),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        print(
+            '[EmailService] Gmail API error ${response.statusCode}: ${response.body}');
+      }
     } catch (e) {
       print('[EmailService] Error al enviar correo a $toEmail: $e');
     }
   }
 
+  Future<void> sendVerificationCode(
+      String toEmail, String nombre, String codigo) async {
+    await _send(
+      toEmail: toEmail,
+      subject: 'Activa tu cuenta SIGESPU · Código de verificación',
+      html: buildHtml(nombre, codigo),
+    );
+  }
+
   Future<void> sendPasswordResetCode(
       String toEmail, String nombre, String codigo) async {
-    final smtpServer = gmail(_user, _pass);
-    final message = Message()
-      ..from = Address(_user, 'SIGESPU Lota')
-      ..recipients.add(toEmail)
-      ..subject = 'Recuperar contraseña SIGESPU · Código de verificación'
-      ..html = buildResetHtml(nombre, codigo);
-
-    try {
-      await send(message, smtpServer);
-    } catch (e) {
-      print('[EmailService] Error al enviar correo de reset a $toEmail: $e');
-    }
+    await _send(
+      toEmail: toEmail,
+      subject: 'Recuperar contraseña SIGESPU · Código de verificación',
+      html: buildResetHtml(nombre, codigo),
+    );
   }
 
   static String buildHtml(String nombre, String codigo) {

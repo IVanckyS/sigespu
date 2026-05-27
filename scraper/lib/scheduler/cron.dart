@@ -2,7 +2,6 @@ import 'dart:async' show unawaited;
 import 'dart:io';
 import 'package:cron/cron.dart';
 import 'package:postgres/postgres.dart';
-import 'package:redis/redis.dart';
 import '../sources/patentes_mensuales.dart';
 import '../sources/permisos_dom.dart';
 import '../sources/decretos_transito.dart';
@@ -14,7 +13,7 @@ import '../geocoder/nominatim_client.dart';
 ///
 /// If RUN_INITIAL_SCRAPE=true, immediately launches a full scrape in background
 /// (useful on first deploy to populate historical data).
-void startScraperCron(Pool db, Command redis) {
+void startScraperCron(Pool db, dynamic redis) {
   final cron = Cron();
   final geocoder = NominatimClient();
 
@@ -47,7 +46,7 @@ void startScraperCron(Pool db, Command redis) {
 }
 
 Future<void> _runAllSources(
-    Pool db, Command redis, NominatimClient geocoder) async {
+    Pool db, dynamic redis, NominatimClient geocoder) async {
   print('[scraper] Iniciando scrape completo de todas las fuentes...');
   await scrapePatentes(db, redis, geocoder);
   await scrapePermisosDom(db, redis, geocoder);

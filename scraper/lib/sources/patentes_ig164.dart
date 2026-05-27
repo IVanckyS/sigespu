@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html;
 import 'package:postgres/postgres.dart';
-import 'package:redis/redis.dart';
 import '../progress.dart';
 
 // ig=164: Patentes comerciales por decreto (Actos y Resoluciones)
@@ -19,7 +18,7 @@ const _base = 'https://www.lotatransparente.cl';
 const _ua = 'SigespuLota/1.0 (+contacto@munilota.cl)';
 
 Future<void> scrapePatentesIg164(
-    Session db, Command redis,
+    Session db, dynamic redis,
     {int? year, ProgressTracker? tracker}) async {
   final now = DateTime.now();
   final y = year ?? now.year;
@@ -58,7 +57,7 @@ Future<void> scrapePatentesIg164(
 
 /// Itera años hacia atrás en modo histórico.
 Future<void> scrapePatentesIg164Historico(
-    Session db, Command redis,
+    Session db, dynamic redis,
     {int yearFrom = 2022, int? yearTo, ProgressTracker? tracker}) async {
   final to = yearTo ?? DateTime.now().year;
   for (var y = yearFrom; y <= to; y++) {
@@ -66,7 +65,7 @@ Future<void> scrapePatentesIg164Historico(
   }
 }
 
-Future<void> _processPagina(Session db, Command redis, String url, ProgressTracker? tracker) async {
+Future<void> _processPagina(Session db, dynamic redis, String url, ProgressTracker? tracker) async {
   final body = await _get(url);
   if (body == null) return;
 

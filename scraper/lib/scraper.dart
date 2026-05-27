@@ -6,8 +6,6 @@
 library scraper;
 
 import 'package:postgres/postgres.dart';
-import 'package:redis/redis.dart';
-
 import 'geocoder/nominatim_client.dart';
 import 'progress.dart';
 import 'sources/decretos_transito.dart';
@@ -22,7 +20,7 @@ export 'progress.dart';
 /// Pensado para uso bajo demanda desde el backend.
 Future<void> runScrapingActual({
   required Session db,
-  required Command redis,
+  required dynamic redis,
 }) async {
   if (await ProgressTracker.isRunning(redis)) {
     throw StateError('Ya hay un scraping en curso');
@@ -65,7 +63,7 @@ Future<void> runScrapingActual({
 /// disponibles en el índice.
 Future<void> runScrapingHistorico({
   required Session db,
-  required Command redis,
+  required dynamic redis,
   int patentesYearFrom = 2022,
   int organizacionesYearFrom = 2020,
 }) async {

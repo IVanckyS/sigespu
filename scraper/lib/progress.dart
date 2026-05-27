@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:redis/redis.dart';
 
 /// Lleva el estado del scraping en Redis bajo la key `scraping:status`.
 ///
@@ -35,32 +34,32 @@ class ProgressTracker {
 
   /// Marca el scraping en curso para que se detenga en el próximo checkpoint.
   /// El backend lo invoca desde POST /api/scraping/stop. Es idempotente.
-  static Future<void> requestCancel(Command redis) async {
+  static Future<void> requestCancel(dynamic redis) async {
     await redis.send_object(['SET', _cancelKey, '1', 'EX', '$_ttlSeconds']);
   }
 
   /// Lectura no-bloqueante: los scrapers la llaman cada N rows / entre categorías.
   /// Si devuelve true deben lanzar ScrapingCancelledException.
-  static Future<bool> isCancelRequested(Command redis) async {
+  static Future<bool> isCancelRequested(dynamic redis) async {
     final raw = await redis.send_object(['GET', _cancelKey]);
     return raw != null;
   }
 
   /// Limpia el flag al iniciar un scraping nuevo, para que un cancel previo
   /// no aborte instantáneamente la nueva corrida.
-  static Future<void> clearCancel(Command redis) async {
+  static Future<void> clearCancel(dynamic redis) async {
     await redis.send_object(['DEL', _cancelKey]);
   }
 
   /// Helper combinado: verifica el flag y lanza si está activo.
   /// Llamar entre rows o entre pasos para tener una salida cooperativa.
-  static Future<void> throwIfCancelled(Command redis) async {
+  static Future<void> throwIfCancelled(dynamic redis) async {
     if (await isCancelRequested(redis)) {
       throw const ScrapingCancelledException();
     }
   }
 
-  final Command _redis;
+  final dynamic _redis;
   final String _modo;
   final int _totalSteps;
   final DateTime _startedAt;
@@ -76,7 +75,7 @@ class ProgressTracker {
         _totalSteps = totalSteps,
         _startedAt = DateTime.now().toUtc();
 
-  static Future<bool> isRunning(Command redis) async {
+  static Future<bool> isRunning(dynamic redis) async {
     final raw = await redis.send_object(['GET', _key]);
     if (raw is! String) return false;
     try {

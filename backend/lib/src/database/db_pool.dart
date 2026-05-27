@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:logging/logging.dart';
 import 'package:postgres/postgres.dart';
@@ -7,10 +8,8 @@ class DatabaseService {
   static final _log = Logger('DatabaseService');
 
   Pool? _db;
-  Command? _redis;
-  Command? _scrapingRedis;
-  RedisConnection? _redisConn;
-  RedisConnection? _scrapingRedisConn;
+  ReconnectingRedis? _redis;
+  ReconnectingRedis? _scrapingRedis;
 
   Pool get db {
     if (_db == null) throw StateError('DatabaseService: initPostgres() no fue llamado');
@@ -18,15 +17,15 @@ class DatabaseService {
   }
 
   /// Conexión Redis para handlers HTTP (rate limit, JWT blacklist, status reads).
-  Command get redis {
+  ReconnectingRedis get redis {
     if (_redis == null) throw StateError('DatabaseService: initRedis() no fue llamado');
     return _redis!;
   }
 
-  /// Conexión Redis dedicada al scraper (progress writes).
-  /// El paquete redis/Dart no es safe para uso concurrente en una sola conexión,
-  /// por eso el scraper necesita su propio Command independiente.
-  Command get scrapingRedis {
+  /// Conexión Redis dedicada al scraper (progress writes, cancel checks, geocode cache).
+  /// Separada del handler HTTP para evitar contención — el paquete redis/Dart
+  /// no soporta comandos concurrentes sobre una sola conexión TCP.
+  ReconnectingRedis get scrapingRedis {
     if (_scrapingRedis == null) throw StateError('DatabaseService: initRedis() no fue llamado');
     return _scrapingRedis!;
   }
@@ -78,9 +77,7 @@ class DatabaseService {
     }
   }
 
-  /// Inicializa Redis. Crea dos conexiones independientes: una para los
-  /// handlers HTTP y otra exclusiva para el scraper. El paquete redis/Dart
-  /// no soporta comandos concurrentes en la misma conexión TCP.
+  /// Inicializa Redis con dos conexiones independientes con auto-reconexión.
   Future<void> initRedis() async {
     final redisUrl = Platform.environment['REDIS_URL'];
     final String host;
@@ -95,23 +92,12 @@ class DatabaseService {
       password = null;
     }
 
-    Future<(RedisConnection, Command)> _connect() async {
-      final conn = RedisConnection();
-      final cmd = await conn.connect(host, port);
-      if (password != null && password.isNotEmpty) {
-        await cmd.send_object(['AUTH', password]);
-      }
-      return (conn, cmd);
-    }
-
     int retries = 5;
     while (retries > 0) {
       try {
-        final r1 = await _connect();
-        _redisConn = r1.$1; _redis = r1.$2;
-        final r2 = await _connect();
-        _scrapingRedisConn = r2.$1; _scrapingRedis = r2.$2;
-        _log.info('Redis ready (2 conexiones) en $host:$port');
+        _redis = await ReconnectingRedis.connect(host, port, password);
+        _scrapingRedis = await ReconnectingRedis.connect(host, port, password);
+        _log.info('Redis ready (2 conexiones con auto-reconexión) en $host:$port');
         break;
       } catch (e) {
         retries--;
@@ -131,8 +117,8 @@ class DatabaseService {
 
   Future<void> close() async {
     await _db?.close();
-    await _redisConn?.close();
-    await _scrapingRedisConn?.close();
+    await _redis?.close();
+    await _scrapingRedis?.close();
   }
 
   // ── URL parsers (static, expuestos para tests) ──────────────────────────────
@@ -178,4 +164,70 @@ class DatabaseService {
   static bool _isProduction() =>
       Platform.environment['APP_ENV']?.toLowerCase() == 'production' ||
       Platform.environment['RAILWAY_ENVIRONMENT'] != null;
+}
+
+/// Wrapper sobre [Command] que reconecta automáticamente si la conexión TCP cae.
+///
+/// El paquete redis/Dart no tiene auto-reconexión. Cuando el servidor Redis
+/// cierra la conexión (reinicio, idle timeout, glitch de red), cualquier
+/// send_object() lanza "Bad state: StreamSink is closed". Este wrapper
+/// detecta ese error y reconecta una vez antes de reintentar el comando.
+/// Incluye timeout de 5s por comando para no colgar si la conexión está muerta
+/// pero el socket aún no lo notificó.
+class ReconnectingRedis {
+  static final _log = Logger('ReconnectingRedis');
+
+  final String _host;
+  final int _port;
+  final String? _password;
+
+  RedisConnection? _conn;
+  Command? _cmd;
+
+  ReconnectingRedis._(this._host, this._port, this._password);
+
+  static Future<ReconnectingRedis> connect(
+      String host, int port, String? password) async {
+    final r = ReconnectingRedis._(host, port, password);
+    await r._doConnect();
+    return r;
+  }
+
+  Future<void> _doConnect() async {
+    final conn = RedisConnection();
+    final cmd = await conn.connect(_host, _port);
+    if (_password != null && _password!.isNotEmpty) {
+      await cmd.send_object(['AUTH', _password]);
+    }
+    _conn = conn;
+    _cmd = cmd;
+  }
+
+  /// Ejecuta un comando Redis. Si la conexión está caída (StateError o
+  /// TimeoutException), reconecta una vez y reintenta automáticamente.
+  Future<dynamic> send_object(List<dynamic> args) async {
+    try {
+      return await _cmd!.send_object(args).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      if (e is StateError || e is TimeoutException || e is SocketException) {
+        _log.warning('Redis reconectando tras error: $e');
+        try {
+          await _conn?.close();
+        } catch (_) {}
+        _conn = null;
+        _cmd = null;
+        await _doConnect();
+        return await _cmd!.send_object(args).timeout(const Duration(seconds: 5));
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> close() async {
+    try {
+      await _conn?.close();
+    } catch (_) {}
+    _conn = null;
+    _cmd = null;
+  }
 }

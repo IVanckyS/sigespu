@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html;
 import 'package:postgres/postgres.dart';
-import 'package:redis/redis.dart';
 import '../geocoder/nominatim_client.dart';
 import '../progress.dart';
 
@@ -18,7 +17,7 @@ const _base = 'https://www.lotatransparente.cl';
 const _ua = 'SigespuLota/1.0 (+contacto@munilota.cl)';
 
 Future<void> scrapePermisosDom(
-    Session db, Command redis, NominatimClient geocoder,
+    Session db, dynamic redis, NominatimClient geocoder,
     {int? maxMonths = 6, ProgressTracker? tracker}) async {
   await tracker?.stepStart(
       fuente: 'permisos_dom',
@@ -61,7 +60,7 @@ Future<void> scrapePermisosDom(
   print('[permisos_dom] Scraping completo');
 }
 
-Future<void> _processMes(Session db, Command redis, String url, ProgressTracker? tracker) async {
+Future<void> _processMes(Session db, dynamic redis, String url, ProgressTracker? tracker) async {
   final body = await _get(url);
   if (body == null) return;
 

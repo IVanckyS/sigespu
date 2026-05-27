@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html;
 import 'package:postgres/postgres.dart';
-import 'package:redis/redis.dart';
 import '../geocoder/nominatim_client.dart';
 import '../normalizers/direccion_lota.dart';
 import '../progress.dart';
@@ -18,7 +17,7 @@ const _base = 'https://www.lotatransparente.cl';
 const _ua = 'SigespuLota/1.0 (+contacto@munilota.cl)';
 
 Future<void> scrapePatentes(
-    Session db, Command redis, NominatimClient geocoder,
+    Session db, dynamic redis, NominatimClient geocoder,
     {int? year, int? semester, ProgressTracker? tracker}) async {
   final now = DateTime.now();
   final y = year ?? now.year;
@@ -61,7 +60,7 @@ Future<void> scrapePatentes(
 
 /// Itera años/semestres en modo histórico. Por defecto desde 2022 hasta hoy.
 Future<void> scrapePatentesHistorico(
-    Session db, Command redis, NominatimClient geocoder,
+    Session db, dynamic redis, NominatimClient geocoder,
     {int yearFrom = 2022, int? yearTo, ProgressTracker? tracker}) async {
   final now = DateTime.now();
   final to = yearTo ?? now.year;
@@ -75,7 +74,7 @@ Future<void> scrapePatentesHistorico(
 
 Future<void> _processCategoria(
     Session db,
-    Command redis,
+    dynamic redis,
     NominatimClient geocoder,
     String url,
     int y,

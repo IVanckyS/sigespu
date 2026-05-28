@@ -32,10 +32,28 @@ class ProgressTracker {
   static const _cancelKey = 'scraping:cancel';
   static const _ttlSeconds = 1800; // 30 min; Nominatim puede ser lento entre ticks
 
+  /// Flag en-proceso: se comparte en la misma Dart isolate sin round-trip Redis.
+  /// requestCancel() lo activa → throwIfCancelled() lo detecta instantáneamente.
+  static bool _inProcessCancel = false;
+
   /// Marca el scraping en curso para que se detenga en el próximo checkpoint.
   /// El backend lo invoca desde POST /api/scraping/stop. Es idempotente.
+  /// Además actualiza Redis status → running:false para que la UI responda
+  /// inmediatamente aunque el scraper tarde un par de segundos en detectarlo.
   static Future<void> requestCancel(dynamic redis) async {
+    _inProcessCancel = true;
     await redis.send_object(['SET', _cancelKey, '1', 'EX', '$_ttlSeconds']);
+    // Actualizar status inmediatamente para que la UI deje de mostrar spinner
+    try {
+      final raw = await redis.send_object(['GET', _key]);
+      final status = raw is String
+          ? (jsonDecode(raw) as Map<String, dynamic>)
+          : <String, dynamic>{};
+      status['running'] = false;
+      status['finished_at'] = DateTime.now().toUtc().toIso8601String();
+      status['error'] = 'Cancelado por usuario';
+      await redis.send_object(['SET', _key, jsonEncode(status), 'EX', '$_ttlSeconds']);
+    } catch (_) {} // best-effort; el flag en-proceso es el mecanismo primario
   }
 
   /// Lectura no-bloqueante: los scrapers la llaman cada N rows / entre categorías.
@@ -48,15 +66,15 @@ class ProgressTracker {
   /// Limpia el flag al iniciar un scraping nuevo, para que un cancel previo
   /// no aborte instantáneamente la nueva corrida.
   static Future<void> clearCancel(dynamic redis) async {
+    _inProcessCancel = false;
     await redis.send_object(['DEL', _cancelKey]);
   }
 
   /// Helper combinado: verifica el flag y lanza si está activo.
-  /// Llamar entre rows o entre pasos para tener una salida cooperativa.
+  /// Ruta rápida: chequea el bool en-proceso (sin Redis) antes del GET a Redis.
   static Future<void> throwIfCancelled(dynamic redis) async {
-    if (await isCancelRequested(redis)) {
-      throw const ScrapingCancelledException();
-    }
+    if (_inProcessCancel) throw const ScrapingCancelledException();
+    if (await isCancelRequested(redis)) throw const ScrapingCancelledException();
   }
 
   final dynamic _redis;
@@ -109,6 +127,8 @@ class ProgressTracker {
   }
 
   Future<void> _write({required bool running, String? error}) async {
+    // Si el cancel ya fue pedido, no sobreescribir running:false con ticks de keepalive.
+    if (_inProcessCancel && running) return;
     final progress = _totalSteps == 0 ? 0.0 : (_step / _totalSteps).clamp(0.0, 1.0);
     final payload = jsonEncode({
       'running': running,

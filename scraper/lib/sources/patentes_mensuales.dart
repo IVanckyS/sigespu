@@ -159,7 +159,7 @@ Future<void> _processCategoria(
 
     final fechaIso = _isoDate(fechaDecretoDate);
 
-    // ─── Cancel cooperativo + keepalive Redis TTL ────────────────────────────
+    // ─── Cancel cooperativo ───────────────────────────────────────────────────
     await ProgressTracker.throwIfCancelled(redis);
     if (rowNum % 20 == 0) await tracker?.tick();
 
@@ -220,6 +220,9 @@ Future<void> _processCategoria(
         }
       }
     }
+
+    // Segundo check: el geocoding puede tardar 1-15s; verificar cancel antes del INSERT.
+    await ProgressTracker.throwIfCancelled(redis);
 
     final rawData = jsonEncode({
       'rol': rolStr,

@@ -150,6 +150,9 @@ Future<void> _processCategoria(Session db, dynamic redis,
     double? lat, lng;
     String confianza = 'fallo';
 
+    // Check antes del geocoding (puede tardar 1-15s en cache miss)
+    await ProgressTracker.throwIfCancelled(redis);
+
     if (sede.isNotEmpty) {
       final sedeNorm = normalizarDireccionLota(sede);
       if (sedeNorm != null) {

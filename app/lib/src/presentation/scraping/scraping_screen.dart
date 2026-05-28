@@ -586,10 +586,12 @@ class _SubHeader extends StatelessWidget {
         const Spacer(),
         if (status.running && !state._stopRequested)
           _LiveScrapingPill(step: status.step, total: status.totalSteps)
+        else if (state._stopRequested)
+          const _SubHeaderBtn(icon: LucideIcons.xCircle, label: 'Cancelando...', onTap: null)
         else
           _SubHeaderBtn(icon: LucideIcons.refreshCw, label: 'Scrappear', primary: true, onTap: state._scrapeNow),
         const SizedBox(width: 8),
-        _SubHeaderBtn(icon: LucideIcons.clock, label: 'Histórico', onTap: state._scrapeHistorico),
+        _SubHeaderBtn(icon: LucideIcons.clock, label: 'Histórico', onTap: state._stopRequested ? null : state._scrapeHistorico),
       ]),
     );
   }
@@ -644,27 +646,28 @@ class _SubHeaderBtn extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool primary;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   const _SubHeaderBtn({required this.icon, required this.label, this.primary = false, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final disabled = onTap == null;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: primary ? _T.or6 : Colors.white,
+          color: disabled ? _T.s100 : (primary ? _T.or6 : Colors.white),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: primary ? _T.or6 : _T.s200),
+          border: Border.all(color: disabled ? _T.s200 : (primary ? _T.or6 : _T.s200)),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 12, color: primary ? Colors.white : _T.s600),
+          Icon(icon, size: 12, color: disabled ? _T.s400 : (primary ? Colors.white : _T.s600)),
           const SizedBox(width: 6),
           Text(label, style: TextStyle(
             fontSize: 12, fontWeight: FontWeight.w600,
-            color: primary ? Colors.white : _T.s800,
+            color: disabled ? _T.s400 : (primary ? Colors.white : _T.s800),
           )),
         ]),
       ),
@@ -2469,6 +2472,16 @@ class _MobileAppHeader extends StatelessWidget {
                     Text('Detener', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white)),
                   ]),
                 ),
+              )
+            else if (state._stopRequested)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: _T.s200, borderRadius: BorderRadius.circular(6)),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(LucideIcons.xCircle, size: 9, color: _T.s500),
+                  SizedBox(width: 4),
+                  Text('Cancelando...', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _T.s500)),
+                ]),
               )
             else
               InkWell(

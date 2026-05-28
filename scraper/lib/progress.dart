@@ -38,22 +38,15 @@ class ProgressTracker {
 
   /// Marca el scraping en curso para que se detenga en el próximo checkpoint.
   /// El backend lo invoca desde POST /api/scraping/stop. Es idempotente.
-  /// Además actualiza Redis status → running:false para que la UI responda
-  /// inmediatamente aunque el scraper tarde un par de segundos en detectarlo.
+  ///
+  /// NO actualiza running:false en Redis — eso lo hace tracker.finish() cuando el
+  /// scraper detecta el cancel y realmente para. Si se actualizara aquí, isRunning()
+  /// devolvería false y permitiría arrancar un nuevo scrape antes de que el anterior
+  /// terminara, lo que resetearía _inProcessCancel y haría que el scraper original
+  /// ignorara el flag de cancelación.
   static Future<void> requestCancel(dynamic redis) async {
     _inProcessCancel = true;
     await redis.send_object(['SET', _cancelKey, '1', 'EX', '$_ttlSeconds']);
-    // Actualizar status inmediatamente para que la UI deje de mostrar spinner
-    try {
-      final raw = await redis.send_object(['GET', _key]);
-      final status = raw is String
-          ? (jsonDecode(raw) as Map<String, dynamic>)
-          : <String, dynamic>{};
-      status['running'] = false;
-      status['finished_at'] = DateTime.now().toUtc().toIso8601String();
-      status['error'] = 'Cancelado por usuario';
-      await redis.send_object(['SET', _key, jsonEncode(status), 'EX', '$_ttlSeconds']);
-    } catch (_) {} // best-effort; el flag en-proceso es el mecanismo primario
   }
 
   /// Lectura no-bloqueante: los scrapers la llaman cada N rows / entre categorías.

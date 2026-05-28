@@ -65,9 +65,16 @@ class AuthHandler {
     final emailRaw = data['email'] as String?;
     final nombre = data['nombre'] as String?;
     final password = data['password'] as String?;
+    final termsAccepted = data['terms_accepted'] as bool? ?? false;
 
     if (emailRaw == null || nombre == null || password == null) {
       return Response.badRequest(body: jsonEncode({'error': 'Faltan campos requeridos'}));
+    }
+
+    if (!termsAccepted) {
+      return Response.badRequest(
+        body: jsonEncode({'error': 'Debe aceptar los Términos de Uso y la Política de Privacidad'}),
+      );
     }
 
     final email = emailRaw.trim().toLowerCase();
@@ -81,13 +88,16 @@ class AuthHandler {
 
     try {
       await _dbService.db.execute(
-        Sql.named('INSERT INTO usuarios (email, nombre, password_hash, nivel_acceso, activo) VALUES (@email, @nombre, @hash, @nivel, false)'),
+        Sql.named(
+          'INSERT INTO usuarios (email, nombre, password_hash, nivel_acceso, activo, terms_accepted_at) '
+          'VALUES (@email, @nombre, @hash, @nivel, false, NOW())',
+        ),
         parameters: {
           'email': email,
           'nombre': nombre,
           'hash': hash,
           'nivel': 'visitante',
-        }
+        },
       );
 
       await _generarYEnviarCodigo(email, nombre);

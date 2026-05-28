@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -27,9 +27,16 @@ class PdfExportService {
     }
   }
 
+  // ── Carga del logo oficial de Seguridad Pública ──────────────────────────────
+
+  static Future<pw.ImageProvider?> _loadLogoImage() async {
+    final data = await rootBundle.load('assets/icon/seguridad logo naranjo.png');
+    return pw.MemoryImage(data.buffer.asUint8List());
+  }
+
   // ── Header / Footer comunes ───────────────────────────────────────────────────
 
-  static pw.Widget _header(String date, String subtitle) {
+  static pw.Widget _header(String date, String subtitle, {pw.ImageProvider? logo}) {
     return pw.Container(
       padding: const pw.EdgeInsets.only(bottom: 10),
       decoration: const pw.BoxDecoration(
@@ -37,11 +44,18 @@ class PdfExportService {
       ),
       child: pw.Row(
         children: [
-          pw.SizedBox(
-            width: 38,
-            height: 38,
-            child: pw.CustomPaint(painter: _pdfEmblemPainter),
-          ),
+          if (logo != null)
+            pw.SizedBox(
+              width: 38,
+              height: 38,
+              child: pw.Image(logo, fit: pw.BoxFit.contain),
+            )
+          else
+            pw.SizedBox(
+              width: 38,
+              height: 38,
+              child: pw.CustomPaint(painter: _pdfEmblemPainter),
+            ),
           pw.SizedBox(width: 10),
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -115,6 +129,7 @@ class PdfExportService {
     String title = 'REPORTE DE GESTION TERRITORIAL',
   }) async {
     final (fontR, fontB) = await _loadFonts();
+    final logoImage = await _loadLogoImage().catchError((_) => null as pw.ImageProvider?);
     final pdf = pw.Document(theme: pw.ThemeData.withFont(base: fontR, bold: fontB));
     final now = DateTime.now();
     final dateStr = _fmtDate(now);
@@ -130,7 +145,7 @@ class PdfExportService {
     pdf.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(40),
-      header: (_) => _header(dateStr, 'Sistema de Informacion Geoespacial de Seguridad Publica'),
+      header: (_) => _header(dateStr, 'Sistema de Informacion Geoespacial de Seguridad Publica', logo: logoImage),
       footer: (ctx) => _footer(userName, dateStr, ctx.pageNumber, ctx.pagesCount),
       build: (_) => [
         pw.SizedBox(height: 16),
@@ -173,6 +188,7 @@ class PdfExportService {
     String userName,
   ) async {
     final (fontR, fontB) = await _loadFonts();
+    final logoImage = await _loadLogoImage().catchError((_) => null as pw.ImageProvider?);
     final pdf = pw.Document(theme: pw.ThemeData.withFont(base: fontR, bold: fontB));
     final now = DateTime.now();
     final dateStr = _fmtDate(now);
@@ -193,7 +209,7 @@ class PdfExportService {
     pdf.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(40),
-      header: (_) => _header(dateStr, 'Resumen Operativo - Sistema de Informacion Geoespacial'),
+      header: (_) => _header(dateStr, 'Resumen Operativo - Sistema de Informacion Geoespacial', logo: logoImage),
       footer: (ctx) => _footer(userName, dateStr, ctx.pageNumber, ctx.pagesCount),
       build: (_) => [
         pw.SizedBox(height: 16),
@@ -249,6 +265,7 @@ class PdfExportService {
     final o = orgs ?? kOrganizaciones;
 
     final (fontR, fontB) = await _loadFonts();
+    final logoImage = await _loadLogoImage().catchError((_) => null as pw.ImageProvider?);
     final pdf = pw.Document(theme: pw.ThemeData.withFont(base: fontR, bold: fontB));
     final now = DateTime.now();
     final dateStr = _fmtDate(now);
@@ -256,7 +273,7 @@ class PdfExportService {
     pdf.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(40),
-      header: (_) => _header(dateStr, 'Datos de Transparencia Municipal - lotatransparente.cl'),
+      header: (_) => _header(dateStr, 'Datos de Transparencia Municipal - lotatransparente.cl', logo: logoImage),
       footer: (ctx) => _footer(userName, dateStr, ctx.pageNumber, ctx.pagesCount),
       build: (_) => [
         pw.SizedBox(height: 16),
@@ -296,6 +313,7 @@ class PdfExportService {
     List<UsuarioItem> usuarios = const [],
   }) async {
     final (fontR, fontB) = await _loadFonts();
+    final logoImage = await _loadLogoImage().catchError((_) => null as pw.ImageProvider?);
     final pdf = pw.Document(theme: pw.ThemeData.withFont(base: fontR, bold: fontB));
     final now = DateTime.now();
     final dateStr = _fmtDate(now);
@@ -308,7 +326,7 @@ class PdfExportService {
     pdf.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(40),
-      header: (_) => _header(dateStr, 'Gestion de Usuarios - Sistema de Informacion Geoespacial'),
+      header: (_) => _header(dateStr, 'Gestion de Usuarios - Sistema de Informacion Geoespacial', logo: logoImage),
       footer: (ctx) => _footer(userName, dateStr, ctx.pageNumber, ctx.pagesCount),
       build: (_) => [
         pw.SizedBox(height: 16),
@@ -354,6 +372,7 @@ class PdfExportService {
     String userName,
   ) async {
     final (fontR, fontB) = await _loadFonts();
+    final logoImage = await _loadLogoImage().catchError((_) => null as pw.ImageProvider?);
     final pdf = pw.Document(theme: pw.ThemeData.withFont(base: fontR, bold: fontB));
     final now = DateTime.now();
     final dateStr = _fmtDate(now);
@@ -417,7 +436,7 @@ class PdfExportService {
     pdf.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(40),
-      header: (_) => _header(dateStr, 'Acta de Actividad Municipal'),
+      header: (_) => _header(dateStr, 'Acta de Actividad Municipal', logo: logoImage),
       footer: (ctx) => _footer(userName, dateStr, ctx.pageNumber, ctx.pagesCount),
       build: (_) => [
         pw.SizedBox(height: 16),
@@ -555,6 +574,7 @@ class PdfExportService {
     String userName,
   ) async {
     final (fontR, fontB) = await _loadFonts();
+    final logoImage = await _loadLogoImage().catchError((_) => null as pw.ImageProvider?);
     final pdf = pw.Document(theme: pw.ThemeData.withFont(base: fontR, bold: fontB));
     final now = DateTime.now();
     final dateStr = _fmtDate(now);
@@ -567,7 +587,7 @@ class PdfExportService {
     pdf.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(40),
-      header: (_) => _header(dateStr, 'Tablero de Actividades Municipales'),
+      header: (_) => _header(dateStr, 'Tablero de Actividades Municipales', logo: logoImage),
       footer: (ctx) => _footer(userName, dateStr, ctx.pageNumber, ctx.pagesCount),
       build: (_) => [
         pw.SizedBox(height: 16),

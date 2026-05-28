@@ -212,6 +212,13 @@ class _DesktopLayout extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      Image.asset(
+                        'assets/icon/LOGOSEGURIDAD.png',
+                        height: 56,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.centerLeft,
+                      ),
+                      const SizedBox(height: 22),
                       const _AccessLabel(),
                       const SizedBox(height: 24),
                       const _DisplayTitle(fontSize: 78, lineHeight: 0.95),
@@ -279,16 +286,23 @@ class _MobileLayout extends StatelessWidget {
               ),
             ),
             // Hero
-            const Padding(
-              padding: EdgeInsets.fromLTRB(4, 28, 4, 22),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 28, 4, 22),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _AccessLabel(),
-                  SizedBox(height: 14),
-                  _DisplayTitle(fontSize: 44, lineHeight: 0.95),
-                  SizedBox(height: 14),
-                  _Acronym(fontSize: 12),
+                  Image.asset(
+                    'assets/icon/LOGOSEGURIDAD.png',
+                    height: 44,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.centerLeft,
+                  ),
+                  const SizedBox(height: 14),
+                  const _AccessLabel(),
+                  const SizedBox(height: 14),
+                  const _DisplayTitle(fontSize: 44, lineHeight: 0.95),
+                  const SizedBox(height: 14),
+                  const _Acronym(fontSize: 12),
                 ],
               ),
             ),

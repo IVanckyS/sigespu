@@ -226,15 +226,20 @@ class _DesktopLayout extends StatelessWidget {
                   ),
                 ),
               ),
-              // Columna derecha — card
+              // Columna derecha — card (scrollable para que el checkbox de TU/PP
+              // no quede cortado cuando el formulario de registro es más alto
+              // que el viewport)
               Expanded(
                 flex: 10,
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 400),
-                      child: _LoginCard(state: state, authState: authState, compact: false),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 40),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        child: _LoginCard(state: state, authState: authState, compact: false),
+                      ),
                     ),
                   ),
                 ),

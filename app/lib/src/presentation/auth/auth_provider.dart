@@ -139,13 +139,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _storage.write(key: 'remember_me', value: rememberMe.toString());
   }
 
-  Future<bool> register(String nombre, String email, String password) async {
+  Future<bool> register(
+    String nombre,
+    String email,
+    String password, {
+    bool termsAccepted = false,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'nombre': nombre, 'email': normalizeEmail(email), 'password': password}),
+        body: jsonEncode({
+          'nombre': nombre,
+          'email': normalizeEmail(email),
+          'password': password,
+          'terms_accepted': termsAccepted,
+        }),
       );
 
       if (response.statusCode == 200) {

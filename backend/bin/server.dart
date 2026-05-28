@@ -19,6 +19,7 @@ import '../lib/src/routes/zonas_route.dart';
 import '../lib/src/routes/scraping_route.dart';
 import '../lib/src/services/email_service.dart';
 import 'package:scraper/scheduler/cron.dart';
+import 'package:scraper/scraper.dart' as scraper;
 
 final _log = Logger('Server');
 
@@ -54,6 +55,7 @@ void main(List<String> args) async {
   await dbService.initPostgres();
   await runMigrations(dbService.db);
   await dbService.initRedis();
+  await scraper.ProgressTracker.clearStaleRunning(dbService.scrapingRedis);
   startScraperCron(dbService.db, dbService.scrapingRedis);
 
   final jwtService = JwtService(dbService);

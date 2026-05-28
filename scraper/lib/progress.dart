@@ -104,6 +104,26 @@ class ProgressTracker {
     }
   }
 
+  /// Llamar UNA VEZ al arrancar el servidor.
+  /// Si hay un status running=true de un proceso anterior (ya muerto), lo resetea
+  /// para que la UI no quede bloqueada esperando un scraper que no existe.
+  static Future<void> clearStaleRunning(dynamic redis) async {
+    _inProcessCancel = false;
+    try { await redis.send_object(['DEL', _cancelKey]); } catch (_) {}
+    try {
+      final raw = await redis.send_object(['GET', _key]);
+      if (raw is String) {
+        final data = jsonDecode(raw) as Map<String, dynamic>;
+        if (data['running'] == true) {
+          data['running'] = false;
+          data['finished_at'] = DateTime.now().toUtc().toIso8601String();
+          data['error'] = 'Proceso reiniciado';
+          await redis.send_object(['SET', _key, jsonEncode(data), 'EX', '$_ttlSeconds']);
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> start() async {
     await _write(running: true);
   }

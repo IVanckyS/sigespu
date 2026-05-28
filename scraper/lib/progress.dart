@@ -30,7 +30,7 @@ class ScrapingCancelledException implements Exception {
 class ProgressTracker {
   static const _key = 'scraping:status';
   static const _cancelKey = 'scraping:cancel';
-  static const _ttlSeconds = 300; // tick() se llama cada ~20 filas — expira en 5 min si el scraper muere
+  static const _ttlSeconds = 1800; // 30 min; Nominatim puede ser lento entre ticks
 
   /// Marca el scraping en curso para que se detenga en el próximo checkpoint.
   /// El backend lo invoca desde POST /api/scraping/stop. Es idempotente.

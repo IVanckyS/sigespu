@@ -18,24 +18,37 @@ const _ua = 'SigespuLota/1.0 (+contacto@munilota.cl)';
 Future<void> scrapeOrganizaciones(
     Session db, dynamic redis, NominatimClient geocoder,
     {int? year, ProgressTracker? tracker}) async {
-  final y = year ?? DateTime.now().year;
-  await tracker?.stepStart(
-      fuente: 'organizaciones', label: 'Organizaciones $y');
+  int y = year ?? DateTime.now().year;
   print('[organizaciones] Iniciando — año=$y');
 
-  final indexUrl =
-      '$_base/index.php?action=plantillas_selec_archivo&ig=351&a=$y';
-  final indexBody = await _get(indexUrl);
+  var indexBody = await _get(
+      '$_base/index.php?action=plantillas_selec_archivo&ig=351&a=$y');
   if (indexBody == null) return;
 
-  final doc = html.parse(indexBody);
   // Los enlaces tienen la forma: ?action=plantillas_generar_plantilla&ig=351&m=X&a=YYYY&ia=XXXXX
-  final categoryAnchors = doc
+  List _parseAnchors(String body) => html.parse(body)
       .querySelectorAll('a[href]')
       .where((a) =>
           (a.attributes['href'] ?? '').contains('plantillas_generar_plantilla') &&
           (a.attributes['href'] ?? '').contains('ig=351'))
       .toList();
+
+  var categoryAnchors = _parseAnchors(indexBody);
+
+  // El municipio suele publicar los registros del año en curso con demora;
+  // si el índice de este año está vacío, intentar el año anterior.
+  if (categoryAnchors.isEmpty && year == null) {
+    final prevY = y - 1;
+    print('[organizaciones] Sin datos para $y — intentando $prevY');
+    final prevBody = await _get(
+        '$_base/index.php?action=plantillas_selec_archivo&ig=351&a=$prevY');
+    if (prevBody != null) {
+      y = prevY;
+      categoryAnchors = _parseAnchors(prevBody);
+    }
+  }
+
+  await tracker?.stepStart(fuente: 'organizaciones', label: 'Organizaciones $y');
 
   if (categoryAnchors.isEmpty) {
     print('[organizaciones] Sin categorías en el índice — abortando');

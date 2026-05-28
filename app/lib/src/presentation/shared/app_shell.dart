@@ -686,6 +686,8 @@ class _BrandLogo extends StatelessWidget {
           ),
         ],
       ),
+      const SizedBox(width: 10),
+      Image.asset('assets/icon/LOGOSEGURIDAD.png', height: 36, fit: BoxFit.contain),
     ]);
   }
 }

@@ -32,11 +32,14 @@ Router buildElementosRouter(DatabaseService db) {
 
     final rows = await db.db.execute(
       Sql.named(r'''
-        SELECT id, tipo, nombre, descripcion, direccion,
-               ST_X(geom) as lng, ST_Y(geom) as lat,
-               metadata, estado, origen, fuente_origen, created_by, created_at
-        FROM puntos_interes
-        ORDER BY created_at DESC
+        SELECT pi.id, pi.tipo, pi.nombre, pi.descripcion, pi.direccion,
+               ST_X(pi.geom) as lng, ST_Y(pi.geom) as lat,
+               pi.metadata, pi.estado, pi.origen, pi.fuente_origen,
+               pi.created_by, pi.created_at,
+               u.nombre AS created_by_nombre
+        FROM puntos_interes pi
+        LEFT JOIN usuarios u ON u.id = pi.created_by
+        ORDER BY pi.created_at DESC
         LIMIT @limit OFFSET @offset
       '''),
       parameters: {'limit': safeLimit, 'offset': safeOffset},
@@ -56,6 +59,7 @@ Router buildElementosRouter(DatabaseService db) {
       'fuente_origen': r[10],
       'created_by': r[11]?.toString(),
       'created_at': (r[12] as DateTime?)?.toIso8601String(),
+      'created_by_nombre': r[13] as String?,
     }).toList();
 
     return ok(items);

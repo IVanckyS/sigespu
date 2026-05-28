@@ -296,7 +296,7 @@ class UserElementsNotifier extends Notifier<List<ElementoMapa>> {
                 lng: p.lng,
                 estado: p.estado,
                 fecha: p.createdAt?.toIso8601String().substring(0, 10) ?? '',
-                by: p.createdBy ?? 'Sistema',
+                by: j['created_by_nombre'] as String? ?? p.createdBy ?? 'Sistema',
                 notas: p.descripcion ?? '',
                 capacidad: p.metadata?['capacidad'],
                 rut: p.metadata?['rut'],

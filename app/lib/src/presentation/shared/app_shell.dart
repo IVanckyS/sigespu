@@ -702,24 +702,37 @@ class _ModeSwitcher extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final actividadesCount = ref.watch(actividadesProvider.select((l) => l.length));
 
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(color: AppTheme.stone100, borderRadius: BorderRadius.circular(10)),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          _ModeBtn(label: 'Mapa',        icon: Icons.map_outlined,               route: '/map',         active: location == '/map'),
-          _ModeBtn(label: 'Resumen',     icon: Icons.dashboard_outlined,          route: '/resumen',     active: location == '/resumen'),
-          _ModeBtn(label: 'Tabla',       icon: Icons.grid_on_outlined,            route: '/tabla',       active: location == '/tabla'),
-          _ModeBtn(label: 'Scraping',    icon: Icons.download_for_offline_outlined, route: '/scraping',  active: location == '/scraping'),
-          _ModeBtn(label: 'Usuarios',    icon: Icons.people_outline,              route: '/users',       active: location == '/users'),
-          _ModeBtnBadged(
-            label: 'Actividades', icon: Icons.view_kanban_outlined,
-            route: '/actividades', active: location == '/actividades',
-            badge: '$actividadesCount',
-          ),
-        ]),
-      ),
+    return LayoutBuilder(
+      builder: (context, c) {
+        // Cada botón con etiqueta ocupa ~110px; sin etiqueta ~36px.
+        // Cuando el espacio disponible no alcanza para todos con texto,
+        // cambiamos a modo compacto (solo icono).
+        final iconOnly = c.maxWidth < 500;
+
+        return Container(
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+              color: AppTheme.stone100,
+              borderRadius: BorderRadius.circular(10)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            _ModeBtn(label: 'Mapa',     icon: Icons.map_outlined,
+                route: '/map',      active: location == '/map',      iconOnly: iconOnly),
+            _ModeBtn(label: 'Resumen',  icon: Icons.dashboard_outlined,
+                route: '/resumen',  active: location == '/resumen',  iconOnly: iconOnly),
+            _ModeBtn(label: 'Tabla',    icon: Icons.grid_on_outlined,
+                route: '/tabla',    active: location == '/tabla',    iconOnly: iconOnly),
+            _ModeBtn(label: 'Scraping', icon: Icons.download_for_offline_outlined,
+                route: '/scraping', active: location == '/scraping', iconOnly: iconOnly),
+            _ModeBtn(label: 'Usuarios', icon: Icons.people_outline,
+                route: '/users',    active: location == '/users',    iconOnly: iconOnly),
+            _ModeBtnBadged(
+              label: 'Actividades', icon: Icons.view_kanban_outlined,
+              route: '/actividades', active: location == '/actividades',
+              badge: '$actividadesCount', iconOnly: iconOnly,
+            ),
+          ]),
+        );
+      },
     );
   }
 }
@@ -729,7 +742,14 @@ class _ModeBtn extends StatefulWidget {
   final IconData icon;
   final String route;
   final bool active;
-  const _ModeBtn({required this.label, required this.icon, required this.route, required this.active});
+  final bool iconOnly;
+  const _ModeBtn({
+    required this.label,
+    required this.icon,
+    required this.route,
+    required this.active,
+    this.iconOnly = false,
+  });
 
   @override
   State<_ModeBtn> createState() => _ModeBtnState();
@@ -740,32 +760,43 @@ class _ModeBtnState extends State<_ModeBtn> {
 
   @override
   Widget build(BuildContext context) {
+    final ic = widget.active ? AppTheme.orange700 : AppTheme.stone600;
     return GestureDetector(
       onTap: () => context.go(widget.route),
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) => setState(() => _pressed = false),
       onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.95 : 1.0,
-        duration: const Duration(milliseconds: 80),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: widget.active ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(7),
-            boxShadow: widget.active
-                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 2, offset: const Offset(0, 1))]
-                : [],
+      child: Tooltip(
+        message: widget.iconOnly ? widget.label : '',
+        child: AnimatedScale(
+          scale: _pressed ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.iconOnly ? 10 : 14,
+              vertical: 7,
+            ),
+            decoration: BoxDecoration(
+              color: widget.active ? Colors.white : Colors.transparent,
+              borderRadius: BorderRadius.circular(7),
+              boxShadow: widget.active
+                  ? [BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1))]
+                  : [],
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(widget.icon, size: 15, color: ic),
+              if (!widget.iconOnly) ...[
+                const SizedBox(width: 6),
+                Text(widget.label, style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w500, color: ic,
+                )),
+              ],
+            ]),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(widget.icon, size: 15, color: widget.active ? AppTheme.orange700 : AppTheme.stone600),
-            const SizedBox(width: 6),
-            Text(widget.label, style: TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w500,
-              color: widget.active ? AppTheme.orange700 : AppTheme.stone600,
-            )),
-          ]),
         ),
       ),
     );
@@ -778,10 +809,11 @@ class _ModeBtnBadged extends StatefulWidget {
   final String route;
   final bool active;
   final String badge;
+  final bool iconOnly;
 
   const _ModeBtnBadged({
     required this.label, required this.icon, required this.route,
-    required this.active, required this.badge,
+    required this.active, required this.badge, this.iconOnly = false,
   });
 
   @override
@@ -793,44 +825,55 @@ class _ModeBtnBadgedState extends State<_ModeBtnBadged> {
 
   @override
   Widget build(BuildContext context) {
+    final ic = widget.active ? AppTheme.orange700 : AppTheme.stone600;
     return GestureDetector(
       onTap: () => context.go(widget.route),
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) => setState(() => _pressed = false),
       onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.95 : 1.0,
-        duration: const Duration(milliseconds: 80),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: widget.active ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(7),
-            boxShadow: widget.active
-                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 2, offset: const Offset(0, 1))]
-                : [],
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(widget.icon, size: 15, color: widget.active ? AppTheme.orange700 : AppTheme.stone600),
-            const SizedBox(width: 6),
-            Text(widget.label, style: TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w500,
-              color: widget.active ? AppTheme.orange700 : AppTheme.stone600,
-            )),
-            const SizedBox(width: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: widget.active ? AppTheme.orange100 : AppTheme.stone200,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(widget.badge, style: TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w700,
-                color: widget.active ? AppTheme.orange700 : AppTheme.stone500,
-              )),
+      child: Tooltip(
+        message: widget.iconOnly ? widget.label : '',
+        child: AnimatedScale(
+          scale: _pressed ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.iconOnly ? 10 : 14,
+              vertical: 7,
             ),
-          ]),
+            decoration: BoxDecoration(
+              color: widget.active ? Colors.white : Colors.transparent,
+              borderRadius: BorderRadius.circular(7),
+              boxShadow: widget.active
+                  ? [BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1))]
+                  : [],
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(widget.icon, size: 15, color: ic),
+              if (!widget.iconOnly) ...[
+                const SizedBox(width: 6),
+                Text(widget.label, style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w500, color: ic,
+                )),
+                const SizedBox(width: 5),
+              ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: widget.active ? AppTheme.orange100 : AppTheme.stone200,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(widget.badge, style: TextStyle(
+                  fontSize: 10, fontWeight: FontWeight.w700,
+                  color: widget.active ? AppTheme.orange700 : AppTheme.stone500,
+                )),
+              ),
+            ]),
+          ),
         ),
       ),
     );

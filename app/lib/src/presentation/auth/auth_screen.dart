@@ -183,83 +183,99 @@ class _DesktopLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Sello esquina superior izquierda
-        const Positioned(
-          left: 48,
-          top: 36,
-          child: _BrandMark(emblemSize: 44, primarySize: 13.5),
-        ),
-        // Nav derecha
-        const Positioned(
-          right: 48,
-          top: 40,
-          child: _TopRightStrip(),
-        ),
-        // Contenido
-        Padding(
-          padding: const EdgeInsets.fromLTRB(0, 100, 0, 40),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Columna izquierda — display
-              Expanded(
-                flex: 11,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(64, 40, 32, 40),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        // Escala el título: 46px en pantallas ~980px, 78px en ~1420px, máx 78px
+        final titleFs = (w * 0.055).clamp(42.0, 78.0);
+        // Logo proporcional al título
+        final logoH = (titleFs * 0.88).clamp(36.0, 68.0);
+        // Ancho máximo del card: acotado en pantallas grandes
+        final cardMaxW = (w * 0.22).clamp(320.0, 420.0);
+
+        return Stack(
+          children: [
+            const Positioned(
+              left: 48,
+              top: 36,
+              child: _BrandMark(emblemSize: 44, primarySize: 13.5),
+            ),
+            const Positioned(
+              right: 48,
+              top: 40,
+              child: _TopRightStrip(),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 100, 0, 40),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Columna izquierda — display
+                  Expanded(
+                    flex: 11,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(64, 40, 32, 40),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const _AccessLabel(),
-                          const SizedBox(width: 18),
-                          Image.asset(
-                            'assets/icon/seguridad logo naranjo.png',
-                            height: 44,
-                            fit: BoxFit.contain,
+                          const SizedBox(height: 16),
+                          // Logo al lado del título, proporcional
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: _DisplayTitle(
+                                    fontSize: titleFs, lineHeight: 0.95),
+                              ),
+                              const SizedBox(width: 24),
+                              Image.asset(
+                                'assets/icon/seguridad logo naranjo.png',
+                                height: logoH,
+                                fit: BoxFit.contain,
+                              ),
+                            ],
                           ),
+                          const SizedBox(height: 24),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 460),
+                            child: _Acronym(
+                                fontSize: (w * 0.011).clamp(11.0, 15.0)),
+                          ),
+                          const Spacer(),
+                          const _CoordsFooter(monoSize: 11),
                         ],
-                      ),
-                      const SizedBox(height: 24),
-                      const _DisplayTitle(fontSize: 78, lineHeight: 0.95),
-                      const SizedBox(height: 24),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 460),
-                        child: const _Acronym(fontSize: 15),
-                      ),
-                      const Spacer(),
-                      const _CoordsFooter(monoSize: 11),
-                    ],
-                  ),
-                ),
-              ),
-              // Columna derecha — card (scrollable para que el checkbox de TU/PP
-              // no quede cortado cuando el formulario de registro es más alto
-              // que el viewport)
-              Expanded(
-                flex: 10,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 40),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 400),
-                        child: _LoginCard(state: state, authState: authState, compact: false),
                       ),
                     ),
                   ),
-                ),
+                  // Columna derecha — card
+                  Expanded(
+                    flex: 10,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: Center(
+                        child: Padding(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 40),
+                          child: ConstrainedBox(
+                            constraints:
+                                BoxConstraints(maxWidth: cardMaxW),
+                            child: _LoginCard(
+                                state: state,
+                                authState: authState,
+                                compact: false),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -296,21 +312,22 @@ class _MobileLayout extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const _AccessLabel(),
+                  const SizedBox(height: 10),
                   Row(
-                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const _AccessLabel(),
-                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: _DisplayTitle(fontSize: 44, lineHeight: 0.95),
+                      ),
+                      const SizedBox(width: 12),
                       Image.asset(
                         'assets/icon/seguridad logo naranjo.png',
-                        height: 32,
+                        height: 40,
                         fit: BoxFit.contain,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  const _DisplayTitle(fontSize: 44, lineHeight: 0.95),
                   const SizedBox(height: 14),
                   const _Acronym(fontSize: 12),
                 ],

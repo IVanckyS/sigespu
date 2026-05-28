@@ -114,6 +114,10 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
   DatoPermiso? _focusedPermiso;
   DatoOrganizacion? _focusedOrg;
 
+  // Oculta el progress strip inmediatamente al pulsar Detener, sin esperar al
+  // siguiente poll de status (que puede tardar ~1s y puede tener race conditions).
+  bool _stopRequested = false;
+
   // Cache de listas por frame.
   List<DatoPatente> _srcPatentes = const [];
   List<DatoPermiso> _srcPermisos = const [];
@@ -326,12 +330,17 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
     ref.listen<AsyncValue<ScrapingStatus>>(scrapingStatusProvider, (prev, next) {
       final wasRunning = prev?.value?.running ?? false;
       final isRunning = next.value?.running ?? false;
+      if (!isRunning) {
+        // Confirmar que el backend terminó → resetear flag local
+        if (_stopRequested && mounted) setState(() => _stopRequested = false);
+      }
       if (wasRunning && !isRunning) {
         ref.read(scrapingControllerProvider).refreshAll();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Scraping completado.')),
-          );
+        if (mounted && !_stopRequested) {
+          // Solo mostrar "Scraping completado" si NO fue cancelado manualmente
+          final error = next.value?.error;
+          final msg = error != null ? 'Cancelado: $error' : 'Scraping completado.';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
         }
       }
     });
@@ -360,6 +369,7 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
           'La operación puede demorar entre 1 y 3 minutos.\n\n¿Continuar?',
     );
     if (confirm != true || !mounted) return;
+    setState(() => _stopRequested = false);
     final res = await ref.read(scrapingControllerProvider).runActual();
     if (!mounted) return;
     if (!res.ok) {
@@ -394,9 +404,14 @@ class _ScrapingScreenState extends ConsumerState<ScrapingScreen> {
     if (confirm != true || !mounted) return;
     final res = await ref.read(scrapingControllerProvider).stop();
     if (!mounted) return;
+    if (res.ok) {
+      // Ocultar el strip de progreso inmediatamente sin esperar el siguiente poll.
+      setState(() => _stopRequested = true);
+      ref.read(scrapingControllerProvider).refreshAll();
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(
-        res.ok ? 'Solicitud de detención enviada' : (res.error ?? 'No se pudo detener'),
+        res.ok ? 'Cancelación solicitada' : (res.error ?? 'No se pudo detener'),
       )),
     );
   }
@@ -509,7 +524,7 @@ class _DesktopLayout extends StatelessWidget {
       color: _T.s100,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _SubHeader(state: state, status: status, activeLabel: activeMeta.label, totalRegs: state._activeCount),
-        if (status.running) _ProgressStrip(status: status, onCancel: state._stopScraping),
+        if (status.running && !state._stopRequested) _ProgressStrip(status: status, onCancel: state._stopScraping),
         Expanded(
           child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             _Sidebar(state: state),
@@ -569,7 +584,7 @@ class _SubHeader extends StatelessWidget {
               style: const TextStyle(fontSize: 10.5, color: _T.s500, letterSpacing: 0.2)),
         ]),
         const Spacer(),
-        if (status.running)
+        if (status.running && !state._stopRequested)
           _LiveScrapingPill(step: status.step, total: status.totalSteps)
         else
           _SubHeaderBtn(icon: LucideIcons.refreshCw, label: 'Scrappear', primary: true, onTap: state._scrapeNow),
@@ -2355,7 +2370,7 @@ class _MobileLayout extends StatelessWidget {
       color: Colors.white,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _MobileAppHeader(state: state, status: status),
-        if (status.running) _ProgressStrip(status: status, onCancel: state._stopScraping),
+        if (status.running && !state._stopRequested) _ProgressStrip(status: status, onCancel: state._stopScraping),
         _MobileKpiStrip(state: state),
         _MobileSegmented(state: state),
         _MobileFilterBar(state: state, filteredCount: filteredCount, totalCount: state._activeCount),
@@ -2441,7 +2456,7 @@ class _MobileAppHeader extends StatelessWidget {
             Text('hoy · 03:00 AM',
                 style: GoogleFonts.jetBrainsMono(fontSize: 10, color: _T.s600)),
             const Spacer(),
-            if (status.running)
+            if (status.running && !state._stopRequested)
               InkWell(
                 onTap: state._stopScraping,
                 borderRadius: BorderRadius.circular(6),

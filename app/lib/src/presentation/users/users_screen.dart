@@ -17,6 +17,7 @@ class UsersScreen extends ConsumerStatefulWidget {
 class _UsersScreenState extends ConsumerState<UsersScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tab;
+  bool _bannerCollapsed = false;
 
   @override
   void initState() {
@@ -32,12 +33,24 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Header card ────────────────────────────────────────────
-        _UsersHeader(),
-        // ── Tab bar ────────────────────────────────────────────────
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        final collapsed = n.metrics.pixels > 40;
+        if (collapsed != _bannerCollapsed) {
+          setState(() => _bannerCollapsed = collapsed);
+        }
+        return false;
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header card ────────────────────────────────────────────
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            child: _bannerCollapsed ? const SizedBox.shrink() : _UsersHeader(),
+          ),
+          // ── Tab bar ────────────────────────────────────────────────
         Container(
           color: Colors.white,
           child: Column(children: [
@@ -112,7 +125,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
           ),
         ),
       ],
-    );
+    ),
+  );
   }
 }
 

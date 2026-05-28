@@ -32,6 +32,7 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
   bool _filtersExpanded = false;
   ElementoMapa? _selected;
   final _datePopupCtrl = DateRangePopupController(LayerLink());
+  bool _bannerCollapsed = false;
 
   /// Cache de la última lista filtrada+ordenada. Se invalida explícitamente
   /// en los setters de filtro para evitar recomputar en rebuilds de hover.
@@ -183,19 +184,37 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
     final allElements = ref.watch(allElementsProvider);
     final filtered = _filtered;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 768;
-        final isCompact = constraints.maxWidth < 1100;
-        final showDetailInline = !isCompact && _selected != null;
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        final collapsed = n.metrics.pixels > 40;
+        if (collapsed != _bannerCollapsed) {
+          setState(() => _bannerCollapsed = collapsed);
+        }
+        return false;
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 768;
+          final isCompact = constraints.maxWidth < 1100;
+          final showDetailInline = !isCompact && _selected != null;
 
-        return Padding(
-          padding: EdgeInsets.all(isMobile ? 12 : 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _TablaBanner(allElements: allElements),
-              const SizedBox(height: 16),
+          return Padding(
+            padding: EdgeInsets.all(isMobile ? 12 : 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  child: _bannerCollapsed
+                      ? const SizedBox.shrink()
+                      : _TablaBanner(allElements: allElements),
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  child: SizedBox(height: _bannerCollapsed ? 0 : 16),
+                ),
 
               // Filtros
               if (!isMobile)
@@ -299,7 +318,8 @@ class _TablaScreenState extends ConsumerState<TablaScreen> {
           ),
         );
       },
-    );
+    ),
+  );
   }
 }
 

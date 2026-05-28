@@ -212,14 +212,18 @@ class _DesktopLayout extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Image.asset(
-                        'assets/icon/seguridad logo naranjo.png',
-                        height: 56,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.centerLeft,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const _AccessLabel(),
+                          const Spacer(),
+                          Image.asset(
+                            'assets/icon/seguridad logo naranjo.png',
+                            height: 48,
+                            fit: BoxFit.contain,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 22),
-                      const _AccessLabel(),
                       const SizedBox(height: 24),
                       const _DisplayTitle(fontSize: 78, lineHeight: 0.95),
                       const SizedBox(height: 24),
@@ -291,14 +295,18 @@ class _MobileLayout extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Image.asset(
-                    'assets/icon/seguridad logo naranjo.png',
-                    height: 44,
-                    fit: BoxFit.contain,
-                    alignment: Alignment.centerLeft,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const _AccessLabel(),
+                      const Spacer(),
+                      Image.asset(
+                        'assets/icon/seguridad logo naranjo.png',
+                        height: 36,
+                        fit: BoxFit.contain,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 14),
-                  const _AccessLabel(),
                   const SizedBox(height: 14),
                   const _DisplayTitle(fontSize: 44, lineHeight: 0.95),
                   const SizedBox(height: 14),

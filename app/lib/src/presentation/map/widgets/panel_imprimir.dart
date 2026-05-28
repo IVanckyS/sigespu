@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -141,6 +142,13 @@ class _PanelImprimirState extends ConsumerState<PanelImprimir> {
       if (byteData == null) return;
       final pngBytes = byteData.buffer.asUint8List();
 
+      // Logo Seguridad Pública
+      pw.ImageProvider? logoImage;
+      try {
+        final data = await rootBundle.load('assets/icon/seguridad logo naranjo.png');
+        logoImage = pw.MemoryImage(data.buffer.asUint8List());
+      } catch (_) {}
+
       final activeLayers = ref.read(activeLayersProvider);
       final sismosVisible = ref.read(sismosVisibleProvider);
 
@@ -202,9 +210,9 @@ class _PanelImprimirState extends ConsumerState<PanelImprimir> {
                   borderRadius: pw.BorderRadius.circular(6),
                 ),
                 child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: pw.CrossAxisAlignment.center,
                   children: [
+                    // Título izquierda
                     pw.Expanded(
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -228,6 +236,17 @@ class _PanelImprimirState extends ConsumerState<PanelImprimir> {
                         ],
                       ),
                     ),
+                    // Logo centrado
+                    if (logoImage != null) ...[
+                      pw.SizedBox(width: 14),
+                      pw.SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                      ),
+                      pw.SizedBox(width: 14),
+                    ],
+                    // Bloque institucional derecha
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [

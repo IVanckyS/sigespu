@@ -213,7 +213,7 @@ class _DesktopLayout extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Image.asset(
-                        'assets/icon/LOGOSEGURIDAD.png',
+                        'assets/icon/seguridad logo naranjo.png',
                         height: 56,
                         fit: BoxFit.contain,
                         alignment: Alignment.centerLeft,
@@ -292,7 +292,7 @@ class _MobileLayout extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Image.asset(
-                    'assets/icon/LOGOSEGURIDAD.png',
+                    'assets/icon/seguridad logo naranjo.png',
                     height: 44,
                     fit: BoxFit.contain,
                     alignment: Alignment.centerLeft,

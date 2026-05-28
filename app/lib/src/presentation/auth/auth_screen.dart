@@ -188,8 +188,8 @@ class _DesktopLayout extends StatelessWidget {
         final w = c.maxWidth;
         // Escala el título: 46px en pantallas ~980px, 78px en ~1420px, máx 78px
         final titleFs = (w * 0.055).clamp(42.0, 78.0);
-        // Logo proporcional al título
-        final logoH = (titleFs * 0.88).clamp(36.0, 68.0);
+        // Logo proporcional al bloque completo del título (3 líneas ≈ titleFs × 2.9)
+        final logoH = (titleFs * 2.0).clamp(80.0, 160.0);
         // Ancho máximo del card: acotado en pantallas grandes
         final cardMaxW = (w * 0.22).clamp(320.0, 420.0);
 

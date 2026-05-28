@@ -213,13 +213,14 @@ class _DesktopLayout extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           const _AccessLabel(),
-                          const Spacer(),
+                          const SizedBox(width: 18),
                           Image.asset(
                             'assets/icon/seguridad logo naranjo.png',
-                            height: 48,
+                            height: 44,
                             fit: BoxFit.contain,
                           ),
                         ],
@@ -296,13 +297,14 @@ class _MobileLayout extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const _AccessLabel(),
-                      const Spacer(),
+                      const SizedBox(width: 14),
                       Image.asset(
                         'assets/icon/seguridad logo naranjo.png',
-                        height: 36,
+                        height: 32,
                         fit: BoxFit.contain,
                       ),
                     ],

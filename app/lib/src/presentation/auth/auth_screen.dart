@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'auth_provider.dart';
 import 'forgot_password_screen.dart';
 import 'verification_screen.dart';
+import '../legal/legal_screen.dart';
 
 /// SIGESPU · Login — Cream Editorial
 ///
@@ -56,6 +57,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   bool _rememberMe = false;
+  bool _termsAccepted = false;
 
   static const _allowedDomains = ['lota.cl', 'munilota.cl'];
 
@@ -103,6 +105,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             _nombreCtrl.text.trim(),
             _emailCtrl.text.trim(),
             _passwordCtrl.text,
+            termsAccepted: _termsAccepted,
           );
     } else {
       ref.read(authProvider.notifier).login(
@@ -118,8 +121,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       _isRegisterMode = !_isRegisterMode;
       _confirmCtrl.clear();
       _nombreCtrl.clear();
+      _termsAccepted = false;
     });
   }
+
+  void toggleTerms() => setState(() => _termsAccepted = !_termsAccepted);
 
   void togglePass() => setState(() => _obscurePass = !_obscurePass);
   void toggleConfirm() => setState(() => _obscureConfirm = !_obscureConfirm);
@@ -691,6 +697,12 @@ class _LoginCard extends StatelessWidget {
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => state._submit(),
                   ),
+                  const SizedBox(height: 14),
+                  _TermsCheckboxRow(
+                    value: state._termsAccepted,
+                    onTap: state.toggleTerms,
+                    compact: compact,
+                  ),
                 ],
 
                 if (!isRegister) ...[
@@ -773,7 +785,9 @@ class _LoginCard extends StatelessWidget {
                 _PrimaryButton(
                   label: isRegister ? 'Crear cuenta' : 'Iniciar sesión',
                   loading: isLoading,
-                  onPressed: isLoading ? null : state._submit,
+                  onPressed: (isLoading || (isRegister && !state._termsAccepted))
+                      ? null
+                      : state._submit,
                 ),
 
                 // Acceso sin conexión (solo móvil + solo en login)
@@ -1406,4 +1420,110 @@ class _EmblemPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_EmblemPainter oldDelegate) => false;
+}
+
+// ── Checkbox Términos ────────────────────────────────────────────────────────
+
+class _TermsCheckboxRow extends StatelessWidget {
+  final bool value;
+  final VoidCallback onTap;
+  final bool compact;
+  const _TermsCheckboxRow({
+    required this.value,
+    required this.onTap,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: Checkbox(
+                value: value,
+                onChanged: (_) => onTap(),
+                activeColor: _C.accent,
+                checkColor: Colors.white,
+                side: const BorderSide(color: _C.cardBorder, width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    fontSize: compact ? 11.5 : 12.5,
+                    color: _C.muted,
+                    height: 1.45,
+                  ),
+                  children: [
+                    const TextSpan(text: 'He leído y acepto los '),
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.baseline,
+                      baseline: TextBaseline.alphabetic,
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const LegalTextScreen(
+                              tipo: TipoLegal.terminos,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          'Términos de Uso',
+                          style: TextStyle(
+                            fontSize: compact ? 11.5 : 12.5,
+                            color: _C.terracota,
+                            fontWeight: FontWeight.w600,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const TextSpan(text: ' y la '),
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.baseline,
+                      baseline: TextBaseline.alphabetic,
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const LegalTextScreen(
+                              tipo: TipoLegal.privacidad,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          'Política de Privacidad',
+                          style: TextStyle(
+                            fontSize: compact ? 11.5 : 12.5,
+                            color: _C.terracota,
+                            fontWeight: FontWeight.w600,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const TextSpan(text: ' de SIGESPU Lota.'),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

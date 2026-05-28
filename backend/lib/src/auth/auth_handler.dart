@@ -40,6 +40,8 @@ class AuthHandler {
     directorRouter.get('/solicitudes', _listarSolicitudes);
     directorRouter.put('/solicitudes/<id>', _resolverSolicitud);
     directorRouter.get('/usuarios', _listarUsuarios);
+    directorRouter.post('/usuarios', _crearUsuario);
+    directorRouter.patch('/usuarios/<id>/password', _cambiarPasswordUsuario);
 
     // Mount protected routers
     router.mount('/', Pipeline()
@@ -465,6 +467,135 @@ class AuthHandler {
       );
     } catch (e) {
       print('[auth] Error en /usuarios: $e');
+      return Response.internalServerError(body: jsonEncode({'error': 'Error de servidor'}));
+    }
+  }
+
+  Future<Response> _crearUsuario(Request req) async {
+    final body = await req.readAsString();
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
+
+    final emailRaw = data['email'] as String?;
+    final nombre = data['nombre'] as String?;
+    final password = data['password'] as String?;
+    final nivelAcceso = data['nivel_acceso'] as String? ?? 'visitante';
+    final unidad = data['unidad'] as String?;
+    final cargo = data['cargo'] as String?;
+
+    if (emailRaw == null || nombre == null || password == null) {
+      return Response.badRequest(
+          body: jsonEncode({'error': 'Faltan campos requeridos: email, nombre, password'}));
+    }
+
+    if (password.length < 8) {
+      return Response.badRequest(
+          body: jsonEncode({'error': 'La contraseña debe tener al menos 8 caracteres'}));
+    }
+
+    final email = emailRaw.trim().toLowerCase();
+    final domainParts = email.split('@');
+    if (domainParts.length != 2 || !allowedDomains.contains(domainParts.last)) {
+      return Response.forbidden(
+          jsonEncode({'error': 'Solo emails @lota.cl o @munilota.cl están permitidos'}));
+    }
+
+    if (!['visitante', 'operativo', 'director'].contains(nivelAcceso)) {
+      return Response.badRequest(body: jsonEncode({'error': 'nivel_acceso inválido'}));
+    }
+
+    final hash = BCrypt.hashpw(password, BCrypt.gensalt(logRounds: 12));
+
+    try {
+      final result = await _dbService.db.execute(
+        Sql.named('''
+          INSERT INTO usuarios (
+            email, nombre, password_hash, nivel_acceso, activo,
+            solicitud_cargo, solicitud_direccion_municipal, terms_accepted_at
+          ) VALUES (
+            @email, @nombre, @hash, @nivel, true,
+            @cargo, @unidad, NOW()
+          )
+          RETURNING id, email, nombre, nivel_acceso, activo
+        '''),
+        parameters: {
+          'email': email,
+          'nombre': nombre,
+          'hash': hash,
+          'nivel': nivelAcceso,
+          'cargo': cargo,
+          'unidad': unidad,
+        },
+      );
+
+      final row = result.first;
+      final nivel = row[3] as String;
+      return Response(
+        201,
+        body: jsonEncode({
+          'id': (row[0] as Object).toString(),
+          'email': row[1] as String,
+          'nombre': row[2] as String,
+          'nivel_acceso': nivel,
+          'activo': row[4] as bool,
+          'unidad': unidad ??
+              switch (nivel) {
+                'director' => 'Dir. Seguridad Pública',
+                'operativo' => 'Inspección',
+                _ => 'Municipal',
+              },
+          'cargo': cargo,
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      if (e.toString().contains('usuarios_email_key')) {
+        return Response(409, body: jsonEncode({'error': 'El email ya está registrado'}));
+      }
+      print('[auth] Error en POST /usuarios: $e');
+      return Response.internalServerError(body: jsonEncode({'error': 'Error de servidor'}));
+    }
+  }
+
+  Future<Response> _cambiarPasswordUsuario(Request req, String id) async {
+    final body = await req.readAsString();
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } on FormatException {
+      return Response.badRequest(body: jsonEncode({'error': 'JSON inválido'}));
+    }
+
+    final password = data['password'] as String?;
+    if (password == null || password.length < 8) {
+      return Response.badRequest(
+          body: jsonEncode({'error': 'La contraseña debe tener al menos 8 caracteres'}));
+    }
+
+    final hash = BCrypt.hashpw(password, BCrypt.gensalt(logRounds: 12));
+
+    try {
+      final result = await _dbService.db.execute(
+        Sql.named('''
+          UPDATE usuarios SET password_hash = @hash, updated_at = NOW()
+          WHERE id = @id
+          RETURNING id
+        '''),
+        parameters: {'id': id, 'hash': hash},
+      );
+
+      if (result.isEmpty) {
+        return Response.notFound(jsonEncode({'error': 'Usuario no encontrado'}));
+      }
+
+      return Response.ok(jsonEncode({'message': 'Contraseña actualizada'}),
+          headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      print('[auth] Error en PATCH /usuarios/$id/password: $e');
       return Response.internalServerError(body: jsonEncode({'error': 'Error de servidor'}));
     }
   }

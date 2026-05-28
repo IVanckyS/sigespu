@@ -282,11 +282,11 @@ class UsersNotifier extends AsyncNotifier<List<UsuarioItem>> {
       );
     }
 
-    // Intentar registro en backend (silencioso si falla)
+    // Crear en backend
     try {
       final storage = ref.read(secureStorageProvider);
       final token = await storage.read(key: 'access_token');
-      await http
+      final response = await http
           .post(
             Uri.parse('$_baseUrl/usuarios'),
             headers: {
@@ -300,30 +300,38 @@ class UsersNotifier extends AsyncNotifier<List<UsuarioItem>> {
               'nivel_acceso': rol,
               'unidad': unidad,
               if (cargo != null) 'cargo': cargo,
-              if (rut != null) 'rut': rut,
             }),
           )
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final serverUser = jsonDecode(response.body) as Map<String, dynamic>;
+        final nuevo = UsuarioItem(
+          id: serverUser['id'] as String,
+          email: serverUser['email'] as String? ?? emailNorm,
+          nombre: serverUser['nombre'] as String? ?? nombre.trim(),
+          nivelAcceso: serverUser['nivel_acceso'] as String? ?? rol,
+          unidad: serverUser['unidad'] as String? ?? unidad,
+          cargo: serverUser['cargo'] as String? ?? cargo,
+          rut: rut,
+          activo: serverUser['activo'] as bool? ?? true,
+        );
+        final next = [...current, nuevo];
+        state = AsyncData(next);
+        return (ok: true, error: null);
+      }
+
+      // HTTP 4xx/5xx — extract backend error message
+      try {
+        final err = jsonDecode(response.body) as Map<String, dynamic>;
+        return (ok: false, error: err['error'] as String? ?? 'Error al crear usuario');
+      } catch (_) {
+        return (ok: false, error: 'Error al crear usuario (${response.statusCode})');
+      }
     } catch (e) {
       if (kDebugMode) debugPrint('[users] backend create: $e');
+      return (ok: false, error: 'No se pudo conectar con el servidor. Verifica tu conexión.');
     }
-
-    // Persistir local sí o sí (offline-first)
-    final nuevo = UsuarioItem(
-      id: 'local-${DateTime.now().millisecondsSinceEpoch}',
-      email: emailNorm,
-      nombre: nombre.trim(),
-      nivelAcceso: rol,
-      unidad: unidad,
-      cargo: cargo,
-      rut: rut,
-      activo: true,
-      ultimaSesion: null,
-    );
-    final next = [...current, nuevo];
-    state = AsyncData(next);
-    await _saveLocal(next);
-    return (ok: true, error: null);
   }
 
   Future<void> editar(
